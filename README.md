@@ -1,112 +1,107 @@
 # Green Media AI Command Center
 
-Manage 100+ local-business clients from one dashboard: Google Business Profile, AI review replies, AI content for every social platform, creative sizing, SEO, analytics and monthly client reports. It's built from the *Green Media AI Command Center Blueprint V1* as a competitor to Dhanda AI.
+Manage 100+ local-business clients from one place: Google Business Profile, AI review replies, AI content for every social platform, creative sizing, SEO, analytics and monthly client reports. It's built from the *Green Media AI Command Center Blueprint V1* as a competitor to Dhanda AI.
 
-**One codebase, every platform:**
+## Architecture
 
-| Platform | Shell | Output |
+```
+┌──────────────────────┐   ┌────────────────────────────┐
+│ Django web frontend  │   │ Flutter app                │
+│ web/  (desktop +     │   │ mobile/  iOS + Android     │
+│ mobile browsers)     │   │                            │
+└──────────┬───────────┘   └─────────────┬──────────────┘
+           │  server-to-server JSON + JWT │  HTTPS JSON + JWT
+           └──────────────┬───────────────┘
+                 ┌────────▼─────────┐
+                 │ FastAPI backend  │  backend/
+                 │ auth · RBAC ·    │  every business rule lives here
+                 │ tenancy · AI ·   │
+                 │ workflows · audit│
+                 └────────┬─────────┘
+          SQLite (dev) / PostgreSQL (prod) · Anthropic or OpenAI · Google / Meta / LinkedIn APIs
+```
+
+| Part | Stack | What it does |
 |---|---|---|
-| iOS (iPhone / iPad) | Capacitor 8 (`ios/`, Swift Package Manager) | Xcode project → App Store |
-| Android | Capacitor 8 (`android/`) | APK / AAB → Play Store |
-| Desktop (Windows, macOS, Linux) | Electron (`electron/`) | `.exe`, `.dmg`, `.AppImage`, `.deb` |
-| Web / PWA | Vite | static `dist/` |
+| `backend/` | FastAPI, SQLAlchemy 2, PyJWT, bcrypt, httpx | The only component with a database. Handles auth, roles, multi-tenant isolation, the review, content and report workflows, AI orchestration, publishing and the audit log. |
+| `web/` | Django 5 templates (no database) | Browser app for the agency team and client portal. Every page renders from the API. The user's token lives in a signed, HttpOnly session cookie. |
+| `mobile/` | Flutter 3 (Material 3) | Native iOS and Android app. The token is stored in the Keychain / Android Keystore. |
 
-The UI adapts to the device. Phones get a bottom tab bar, a "More" sheet, cards in place of tables, and iOS safe-area insets. Desktops and tablets get a full sidebar. Light and dark themes are both included.
+The frontends hold no business logic, so a rule like "2★ replies need approval" is enforced once, on the server, for web and mobile alike.
 
-## What's in the MVP
+## Features (blueprint Phase 1–2)
 
-The MVP covers blueprint Phases 1–2 and part of Phase 3.
+- **Roles.** Admin, Account Manager, SEO, Content, Designer and Client each see different sections and actions. Client-portal users are isolated to their own company.
+- **Dashboard.** KPI cards, a 30-day growth chart, a "needs attention" list (negative reviews and SEO drops) and client performance.
+- **Clients.** Search and filter clients. Each client workspace shows accounts, brand voice, **auto-publish switches per channel**, keywords, reviews, content, tasks, reports and notes.
+- **GMB Center.** Connection health, sync, insights and posts.
+- **AI Review Queue.** Each review goes through sentiment and language detection, then an AI draft. You can then edit, regenerate, approve, reject or publish. **Replies to reviews of 2★ or lower must be approved first.** Editing a reply resets its approval. A failed publish is marked `failed` and can be retried.
+- **AI Content Studio.** A topic becomes master copy, variants for each platform (GMB, Facebook, Instagram, LinkedIn, YouTube, X) and a creative brief. Content then moves draft → in review → scheduled → published, and can optionally require client approval.
+- **Creative Studio** (web). One master image previewed at 6 platform sizes, each exportable as a PNG.
+- **Social Hub.** Monthly calendar, publishing queue, and reconnect prompts for expired tokens.
+- **SEO Center.** Rank tracking, the biggest movers, GSC/GA4 traffic and technical tasks.
+- **Analytics.** GMB, website, social and leads data over 7, 30 or 45 days.
+- **Reports.** AI monthly narrative, KPI comparison and ranking movement. Deliver as PDF (print), email or WhatsApp.
+- **Tasks and audit trail.** Every write action is logged with who, what and when.
 
-- **Login and role-based access.** Roles are Admin, Account Manager, SEO, Content, Designer and Client. Client-portal users only ever see their own company.
-- **Master dashboard.** Shows KPI cards, a 30-day growth chart, a "needs attention" list (negative reviews and SEO drops) and a client performance table.
-- **Clients.** Search and filter the client list. Each client has a workspace with profile, connected accounts, AI brand voice, publishing-safety switches, keywords, reviews, calendar, tasks, reports and notes.
-- **GMB Center.** Shows connection health, sync, insights, customer actions, posts, offers and reviews.
-- **AI Review Queue.** Each review goes through sentiment and language detection, then an AI draft. You can then edit, regenerate, reject, approve or publish. Replies to reviews rated 2 stars or lower must be approved before they can be published.
-- **AI Content Studio.** You enter a topic, the AI writes master copy and a variant for each platform (GMB, Facebook, Instagram, LinkedIn, YouTube, X) plus a creative brief. The content then goes through approval, scheduling and publishing.
-- **Creative Studio.** Upload one master image and preview it at 6 platform sizes (4:5, 1:1, 9:16, 4:3, 1.91:1, 16:9). Each size exports as a PNG.
-- **Social Hub.** A unified monthly calendar, a publishing queue with retry for failed posts, and health checks for connected accounts (expired tokens are flagged).
-- **SEO Center.** Tracked keywords with current and previous rank, the biggest movers, GSC clicks, GA4 organic sessions and technical tasks.
-- **Analytics.** GMB, website, social and leads data over 7, 30 or 45 days, for one client or all of them.
-- **Reports.** AI monthly summary, KPI comparison and ranking movement. Save as PDF (print), or send by email or WhatsApp.
-- **Team and Tasks.** A kanban board with assignees, priorities and due dates, plus an **audit trail** of every action.
-- **Settings.** API server, notifications, client-approval mode, theme, integrations list and the permission matrix.
+**Safety defaults:** everything requires human approval. Auto-publish is an explicit setting per client and per channel.
 
-**Safety defaults (from the blueprint):** everything needs human approval. Auto-publish is an explicit setting per client and per channel. Failed publications are shown clearly.
-
-## Quick start
+## Run it locally
 
 ```bash
-npm install
-npm run dev            # web at http://localhost:5173
+# 1. API  → http://127.0.0.1:8001  (interactive docs at /docs)
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env            # optional: add ANTHROPIC_API_KEY or OPENAI_API_KEY
+uvicorn app.main:app --reload --port 8001
+
+# 2. Web  → http://127.0.0.1:8000
+cd web
+pip install -r requirements.txt
+API_URL=http://127.0.0.1:8001 python manage.py runserver 8000
+
+# 3. Mobile (Android emulator reaches your machine at 10.0.2.2; iOS simulator at 127.0.0.1)
+cd mobile
+flutter pub get
+flutter run                                              # picks a connected device/emulator
+flutter run --dart-define=API_URL=https://api.yourdomain  # point at a deployed API
 ```
 
-Sign in with any demo account on the login screen; any password works in demo mode. The app ships with 24 sample clients and 90 days of metrics, so it runs fully offline with template-based AI.
+Sign in with any demo account; the password is `demo1234`. The login screens have one-tap buttons for each role. The API seeds 24 sample clients with 90 days of metrics on first start (`SEED_DEMO=1`). Run `python -m app.seed --reset` to reset them.
 
-### Real AI
+**AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `ANTHROPIC_API_KEY` (or `AI_PROVIDER=openai` plus `OPENAI_API_KEY`) on the API server to switch to real model output. Keys never ship inside the apps.
 
-AI keys stay on the server and are never bundled into the mobile or desktop apps.
+## Tests
 
 ```bash
-cp .env.example .env    # set ANTHROPIC_API_KEY (or AI_PROVIDER=openai + OPENAI_API_KEY)
-npm run server          # http://localhost:8787
+cd backend && pytest -q          # 14 tests: permissions, tenant isolation, escalation, state machines, publish failures
+cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```
 
-Then open **Settings → API server URL** in the app, enter the server address, and click **Test connection**. Review replies, content and reports will now come from the model. If the server can't be reached, the app falls back to templates.
+The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
 
-> iOS and Android block plain `http://` requests. For devices, deploy the server behind HTTPS and add that origin to `CORS_ORIGINS`.
-
-## Building the apps
-
-### Desktop
+## Building the mobile apps
 
 ```bash
-npm run desktop:dev     # Electron + hot reload
-npm run desktop         # run the production build in Electron
-npm run desktop:dist    # installers in release/ (build each OS on that OS)
+cd mobile
+flutter build apk --release --dart-define=API_URL=https://api.yourdomain      # Android
+flutter build appbundle --release --dart-define=API_URL=https://api.yourdomain # Play Store
+flutter build ipa --release --dart-define=API_URL=https://api.yourdomain       # iOS (on a Mac, with your Apple team)
 ```
 
-### Android
+Release builds only talk to HTTPS APIs. Plain `http://` is allowed only in Android debug builds and for localhost/LAN on iOS.
 
-This needs Android Studio and JDK 21.
+**CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK** and an unsigned **iOS build**, which you can download from the run's Artifacts. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
 
-```bash
-npm run android         # build web → cap sync → open Android Studio → Run
-# or: npm run cap:sync && cd android && ./gradlew assembleDebug
-```
+## Deploying
 
-### iOS
-
-This needs macOS with Xcode 16 or later.
-
-```bash
-npm run ios             # build web → cap sync → open Xcode → pick a team → Run
-```
-
-After any web change, run `npm run cap:sync` to copy the new build into the native projects.
-
-### CI
-
-`.github/workflows/build.yml` builds the web bundle, an Android debug APK, an iOS simulator build, and Windows, macOS and Linux desktop installers on every push. You can download the results from the run's **Artifacts**. Store releases still need your signing keys: an Android keystore, an Apple team, and Windows/macOS code-signing certificates.
-
-## Project layout
-
-```
-src/
-  data/        types (mirror the DB), seed data, store (offline, localStorage), client scoping
-  lib/         ai client (server → template fallback), permissions (RBAC), sentiment, platform bridge
-  components/  layout (sidebar ↔ tab bar), icons, UI kit and charts
-  pages/       one file per blueprint screen
-server/        zero-dependency Node API: /api/health, /api/ai/review-reply, /api/ai/content, /api/ai/report
-db/schema.sql  multi-tenant PostgreSQL schema (blueprint §4) with row-level security
-electron/      desktop main process and preload
-android/ ios/  Capacitor native projects
-```
+- **API:** `uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4` behind HTTPS. Set `DATABASE_URL` to PostgreSQL, a strong `JWT_SECRET`, and `SEED_DEMO=0`.
+- **Web:** `python manage.py collectstatic && gunicorn greenmedia_web.wsgi`. Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` and `API_URL`. Static files are served by WhiteNoise.
 
 ## Roadmap to production
 
-The UI and workflows are complete, and the data layer is a local store. To go live:
-
-1. **Backend data.** Move the store actions in `src/data/store.ts` to REST endpoints backed by `db/schema.sql`. Real auth needs bcrypt and optional TOTP 2FA, with JWT sessions carrying `tenant_id`.
-2. **Integrations.** Use OAuth for Google Business Profile, GSC, GA4, Meta, LinkedIn and YouTube. Store tokens encrypted and handle token expiry and refresh. Check each platform's current API permissions before building against it.
-3. **Scheduler.** A Redis/BullMQ worker should publish from `scheduled_posts`, sync reviews and metrics nightly, and log every failure.
-4. **Phase 3–4.** WhatsApp Business API, lead CRM, push notifications (`@capacitor/push-notifications`), then SaaS billing, white-label branding and custom domains. Tenancy is already in the schema.
+1. **Official integrations.** `backend/app/publishers.py` is the seam for them. Add OAuth apps for Google Business Profile, Search Console, GA4, Meta, LinkedIn and YouTube, with encrypted token storage and refresh. Until then, publishing is simulated so the workflows can be exercised end to end. Check each platform's current API permissions before building.
+2. **Scheduler.** A worker (Celery, RQ or APScheduler) should publish due `scheduled` content, pull new reviews (via GBP notifications), and sync daily metrics and ranks.
+3. **Migrations.** Add Alembic before the first production schema change. Tables are currently created by `create_all`.
+4. **Phase 3–4.** WhatsApp Business API, push notifications, lead CRM, then SaaS billing, white-label branding and custom domains. `tenant_id` is already on every row.

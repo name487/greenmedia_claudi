@@ -1,0 +1,29 @@
+{% extends "portal/base.html" %}{% load gm static %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Creative Studio</h1><p class="muted">One master creative → every platform size</p></div>
+  <div class="page-actions">{% include "portal/_client_select.html" with allow_all=False %}</div>
+</div>
+<div class="grid cols-3">
+  <section class="card"><header class="card-head"><h3>Master creative</h3></header>
+    <div class="form">
+      <label class="field">Image <input class="input" type="file" accept="image/*" id="cr-file"></label>
+      <label class="field">Headline <input class="input" id="cr-headline" maxlength="60" value="{{ headline }}"></label>
+      <label class="field">Call to action <input class="input" id="cr-cta" maxlength="24" value="{{ cta }}"></label>
+      <button class="btn" type="button" id="cr-all">Export all sizes</button>
+      <p class="muted small" style="margin:0">Rendered in your browser — images never leave this device. Crops are centre-weighted.</p>
+    </div>
+  </section>
+  <section class="card span-2"><header class="card-head"><h3>Platform previews</h3></header>
+    <div class="previews" data-slug="{{ c.company_name|slugify }}">
+      {% for name, ratio, w, h in sizes %}
+      <div class="preview" data-w="{{ w }}" data-h="{{ h }}" data-ratio="{{ ratio }}">
+        <div class="frame" style="aspect-ratio: {{ w }} / {{ h }}"><img alt="" hidden><span class="headline">{{ headline }}</span><span class="cta">{{ cta }}</span></div>
+        <div class="row between small"><span>{{ name }} <span class="muted">{{ ratio }}</span></span><button type="button" class="btn ghost sm" data-export>PNG</button></div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'portal/creative.js' %}"></script>{% endblock %}

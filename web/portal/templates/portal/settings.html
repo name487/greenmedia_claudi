@@ -1,0 +1,29 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header"><div><h1>Settings</h1><p class="muted">{{ s.tenant_name }}</p></div></div>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Backend &amp; AI</h3></header>
+    <dl class="kv">
+      <dt>API</dt><dd>{% if health.ok %}<span class="badge badge-green">Connected</span>{% else %}<span class="badge badge-red">Down</span>{% endif %}</dd>
+      <dt>AI</dt><dd>{% if s.ai.enabled %}<span class="badge badge-green">On</span> {{ s.ai.provider }} · {{ s.ai.model }}{% else %}<span class="badge badge-amber">Offline templates</span> set ANTHROPIC_API_KEY or OPENAI_API_KEY on the API server{% endif %}</dd>
+    </dl>
+  </section>
+  <section class="card"><header class="card-head"><h3>Workflow &amp; notifications</h3></header>
+    <form method="post" class="form">{% csrf_token %}
+      <label class="check"><input type="checkbox" name="notify"{% if s.notify_on_negative_review %} checked{% endif %}{% if not can_edit %} disabled{% endif %}> Alert account manager on negative reviews</label>
+      <label class="check"><input type="checkbox" name="client_approval"{% if s.require_client_approval %} checked{% endif %}{% if not can_edit %} disabled{% endif %}> Require client approval before content is scheduled</label>
+      <p class="muted small" style="margin:0">Auto-publish is configured per client and per channel in each client workspace.</p>
+      {% if can_edit %}<div><button class="btn sm">Save</button></div>{% endif %}
+    </form>
+  </section>
+</div>
+<section class="card"><header class="card-head"><h3>Integrations</h3></header>
+  <ul class="list">{% for i in s.integrations %}<li class="row between"><span>{{ i.name }}<div class="muted small">{{ i.description }}</div></span><span class="badge badge-gray">Configure on server</span></li>{% endfor %}</ul>
+</section>
+<section class="card"><header class="card-head"><h3>Role permissions</h3></header>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Section</th>{% for r in s.roles %}<th>{{ r.label }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for sec, row in matrix %}<tr><td style="text-transform:capitalize">{{ sec }}</td>{% for ok in row %}<td>{% if ok %}✓{% else %}<span class="muted">—</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

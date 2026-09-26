@@ -1,0 +1,45 @@
+{% load static gm %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f7a45">
+  <title>{% block title %}Green Media Command Center{% endblock %}</title>
+  <link rel="icon" href="{% static 'portal/icon.svg' %}">
+  <link rel="stylesheet" href="{% static 'portal/app.css' %}">
+</head>
+<body>
+<div class="shell">
+  <input type="checkbox" id="drawer" class="drawer-toggle" aria-hidden="true">
+  <header class="topbar">
+    <label for="drawer" aria-label="Open menu">{% icon 'menu' %}</label>
+    <strong>Green Media</strong>
+    <span class="avatar">{{ me.name|slice:":1" }}</span>
+  </header>
+  <label for="drawer" class="drawer-backdrop" aria-hidden="true"></label>
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="{% static 'portal/icon.svg' %}" alt="" width="32" height="32">
+      <div><strong>Green Media</strong><span>AI Command Center</span></div>
+    </div>
+    <nav>
+      {% for n in nav_items %}
+        <a href="{% url n.url_name %}" class="nav-item{% if n.active %} active{% endif %}">{% icon n.icon %}<span>{{ n.label }}</span></a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="me">
+        <span class="avatar">{{ me.name|slice:":1" }}</span>
+        <div><strong>{{ me.name }}</strong><span>{{ me.client_name|default:me.role_label }}</span></div>
+      </div>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn ghost sm block">Sign out</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,13 +1,16 @@
-node_modules/
-dist/
-release/
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+backend/*.db
+web/staticfiles/
+
+# Secrets
 .env
 .env.*
 !.env.example
-*.log
+
 .DS_Store
-android/app/build/
-android/.gradle/
-ios/App/Pods/
-ios/App/build/
-*.tsbuildinfo
+*.log

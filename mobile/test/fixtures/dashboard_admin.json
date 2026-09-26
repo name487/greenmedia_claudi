@@ -1,0 +1,674 @@
+{
+ "kpis": {
+  "active_clients": 22,
+  "onboarding_clients": 1,
+  "gmb_connected": 23,
+  "gmb_disconnected": 1,
+  "pending_reviews": 57,
+  "negative_reviews": 8,
+  "scheduled_posts": 9,
+  "failed_posts": 0,
+  "leads": 4256,
+  "leads_change_pct": 8,
+  "seo_alerts": 31
+ },
+ "growth": [
+  {
+   "date": "2026-08-28",
+   "gmb_views": 9855,
+   "social_reach": 46848,
+   "leads": 163
+  },
+  {
+   "date": "2026-08-29",
+   "gmb_views": 7329,
+   "social_reach": 35427,
+   "leads": 126
+  },
+  {
+   "date": "2026-08-30",
+   "gmb_views": 6487,
+   "social_reach": 33468,
+   "leads": 106
+  },
+  {
+   "date": "2026-08-31",
+   "gmb_views": 8493,
+   "social_reach": 40255,
+   "leads": 132
+  },
+  {
+   "date": "2026-09-01",
+   "gmb_views": 8985,
+   "social_reach": 41743,
+   "leads": 147
+  },
+  {
+   "date": "2026-09-02",
+   "gmb_views": 8639,
+   "social_reach": 44566,
+   "leads": 153
+  },
+  {
+   "date": "2026-09-03",
+   "gmb_views": 8722,
+   "social_reach": 41216,
+   "leads": 140
+  },
+  {
+   "date": "2026-09-04",
+   "gmb_views": 9951,
+   "social_reach": 51784,
+   "leads": 166
+  },
+  {
+   "date": "2026-09-05",
+   "gmb_views": 7652,
+   "social_reach": 38589,
+   "leads": 122
+  },
+  {
+   "date": "2026-09-06",
+   "gmb_views": 6426,
+   "social_reach": 32213,
+   "leads": 109
+  },
+  {
+   "date": "2026-09-07",
+   "gmb_views": 8523,
+   "social_reach": 41892,
+   "leads": 136
+  },
+  {
+   "date": "2026-09-08",
+   "gmb_views": 8323,
+   "social_reach": 42179,
+   "leads": 149
+  },
+  {
+   "date": "2026-09-09",
+   "gmb_views": 8930,
+   "social_reach": 45562,
+   "leads": 155
+  },
+  {
+   "date": "2026-09-10",
+   "gmb_views": 8934,
+   "social_reach": 44289,
+   "leads": 149
+  },
+  {
+   "date": "2026-09-11",
+   "gmb_views": 10080,
+   "social_reach": 50194,
+   "leads": 165
+  },
+  {
+   "date": "2026-09-12",
+   "gmb_views": 7468,
+   "social_reach": 38070,
+   "leads": 124
+  },
+  {
+   "date": "2026-09-13",
+   "gmb_views": 7051,
+   "social_reach": 33902,
+   "leads": 114
+  },
+  {
+   "date": "2026-09-14",
+   "gmb_views": 8623,
+   "social_reach": 44506,
+   "leads": 141
+  },
+  {
+   "date": "2026-09-15",
+   "gmb_views": 8735,
+   "social_reach": 44634,
+   "leads": 142
+  },
+  {
+   "date": "2026-09-16",
+   "gmb_views": 9527,
+   "social_reach": 45856,
+   "leads": 150
+  },
+  {
+   "date": "2026-09-17",
+   "gmb_views": 8792,
+   "social_reach": 44822,
+   "leads": 152
+  },
+  {
+   "date": "2026-09-18",
+   "gmb_views": 10440,
+   "social_reach": 52007,
+   "leads": 169
+  },
+  {
+   "date": "2026-09-19",
+   "gmb_views": 7495,
+   "social_reach": 39477,
+   "leads": 127
+  },
+  {
+   "date": "2026-09-20",
+   "gmb_views": 6805,
+   "social_reach": 34507,
+   "leads": 113
+  },
+  {
+   "date": "2026-09-21",
+   "gmb_views": 8370,
+   "social_reach": 44281,
+   "leads": 140
+  },
+  {
+   "date": "2026-09-22",
+   "gmb_views": 9272,
+   "social_reach": 44023,
+   "leads": 154
+  },
+  {
+   "date": "2026-09-23",
+   "gmb_views": 9583,
+   "social_reach": 46673,
+   "leads": 159
+  },
+  {
+   "date": "2026-09-24",
+   "gmb_views": 9001,
+   "social_reach": 44290,
+   "leads": 146
+  },
+  {
+   "date": "2026-09-25",
+   "gmb_views": 10779,
+   "social_reach": 52709,
+   "leads": 176
+  },
+  {
+   "date": "2026-09-26",
+   "gmb_views": 7799,
+   "social_reach": 40880,
+   "leads": 131
+  }
+ ],
+ "negative_reviews": [
+  {
+   "id": 72,
+   "client_id": 14,
+   "client_name": "QuickFix Electricals",
+   "author": "Isha M.",
+   "rating": 2,
+   "text": "Waited over 40 minutes even with an appointment. Not happy with the delay.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-25T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 127,
+   "client_id": 24,
+   "client_name": "IronCore Constructions",
+   "author": "Tara S.",
+   "rating": 1,
+   "text": "Very rude behaviour at the front desk and nobody called me back. Terrible experience.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-24T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 22,
+   "client_id": 5,
+   "client_name": "GlowUp Salon & Spa",
+   "author": "Ananya M.",
+   "rating": 2,
+   "text": "The quality has dropped compared to last year. Disappointed.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-22T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 103,
+   "client_id": 20,
+   "client_name": "PixelPerfect Studio",
+   "author": "Neha S.",
+   "rating": 2,
+   "text": "The quality has dropped compared to last year. Disappointed.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-22T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 25,
+   "client_id": 5,
+   "client_name": "GlowUp Salon & Spa",
+   "author": "Arjun K.",
+   "rating": 1,
+   "text": "Very rude behaviour at the front desk and nobody called me back. Terrible experience.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-20T11:00:27.941232+00:00",
+   "published_at": null
+  }
+ ],
+ "seo_alerts": [
+  {
+   "keyword": "top rated dental clinic",
+   "client_name": "Smile Dental Studio",
+   "previous_rank": 17,
+   "current_rank": 21
+  },
+  {
+   "keyword": "dental clinic open now",
+   "client_name": "Smile Dental Studio",
+   "previous_rank": 8,
+   "current_rank": 13
+  },
+  {
+   "keyword": "restaurant near me",
+   "client_name": "Spice Route Kitchen",
+   "previous_rank": 22,
+   "current_rank": 27
+  },
+  {
+   "keyword": "top rated restaurant",
+   "client_name": "Spice Route Kitchen",
+   "previous_rank": 38,
+   "current_rank": 42
+  },
+  {
+   "keyword": "best real estate in hyderabad",
+   "client_name": "UrbanNest Realty",
+   "previous_rank": 40,
+   "current_rank": 43
+  }
+ ],
+ "client_performance": [
+  {
+   "id": 19,
+   "company_name": "GreenLeaf Organics",
+   "industry": "Grocery",
+   "city": "Mysuru",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 4.5,
+   "gmb_connected": true,
+   "contact_name": "Simran Joshi",
+   "gmb_views": 15190,
+   "leads": 274,
+   "leads_change_pct": 19,
+   "pending_reviews": 5
+  },
+  {
+   "id": 18,
+   "company_name": "CloudNine IVF Centre",
+   "industry": "Healthcare",
+   "city": "Pune",
+   "status": "active",
+   "plan": "Growth",
+   "rating": 4.8,
+   "gmb_connected": true,
+   "contact_name": "Farhan Gupta",
+   "gmb_views": 8942,
+   "leads": 141,
+   "leads_change_pct": 7,
+   "pending_reviews": 5
+  },
+  {
+   "id": 5,
+   "company_name": "GlowUp Salon & Spa",
+   "industry": "Beauty",
+   "city": "Delhi",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "Pooja Patel",
+   "gmb_views": 9042,
+   "leads": 142,
+   "leads_change_pct": 6,
+   "pending_reviews": 4
+  },
+  {
+   "id": 20,
+   "company_name": "PixelPerfect Studio",
+   "industry": "Photography",
+   "city": "Goa",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "Karan Joshi",
+   "gmb_views": 7363,
+   "leads": 123,
+   "leads_change_pct": 12,
+   "pending_reviews": 4
+  },
+  {
+   "id": 9,
+   "company_name": "The Coffee Collective",
+   "industry": "Cafe",
+   "city": "Kochi",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 4.2,
+   "gmb_connected": true,
+   "contact_name": "Ananya Gupta",
+   "gmb_views": 6941,
+   "leads": 112,
+   "leads_change_pct": 4,
+   "pending_reviews": 4
+  },
+  {
+   "id": 1,
+   "company_name": "Smile Dental Studio",
+   "industry": "Dental Clinic",
+   "city": "Pune",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 3.7,
+   "gmb_connected": true,
+   "contact_name": "Dev Gupta",
+   "gmb_views": 14860,
+   "leads": 253,
+   "leads_change_pct": 10,
+   "pending_reviews": 3
+  },
+  {
+   "id": 4,
+   "company_name": "UrbanNest Realty",
+   "industry": "Real Estate",
+   "city": "Hyderabad",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "John Kapoor",
+   "gmb_views": 14879,
+   "leads": 251,
+   "leads_change_pct": 11,
+   "pending_reviews": 3
+  },
+  {
+   "id": 21,
+   "company_name": "SafeHands Physiotherapy",
+   "industry": "Healthcare",
+   "city": "Nashik",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 4.2,
+   "gmb_connected": true,
+   "contact_name": "Vikram Bose",
+   "gmb_views": 14665,
+   "leads": 250,
+   "leads_change_pct": 9,
+   "pending_reviews": 3
+  },
+  {
+   "id": 22,
+   "company_name": "BookWorm Library Cafe",
+   "industry": "Cafe",
+   "city": "Bhopal",
+   "status": "active",
+   "plan": "Growth",
+   "rating": 4.6,
+   "gmb_connected": true,
+   "contact_name": "Ananya Patel",
+   "gmb_views": 12930,
+   "leads": 198,
+   "leads_change_pct": 2,
+   "pending_reviews": 3
+  },
+  {
+   "id": 24,
+   "company_name": "IronCore Constructions",
+   "industry": "Construction",
+   "city": "Coimbatore",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "Isha Bose",
+   "gmb_views": 5515,
+   "leads": 97,
+   "leads_change_pct": 17,
+   "pending_reviews": 3
+  },
+  {
+   "id": 11,
+   "company_name": "PetPals Veterinary",
+   "industry": "Veterinary",
+   "city": "Indore",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 3.9,
+   "gmb_connected": true,
+   "contact_name": "Vikram Bose",
+   "gmb_views": 4323,
+   "leads": 74,
+   "leads_change_pct": 16,
+   "pending_reviews": 3
+  },
+  {
+   "id": 16,
+   "company_name": "MediPlus Pharmacy",
+   "industry": "Pharmacy",
+   "city": "Lucknow",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.1,
+   "gmb_connected": true,
+   "contact_name": "Isha Khan",
+   "gmb_views": 16315,
+   "leads": 270,
+   "leads_change_pct": 9,
+   "pending_reviews": 2
+  },
+  {
+   "id": 14,
+   "company_name": "QuickFix Electricals",
+   "industry": "Home Services",
+   "city": "Nagpur",
+   "status": "paused",
+   "plan": "Growth",
+   "rating": 4.4,
+   "gmb_connected": true,
+   "contact_name": "Neha Singh",
+   "gmb_views": 15790,
+   "leads": 269,
+   "leads_change_pct": 7,
+   "pending_reviews": 2
+  },
+  {
+   "id": 17,
+   "company_name": "StyleStreet Boutique",
+   "industry": "Retail",
+   "city": "Chandigarh",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 4.4,
+   "gmb_connected": true,
+   "contact_name": "Pooja Patel",
+   "gmb_views": 13413,
+   "leads": 220,
+   "leads_change_pct": 8,
+   "pending_reviews": 2
+  },
+  {
+   "id": 6,
+   "company_name": "BrightKids Academy",
+   "industry": "Education",
+   "city": "Chennai",
+   "status": "onboarding",
+   "plan": "Growth",
+   "rating": 4.4,
+   "gmb_connected": false,
+   "contact_name": "Pooja Menon",
+   "gmb_views": 12769,
+   "leads": 203,
+   "leads_change_pct": 3,
+   "pending_reviews": 2
+  },
+  {
+   "id": 7,
+   "company_name": "AutoCare Pro",
+   "industry": "Automotive",
+   "city": "Ahmedabad",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 3.7,
+   "gmb_connected": true,
+   "contact_name": "Neha Bose",
+   "gmb_views": 9917,
+   "leads": 157,
+   "leads_change_pct": 9,
+   "pending_reviews": 2
+  },
+  {
+   "id": 23,
+   "company_name": "SkyHigh Travels",
+   "industry": "Travel",
+   "city": "Vadodara",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 3.8,
+   "gmb_connected": true,
+   "contact_name": "Isha Menon",
+   "gmb_views": 8369,
+   "leads": 135,
+   "leads_change_pct": 6,
+   "pending_reviews": 2
+  },
+  {
+   "id": 12,
+   "company_name": "CraftWood Interiors",
+   "industry": "Interior Design",
+   "city": "Surat",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.5,
+   "gmb_connected": true,
+   "contact_name": "Karan Bose",
+   "gmb_views": 14952,
+   "leads": 244,
+   "leads_change_pct": 6,
+   "pending_reviews": 1
+  },
+  {
+   "id": 2,
+   "company_name": "Spice Route Kitchen",
+   "industry": "Restaurant",
+   "city": "Bengaluru",
+   "status": "active",
+   "plan": "Growth",
+   "rating": 3.8,
+   "gmb_connected": true,
+   "contact_name": "Vikram Gupta",
+   "gmb_views": 8849,
+   "leads": 140,
+   "leads_change_pct": 3,
+   "pending_reviews": 1
+  },
+  {
+   "id": 3,
+   "company_name": "FitNation Gym",
+   "industry": "Fitness",
+   "city": "Mumbai",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 4.0,
+   "gmb_connected": true,
+   "contact_name": "Tara Bose",
+   "gmb_views": 6111,
+   "leads": 100,
+   "leads_change_pct": 5,
+   "pending_reviews": 1
+  },
+  {
+   "id": 8,
+   "company_name": "Sunrise Eye Hospital",
+   "industry": "Healthcare",
+   "city": "Jaipur",
+   "status": "active",
+   "plan": "Agency",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "John Joshi",
+   "gmb_views": 4686,
+   "leads": 79,
+   "leads_change_pct": 7,
+   "pending_reviews": 1
+  },
+  {
+   "id": 15,
+   "company_name": "Zen Yoga Shala",
+   "industry": "Wellness",
+   "city": "Rishikesh",
+   "status": "active",
+   "plan": "Pro",
+   "rating": 3.9,
+   "gmb_connected": true,
+   "contact_name": "Sanjay Khan",
+   "gmb_views": 4781,
+   "leads": 77,
+   "leads_change_pct": 7,
+   "pending_reviews": 1
+  },
+  {
+   "id": 13,
+   "company_name": "Heritage Stay Homestay",
+   "industry": "Hospitality",
+   "city": "Udaipur",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 4.3,
+   "gmb_connected": true,
+   "contact_name": "Simran Bose",
+   "gmb_views": 16194,
+   "leads": 277,
+   "leads_change_pct": 10,
+   "pending_reviews": 0
+  },
+  {
+   "id": 10,
+   "company_name": "LegalEase Associates",
+   "industry": "Legal",
+   "city": "Kolkata",
+   "status": "active",
+   "plan": "Growth",
+   "rating": 3.6,
+   "gmb_connected": true,
+   "contact_name": "Meera Joshi",
+   "gmb_views": 10273,
+   "leads": 170,
+   "leads_change_pct": 8,
+   "pending_reviews": 0
+  }
+ ],
+ "lead_sources": {
+  "calls": 8440,
+  "directions": 12909,
+  "website_clicks": 19974,
+  "social_engagement": 85164
+ }
+}

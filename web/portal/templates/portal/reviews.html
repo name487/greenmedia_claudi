@@ -1,0 +1,48 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>AI Review Queue</h1><p class="muted">Detect → sentiment → AI draft → approve → publish</p></div>
+  <div class="page-actions">
+    {% include "portal/_client_select.html" with allow_all=True %}
+    {% if 'gmb' in me.sections %}<form method="post" class="inline">{% csrf_token %}<button class="btn soft" name="action" value="sync">Sync new reviews</button></form>{% endif %}
+  </div>
+</div>
+<div class="pill-tabs">
+  {% for key, label in tabs %}<a href="{% qs filter=key %}" class="{% if flt == key %}on{% endif %}" style="text-decoration:none">{{ label }} ({{ counts|get:key }})</a>{% endfor %}
+</div>
+{% if not items %}<section class="card"><div class="empty">No reviews here.</div></section>{% endif %}
+<div class="grid cols-2">
+{% for r in items %}
+  <section class="card review" id="r{{ r.id }}">
+    <div class="row between">
+      <div><strong>{{ r.author }}</strong> {{ r.rating|stars }}<div class="muted small">{{ r.client_name }} · {{ r.created_at|when }}</div></div>
+      <div class="row">{{ r.sentiment|badge }}{% if r.language != 'en' %}<span class="badge badge-blue">{{ r.language }}</span>{% endif %}{{ r.reply_status|badge }}</div>
+    </div>
+    <blockquote>{{ r.text }}</blockquote>
+    {% if r.needs_escalation and r.reply_status != 'published' %}<div class="notice">Escalation: replies to 2★ or lower need approval before publishing.</div>{% endif %}
+
+    {% if r.reply_status == 'new' %}
+      <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}">
+        <button class="btn" name="action" value="draft">{% icon 'sparkle' 16 %} Generate AI reply</button></form>
+    {% elif r.reply_status == 'published' %}
+      <div class="reply-box"><p style="margin:0">{{ r.reply }}</p><span class="muted small">Published {{ r.published_at|when }}</span></div>
+    {% elif r.reply_status == 'rejected' %}
+      <div class="reply-box"><p class="muted" style="margin:0">{{ r.reply|default:"—" }}</p>
+        <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}"><button class="btn ghost sm" name="action" value="reopen">Reopen</button></form></div>
+    {% else %}
+      <form method="post" class="reply-box form">{% csrf_token %}
+        <input type="hidden" name="review_id" value="{{ r.id }}"><input type="hidden" name="original" value="{{ r.reply }}">
+        <textarea class="input" name="reply" aria-label="Reply">{{ r.reply }}</textarea>
+        <div class="btn-row">
+          <button class="btn ghost sm" name="action" value="save">Save edit</button>
+          <button class="btn ghost sm" name="action" value="draft">Regenerate</button>
+          <button class="btn ghost sm" name="action" value="reject">Reject</button>
+          {% if can_approve and r.reply_status != 'approved' %}<button class="btn soft sm" name="action" value="approve">Approve</button>{% endif %}
+          {% if can_publish %}<button class="btn sm" name="action" value="publish"{% if r.needs_escalation and r.reply_status != 'approved' %} disabled title="Approve first"{% endif %}>Publish to Google</button>{% endif %}
+        </div>
+      </form>
+    {% endif %}
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

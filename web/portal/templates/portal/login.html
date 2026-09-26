@@ -1,0 +1,37 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in · Green Media</title>
+  <link rel="icon" href="{% static 'portal/icon.svg' %}"><link rel="stylesheet" href="{% static 'portal/app.css' %}">
+</head>
+<body>
+<div class="login">
+  <form class="login-card" method="post">
+    {% csrf_token %}
+    <div class="row">
+      <img src="{% static 'portal/icon.svg' %}" alt="" width="40" height="40">
+      <div><h1 style="font-size:20px">Green Media</h1><p class="muted small">AI Command Center — grow every client from one dashboard</p></div>
+    </div>
+    <label class="field">Email <input class="input" type="email" name="email" id="email" autocomplete="username" value="{{ email|default:'' }}" required></label>
+    <label class="field">Password <input class="input" type="password" name="password" id="password" autocomplete="current-password" required></label>
+    {% if error %}<div class="notice">{{ error }}</div>{% endif %}
+    <button class="btn block" type="submit">Sign in</button>
+    <div>
+      <p class="muted small" style="margin-bottom:6px">Demo accounts (password <code>demo1234</code>) — tap to fill:</p>
+      <div class="demo-users">
+        {% for role, name, email in demo_users %}
+          <button type="button" data-email="{{ email }}"><strong>{{ role }}</strong>{{ name }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </form>
+</div>
+<script>
+  document.querySelectorAll('.demo-users button').forEach(b => b.addEventListener('click', () => {
+    document.getElementById('email').value = b.dataset.email;
+    document.getElementById('password').value = 'demo1234';
+  }));
+</script>
+</body>
+</html>

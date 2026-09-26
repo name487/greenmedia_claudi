@@ -1,9 +1,0 @@
-{
-  "name": "Green Media AI Command Center",
-  "short_name": "Green Media",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#0b1a12",
-  "theme_color": "#0f7a45",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
-}

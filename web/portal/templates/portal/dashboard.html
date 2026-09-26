@@ -1,0 +1,59 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Good {{ greeting }}, {{ me.name }}</h1><p class="muted">{% if me.client_id %}{{ me.client_name }}{% else %}{{ d.client_performance|length }} clients{% endif %} · last 30 days</p></div>
+  {% if not me.client_id and 'content.create' in perms %}<div class="page-actions"><a class="btn" href="{% url 'content' %}">+ New campaign</a></div>{% endif %}
+</div>
+
+<div class="grid stats">
+  {% if not me.client_id %}<div class="stat"><span class="stat-label">Active clients</span><strong class="stat-value">{{ k.active_clients }}</strong><span class="stat-hint">{{ k.onboarding_clients }} onboarding</span></div>{% endif %}
+  <div class="stat"><span class="stat-label">GMB profiles</span><strong class="stat-value">{{ k.gmb_connected }}</strong><span class="stat-hint">{{ k.gmb_disconnected }} need connection</span></div>
+  <div class="stat"><span class="stat-label">Pending reviews</span><strong class="stat-value">{{ k.pending_reviews }}</strong><span class="stat-hint">{{ k.negative_reviews }} negative</span></div>
+  <div class="stat"><span class="stat-label">Scheduled posts</span><strong class="stat-value">{{ k.scheduled_posts }}</strong><span class="stat-hint">{% if k.failed_posts %}{{ k.failed_posts }} failed{% else %}none failed{% endif %}</span></div>
+  <div class="stat"><span class="stat-label">Leads</span><strong class="stat-value">{{ k.leads|compact }}</strong>{{ k.leads_change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">SEO alerts</span><strong class="stat-value">{{ k.seo_alerts }}</strong><span class="stat-hint">keywords dropped 3+</span></div>
+</div>
+
+<div class="grid cols-3">
+  <section class="card span-2">
+    <header class="card-head"><h3>Growth — last 30 days</h3></header>
+    {% line_chart d.growth "gmb_views|GMB views|var(--c1)" "social_reach|Social reach ÷10|var(--c2)|0.1" %}
+  </section>
+  <section class="card">
+    <header class="card-head"><h3>Needs attention</h3>{% if 'reviews' in me.sections %}<a class="small" href="{% url 'reviews' %}?filter=negative">Open queue</a>{% endif %}</header>
+    {% if not d.negative_reviews and not d.seo_alerts %}<p class="muted">All clear. 🎉</p>{% else %}
+    <ul class="list">
+      {% for r in d.negative_reviews|slice:":3" %}
+        <li><div class="row between"><strong>{{ r.client_name }}</strong>{{ r.rating|stars }}</div><p class="muted small" style="margin:0">{{ r.text|truncatechars:90 }}</p></li>
+      {% endfor %}
+      {% for s in d.seo_alerts|slice:":2" %}
+        <li class="row between"><span>“{{ s.keyword }}”</span><span class="badge badge-red">#{{ s.previous_rank }} → #{{ s.current_rank }}</span></li>
+      {% endfor %}
+    </ul>{% endif %}
+  </section>
+</div>
+
+{% if me.client_id %}
+<section class="card"><header class="card-head"><h3>Where your leads come from</h3></header>{% bar_list lead_sources %}</section>
+{% else %}
+<section class="card">
+  <header class="card-head"><h3>Client performance</h3></header>
+  <div class="table-wrap"><table class="table responsive">
+    <thead><tr><th>Client</th><th>Plan</th><th>Rating</th><th class="num">GMB views</th><th class="num">Leads</th><th class="num">Pending</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for c in d.client_performance %}
+      <tr class="clickable" onclick="location.href='{% url 'client_detail' c.id %}'">
+        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit;text-decoration:none">{{ c.company_name }}</a><div class="muted small">{{ c.industry }} · {{ c.city }}</div></td>
+        <td data-label="Plan">{{ c.plan }}</td>
+        <td data-label="Rating">{{ c.rating|stars }} {{ c.rating }}</td>
+        <td data-label="GMB views" class="num">{{ c.gmb_views|compact }}</td>
+        <td data-label="Leads" class="num">{{ c.leads }} {{ c.leads_change_pct|delta }}</td>
+        <td data-label="Pending" class="num">{{ c.pending_reviews|default:"—" }}</td>
+        <td data-label="Status">{{ c.status|badge }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

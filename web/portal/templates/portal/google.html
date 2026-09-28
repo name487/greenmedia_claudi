@@ -38,6 +38,13 @@
     </ul>
   </section>
 
+  <details class="card" style="margin-top:16px">
+    <summary>Getting “Error 400: redirect_uri_mismatch” from Google?</summary>
+    <p class="small" style="margin-top:0">Add this exact address under <strong>Authorized redirect URIs</strong> on the OAuth client in Google Cloud (APIs &amp; Services → Credentials), save, and wait ~5 minutes:</p>
+    <p><code style="user-select:all;font-size:14px">{{ status.redirect_uri }}</code></p>
+    <p class="muted small" style="margin:0">It must match character for character — <code>localhost</code> vs <code>127.0.0.1</code>, <code>http</code> vs <code>https</code>, the port and a trailing slash all count. To change it, set <code>GOOGLE_REDIRECT_URI</code> in <code>backend/.env</code> and restart the API. When Google asks, sign in with the account that manages the Business Profiles.</p>
+  </details>
+
   {% for e in loc_errors %}<div class="notice" style="margin:16px 0">{{ e.email }}: {{ e.error }}</div>{% endfor %}
 
   {% if status.connections %}

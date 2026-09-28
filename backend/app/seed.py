@@ -15,6 +15,7 @@ from .models import (
 )
 from .ai import PLATFORM_FORMAT
 from .security import hash_password
+from .upgrade import add_missing_columns
 from .sentiment import detect_sentiment
 
 DEMO_PASSWORD = "demo1234"
@@ -161,6 +162,7 @@ def seed(db: Session) -> None:
 
 def init_db(seed_if_empty: bool = True) -> None:
     Base.metadata.create_all(engine)
+    add_missing_columns(engine)  # older databases: add columns introduced since they were created
     if seed_if_empty:
         with SessionLocal() as db:
             if not db.scalar(select(func.count()).select_from(Tenant)):

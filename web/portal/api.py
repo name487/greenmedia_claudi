@@ -1,6 +1,7 @@
 """Thin client for the FastAPI backend. Views never talk to a database; they talk to this."""
 
 from functools import wraps
+from urllib.parse import quote
 
 import httpx
 from django.conf import settings
@@ -63,7 +64,8 @@ def login_required(section: str | None = None):
         def wrapped(request, *args, **kwargs):
             me = request.session.get(SESSION_ME)
             if not request.session.get(SESSION_TOKEN) or not me:
-                return redirect(f"/login/?next={request.path}")
+                # Keep the query string (e.g. the ?google=... result from Google's OAuth return) through login.
+                return redirect(f"/login/?next={quote(request.get_full_path())}")
             if section and section not in me["sections"]:
                 messages.error(request, "Your role does not have access to that page.")
                 return redirect("dashboard")
@@ -74,7 +76,7 @@ def login_required(section: str | None = None):
                 if e.status == 401:
                     request.session.flush()
                     messages.error(request, "Your session expired. Please sign in again.")
-                    return redirect(f"/login/?next={request.path}")
+                    return redirect(f"/login/?next={quote(request.get_full_path())}")
                 messages.error(request, e.detail)
                 if request.method == "POST":
                     return redirect(request.get_full_path())

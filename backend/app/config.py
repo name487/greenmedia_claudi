@@ -19,14 +19,14 @@ class Settings:
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     # Must exactly match an "Authorized redirect URI" on the OAuth client, e.g. https://api.example.com/api/google/callback
-    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8001/api/google/callback")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8001/api/google/callback")
     # Where the browser lands after connecting (the Django "Google Business Profile" page)
-    web_app_url: str = os.getenv("WEB_APP_URL", "http://localhost:8000").rstrip("/")
+    web_app_url: str = os.getenv("WEB_APP_URL", "http://127.0.0.1:8000").rstrip("/")
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     # Background sync/publish loop inside the API process (0 = off; use `python -m app.jobs` from cron instead)
     scheduler_minutes: int = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "0"))
-    cors_origins: list[str] = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",") if o.strip()]
+    cors_origins: list[str] = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000").split(",") if o.strip()]
 
     @property
     def ai_key(self) -> str:

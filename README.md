@@ -72,10 +72,51 @@ Sign in with any demo account; the password is `demo1234`. The login screens hav
 
 **AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `ANTHROPIC_API_KEY` (or `AI_PROVIDER=openai` plus `OPENAI_API_KEY`) on the API server to switch to real model output. Keys never ship inside the apps.
 
+## Going live with Google Business Profile
+
+Clients linked to a real Google location are **live**. Their reviews, rating and daily insights are pulled from Google, and approved replies and GMB posts are published to Google. Every other client stays on demo data. Linking a client deletes that client's demo reviews and metrics, so real and fake data never mix.
+
+### One-time setup (Google Cloud)
+
+1. **Create a project** at [console.cloud.google.com](https://console.cloud.google.com/). Then, under *APIs & Services → Library*, enable these four APIs:
+   **My Business Account Management API**, **My Business Business Information API**, **Google My Business API** and **Business Profile Performance API**.
+2. **Request API access.** The Business Profile APIs start with a quota of 0. Submit Google's [Business Profile API access request](https://developers.google.com/my-business/content/prereqs) for this project. Until it is approved, calls fail with a quota error, which the app shows on screen.
+3. **Configure the OAuth consent screen** (*APIs & Services → OAuth consent screen*): choose External, name it "Green Media Command Center", and add the scope `…/auth/business.manage`. While the app is in *Testing*, add `greenmediaseoteam2@gmail.com` as a test user. Note that in Testing mode Google expires refresh tokens after **7 days**. For uninterrupted sync, **publish** the app and complete Google's verification.
+4. **Create credentials** (*APIs & Services → Credentials → Create OAuth client ID*): choose *Web application*, and add the authorized redirect URI `https://<your-api-host>/api/google/callback` (locally: `http://localhost:8001/api/google/callback`).
+5. **Configure the API server.** Put these in `backend/.env` and restart the API:
+   ```
+   GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=…
+   GOOGLE_REDIRECT_URI=https://<your-api-host>/api/google/callback
+   WEB_APP_URL=https://<your-web-host>
+   TOKEN_ENCRYPTION_KEY=<python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
+   SCHEDULER_INTERVAL_MINUTES=15
+   ```
+
+### Connect and link (in the app)
+
+1. Sign in to the web app as an Admin or Account Manager, then open **GMB Center → Google connections**.
+2. Click **Connect Google account**, sign in as **greenmediaseoteam2@gmail.com** (the account with management rights), and approve.
+3. Every location that account manages is listed. For each one, pick the matching client and click **Link & sync**. Reviews, rating and 90 days of insights are imported immediately.
+4. From then on:
+   - **AI Reviews:** the "Sync new reviews" button pulls reviews from Google. Approved replies are posted to Google, and 2★ replies still need approval first.
+   - **Content Studio:** GMB variants of approved content are posted to the profile as Google posts when you click "Publish now", or at their scheduled time.
+   - **Scheduler:** every `SCHEDULER_INTERVAL_MINUTES`, the API re-syncs every live profile and publishes posts that are due. You can also run it from cron: `python -m app.jobs`.
+   - **Errors:** if access is revoked or expires, the profile shows **Expired** with Google's error message, and **Reconnect** fixes it.
+
+**Security:**
+- The app never sees the Google password. Access uses OAuth only.
+- The refresh token is encrypted at rest (Fernet).
+- **Disconnect** removes the stored token and also revokes it on Google's side.
+- The OAuth `state` is signed and expires after 15 minutes.
+
+**Still simulated:** Facebook, Instagram, LinkedIn and YouTube publishing, plus the GA4/Search Console/social columns in analytics. After you link a client, those columns show 0 until their integrations are added.
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 14 tests: permissions, tenant isolation, escalation, state machines, publish failures
+cd backend && pytest -q          # 23 tests: permissions, tenant isolation, escalation, state machines, publish failures,
+                                 #   and the Google flow (OAuth, locations, review import, reply, posts, insights, revoked access)
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```
 
@@ -101,7 +142,7 @@ Release builds only talk to HTTPS APIs. Plain `http://` is allowed only in Andro
 
 ## Roadmap to production
 
-1. **Official integrations.** `backend/app/publishers.py` is the seam for them. Add OAuth apps for Google Business Profile, Search Console, GA4, Meta, LinkedIn and YouTube, with encrypted token storage and refresh. Until then, publishing is simulated so the workflows can be exercised end to end. Check each platform's current API permissions before building.
-2. **Scheduler.** A worker (Celery, RQ or APScheduler) should publish due `scheduled` content, pull new reviews (via GBP notifications), and sync daily metrics and ranks.
+1. **More integrations.** Google Business Profile is live (see above). Next come Search Console, GA4, Meta, LinkedIn and YouTube, following the same pattern as `backend/app/google/` with `backend/app/publishers.py` as the seam.
+2. **Real-time reviews.** Switch from polling to GBP Pub/Sub notifications, and move the scheduler to a dedicated worker when running several API processes.
 3. **Migrations.** Add Alembic before the first production schema change. Tables are currently created by `create_all`.
 4. **Phase 3–4.** WhatsApp Business API, push notifications, lead CRM, then SaaS billing, white-label branding and custom domains. `tenant_id` is already on every row.

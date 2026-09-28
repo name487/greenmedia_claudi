@@ -24,7 +24,7 @@ def me_out(u: User, client_name: str | None) -> dict:
 def client_brief(c: Client) -> dict:
     return {
         "id": c.id, "company_name": c.company_name, "industry": c.industry, "city": c.city, "status": c.status, "plan": c.plan,
-        "rating": c.gmb.rating if c.gmb else None, "gmb_connected": bool(c.gmb and c.gmb.status == "connected"),
+        "rating": c.gmb.rating if c.gmb else None, "gmb_connected": bool(c.gmb and c.gmb.status == "connected"), "gmb_live": bool(c.gmb and c.gmb.is_live),
         "contact_name": c.contacts[0].name if c.contacts else "",
     }
 
@@ -35,7 +35,9 @@ def client_out(c: Client) -> dict:
         "website": c.website, "services": c.services, "account_manager_id": c.account_manager_id,
         "brand_voice": c.brand_voice, "auto_publish": c.auto_publish, "notes": c.notes,
         "contacts": [{"id": x.id, "name": x.name, "email": x.email, "phone": x.phone, "designation": x.designation} for x in c.contacts],
-        "gmb": c.gmb and {"location_id": c.gmb.location_id, "status": c.gmb.status, "last_sync": iso(c.gmb.last_sync), "rating": c.gmb.rating, "review_count": c.gmb.review_count},
+        "gmb": c.gmb and {"location_id": c.gmb.location_id, "status": c.gmb.status, "last_sync": iso(c.gmb.last_sync), "rating": c.gmb.rating,
+                         "review_count": c.gmb.review_count, "is_live": c.gmb.is_live, "title": c.gmb.title, "last_error": c.gmb.last_error,
+                         "google_email": c.gmb.connection.email if c.gmb.connection else None},
         "social_accounts": [{"platform": s.platform, "handle": s.handle, "status": s.status} for s in c.social_accounts],
     }
 

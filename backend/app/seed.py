@@ -113,7 +113,7 @@ def seed(db: Session) -> None:
             age = r.randint(0, 20)
             replied = age > 6 and r.random() > 0.3
             db.add(Review(
-                tenant_id=tenant.id, client_id=c.id, external_review_id=f"g_{c.id}_{k}", author=f"{r.choice(FIRST)} {r.choice(LAST)[0]}.",
+                tenant_id=tenant.id, client_id=c.id, external_review_id=f"demo_{c.id}_{k}", author=f"{r.choice(FIRST)} {r.choice(LAST)[0]}.",
                 rating=rating, text=text, language=lang, sentiment=detect_sentiment(text, rating), created_at=now - timedelta(days=age),
                 reply_status="published" if replied else "new", reply=f"Thank you for your feedback, we truly appreciate it! — {name}" if replied else None,
                 published_at=now - timedelta(days=age - 1) if replied else None,

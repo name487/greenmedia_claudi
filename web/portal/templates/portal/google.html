@@ -1,0 +1,83 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<a class="back small muted" href="{% url 'gmb' %}">{% icon 'back' 16 %} GMB Center</a>
+<div class="page-header">
+  <div><h1>Google Business Profile</h1><p class="muted">Connect the Google account that manages your clients' profiles, then link each location to a client.</p></div>
+  {% if can_manage and status.configured %}
+  <div class="page-actions"><form method="post">{% csrf_token %}<button class="btn" name="action" value="connect">{% if status.connections %}+ Connect another Google account{% else %}Connect Google account{% endif %}</button></form></div>
+  {% endif %}
+</div>
+
+{% if not can_manage %}
+  <section class="card"><div class="empty">Only Admins and Account Managers can connect Google accounts.</div></section>
+{% elif not status.configured %}
+  <section class="card">
+    <header class="card-head"><h3>One-time setup needed on the API server</h3><span class="badge badge-amber">Not configured</span></header>
+    <ol class="small" style="line-height:1.8;margin:0;padding-left:18px">
+      <li>In <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a>, create a project and enable: <em>My Business Account Management API</em>, <em>My Business Business Information API</em>, <em>Google My Business API</em>, <em>Business Profile Performance API</em>.</li>
+      <li>Request Business Profile API access for the project (Google approves it; until then quota is 0).</li>
+      <li>Create an OAuth client ID of type <strong>Web application</strong> with authorized redirect URI <code>{{ status.redirect_uri }}</code>.</li>
+      <li>Set <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code>, <code>GOOGLE_REDIRECT_URI</code>, <code>WEB_APP_URL</code> and <code>TOKEN_ENCRYPTION_KEY</code> in <code>backend/.env</code> and restart the API.</li>
+    </ol>
+  </section>
+{% else %}
+  <section class="card">
+    <header class="card-head"><h3>Connected Google accounts</h3></header>
+    <ul class="list">
+      {% for c in status.connections %}
+        <li class="row between">
+          <span><strong>{{ c.email }}</strong> {{ c.status|badge }}<div class="muted small">{{ c.linked_locations }} linked location{{ c.linked_locations|pluralize }}{% if c.last_error %} · <span style="color:var(--red)">{{ c.last_error }}</span>{% endif %}</div></span>
+          <span class="btn-row">
+            {% if c.status != 'active' %}<form method="post" class="inline">{% csrf_token %}<button class="btn sm" name="action" value="connect">Reconnect</button></form>{% endif %}
+            <form method="post" class="inline" onsubmit="return confirm('Disconnect {{ c.email }}? Linked clients go back to demo data.')">{% csrf_token %}<input type="hidden" name="connection_id" value="{{ c.id }}"><button class="btn ghost sm" name="action" value="disconnect">Disconnect</button></form>
+          </span>
+        </li>
+      {% empty %}
+        <li class="muted">No Google account connected yet. Click <strong>Connect Google account</strong> and sign in with the account that manages the Business Profiles (e.g. your SEO team account). You'll be asked to allow “See, edit, create and delete your Google business listings”.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% for e in loc_errors %}<div class="notice" style="margin:16px 0">{{ e.email }}: {{ e.error }}</div>{% endfor %}
+
+  {% if status.connections %}
+  <section class="card">
+    <header class="card-head"><h3>Locations ({{ locations|length }})</h3></header>
+    {% if not locations and not loc_errors %}<div class="empty">This Google account doesn't manage any Business Profile locations.</div>{% endif %}
+    <div class="table-wrap"><table class="table responsive">
+      <thead><tr><th>Business</th><th>Google account</th><th>Linked client</th><th></th></tr></thead>
+      <tbody>
+      {% for l in locations %}
+        <tr>
+          <td class="primary">{{ l.title }}<div class="muted small">{{ l.address }}{% if l.maps_uri %} · <a href="{{ l.maps_uri }}" target="_blank" rel="noopener">Maps</a>{% endif %}</div></td>
+          <td data-label="Google account">{{ l.email }}<div class="muted small">{{ l.account_name }}</div></td>
+          <td data-label="Linked client" colspan="2">
+            {% if l.linked_client_id %}
+              {% for c in clients %}{% if c.id == l.linked_client_id %}<a href="{% url 'client_detail' c.id %}">{{ c.company_name }}</a>{% endif %}{% endfor %}
+              <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="client_id" value="{{ l.linked_client_id }}"><button class="btn ghost sm" name="action" value="unlink" style="margin-left:8px">Unlink</button></form>
+            {% else %}
+              <form method="post" class="btn-row">{% csrf_token %}
+                <input type="hidden" name="connection_id" value="{{ l.connection_id }}"><input type="hidden" name="account" value="{{ l.account }}">
+                <input type="hidden" name="location" value="{{ l.location }}"><input type="hidden" name="title" value="{{ l.title }}">
+                <select class="input" name="client_id" aria-label="Client">{% for c in clients %}<option value="{{ c.id }}">{{ c.company_name }}{% if c.gmb_live %} (already live){% endif %}</option>{% endfor %}</select>
+                <button class="btn sm" name="action" value="link">Link &amp; sync</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
+  {% if status.linked %}
+  <section class="card">
+    <header class="card-head"><h3>Live clients</h3></header>
+    <ul class="list">{% for g in status.linked %}
+      <li class="row between"><span><a href="{% url 'gmb' %}?client={{ g.client_id }}">{{ g.client_name }}</a> → {{ g.title|default:g.location }}<div class="muted small">Last sync {{ g.last_sync|when|default:"never" }}{% if g.last_error %} · <span style="color:var(--red)">{{ g.last_error }}</span>{% endif %}</div></span>{{ g.status|badge }}</li>
+    {% endfor %}</ul>
+  </section>
+  {% endif %}
+{% endif %}
+{% endblock %}

@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from .. import ai
 from ..db import get_db
+from ..google import api as google_api
+from ..google import service as google_service
 from ..models import Client, Review, User
 from ..publishers import PublishError, publish_review_reply
 from ..security import audit, can, get_client, require_section, scoped_ids
@@ -139,11 +141,25 @@ def sync(body: SyncIn, user: User = Depends(require_section("gmb")), db: Session
     Production: triggered by GBP Pub/Sub notifications or a scheduled pull."""
     ids = scoped_ids(db, user, body.client_id)
     pool = [c for c in db.scalars(select(Client).where(Client.id.in_(ids))) if c.gmb and c.gmb.status == "connected"]
+    live = [c for c in pool if c.gmb.is_live]
+    if live:
+        # Real Google profiles in scope: pull their reviews instead of simulating one.
+        new, errors = 0, []
+        for c in live:
+            try:
+                new += google_service.sync_reviews(db, c)["new_reviews"]
+                c.gmb.last_sync, c.gmb.last_error = datetime.now(timezone.utc), ""
+            except google_api.GoogleApiError as e:
+                c.gmb.last_error = str(e)
+                errors.append(f"{c.company_name}: {e}")
+        audit(db, user, f"Google review sync: {new} new", entity_type="review")
+        db.commit()
+        return {"mode": "live", "profiles": len(live), "new_reviews": new, "errors": errors}
     if not pool:
         raise HTTPException(409, "No connected Google Business Profiles")
     c = random.choice(pool)
     rating, text = random.choice(INCOMING)
-    r = Review(tenant_id=user.tenant_id, client_id=c.id, external_review_id=f"g_{uuid.uuid4().hex[:10]}", author="New Customer", rating=rating, text=text,
+    r = Review(tenant_id=user.tenant_id, client_id=c.id, external_review_id=f"demo_{uuid.uuid4().hex[:10]}", author="New Customer", rating=rating, text=text,
                language=detect_language(text), sentiment=detect_sentiment(text, rating))
     db.add(r)
     db.flush()
@@ -157,4 +173,4 @@ def sync(body: SyncIn, user: User = Depends(require_section("gmb")), db: Session
             auto = False
     audit(db, user, "auto-published reply" if auto else f"AI drafted reply ({source})", client_id=c.id, entity_type="review", entity_id=r.id)
     db.commit()
-    return review_out(r, c.company_name)
+    return {"mode": "demo", **review_out(r, c.company_name)}

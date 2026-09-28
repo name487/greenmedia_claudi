@@ -80,6 +80,33 @@ class GmbAccount(Base):
     last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=0)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Live link to a real Google Business Profile. When connection_id is NULL the profile is simulated (demo data).
+    connection_id: Mapped[int | None] = mapped_column(ForeignKey("google_connections.id"), nullable=True)
+    google_account: Mapped[str] = mapped_column(String(100), default="")  # "accounts/123"
+    title: Mapped[str] = mapped_column(String(200), default="")
+    last_error: Mapped[str] = mapped_column(Text, default="")
+
+    connection: Mapped["GoogleConnection | None"] = relationship()
+
+    @property
+    def is_live(self) -> bool:
+        return self.connection_id is not None
+
+
+class GoogleConnection(Base):
+    """A Google account that granted the agency Business Profile access (OAuth). The refresh token is encrypted."""
+
+    __tablename__ = "google_connections"
+    __table_args__ = (UniqueConstraint("tenant_id", "email"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    email: Mapped[str] = mapped_column(String(200))
+    refresh_token_enc: Mapped[str] = mapped_column(Text)
+    scopes: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active | revoked
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    connected_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class SocialAccount(Base):

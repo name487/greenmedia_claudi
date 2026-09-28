@@ -82,7 +82,7 @@ Clients linked to a real Google location are **live**. Their reviews, rating and
    **My Business Account Management API**, **My Business Business Information API**, **Google My Business API** and **Business Profile Performance API**.
 2. **Request API access.** The Business Profile APIs start with a quota of 0. Submit Google's [Business Profile API access request](https://developers.google.com/my-business/content/prereqs) for this project. Until it is approved, calls fail with a quota error, which the app shows on screen.
 3. **Configure the OAuth consent screen** (*APIs & Services → OAuth consent screen*): choose External, name it "Green Media Command Center", and add the scope `…/auth/business.manage`. While the app is in *Testing*, add `greenmediaseoteam2@gmail.com` as a test user. Note that in Testing mode Google expires refresh tokens after **7 days**. For uninterrupted sync, **publish** the app and complete Google's verification.
-4. **Create credentials** (*APIs & Services → Credentials → Create OAuth client ID*): choose *Web application*, and add the authorized redirect URI `https://<your-api-host>/api/google/callback` (locally: `http://localhost:8001/api/google/callback`).
+4. **Create credentials** (*APIs & Services → Credentials → Create OAuth client ID*): choose *Web application*, and add the authorized redirect URI `https://<your-api-host>/api/google/callback` (locally: `http://127.0.0.1:8001/api/google/callback`).
 5. **Configure the API server.** Put these in `backend/.env` and restart the API:
    ```
    GOOGLE_CLIENT_ID=…apps.googleusercontent.com

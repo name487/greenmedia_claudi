@@ -1,0 +1,178 @@
+"""OAuth + HTTP client for the Google Business Profile APIs.
+
+APIs used (enable all of them in Google Cloud Console):
+- My Business Account Management API      accounts
+- My Business Business Information API    locations
+- Google My Business API (v4)             reviews, review replies, local posts
+- Business Profile Performance API        daily insights
+"""
+
+import time
+from datetime import date
+from urllib.parse import urlencode
+
+import httpx
+
+from ..config import settings
+
+AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts"
+INFO_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1"
+V4_BASE = "https://mybusiness.googleapis.com/v4"
+PERF_BASE = "https://businessprofileperformance.googleapis.com/v1"
+
+SCOPES = ["openid", "email", "https://www.googleapis.com/auth/business.manage"]
+
+# Swappable in tests (httpx.MockTransport).
+http = httpx.Client(timeout=30)
+
+
+class GoogleApiError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+    @property
+    def auth_failed(self) -> bool:
+        """Token revoked/expired beyond refresh: the user must reconnect Google."""
+        return self.status == 401 or "invalid_grant" in str(self)
+
+
+def _raise(r: httpx.Response) -> None:
+    if r.status_code < 400:
+        return
+    try:
+        body = r.json()
+        err = body.get("error")
+        msg = err.get("message") if isinstance(err, dict) else f"{err}: {body.get('error_description', '')}"
+    except ValueError:
+        msg = r.text[:300]
+    hint = ""
+    if r.status_code == 429 or "quota" in (msg or "").lower():
+        hint = " — Business Profile API quota is 0 until Google approves your API access request."
+    elif r.status_code == 403:
+        hint = " — check that the API is enabled in Google Cloud and the Google account manages this profile."
+    raise GoogleApiError(r.status_code, f"Google API {r.status_code}: {msg}{hint}")
+
+
+# ---------- OAuth ----------
+
+def auth_url(state: str) -> str:
+    return AUTH_URL + "?" + urlencode({
+        "client_id": settings.google_client_id,
+        "redirect_uri": settings.google_redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",  # we need a refresh token for background sync
+        "prompt": "consent",       # always return a refresh token, even on reconnect
+        "include_granted_scopes": "true",
+        "state": state,
+    })
+
+
+def exchange_code(code: str) -> dict:
+    r = http.post(TOKEN_URL, data={
+        "code": code, "client_id": settings.google_client_id, "client_secret": settings.google_client_secret,
+        "redirect_uri": settings.google_redirect_uri, "grant_type": "authorization_code",
+    })
+    _raise(r)
+    return r.json()
+
+
+_token_cache: dict[str, tuple[str, float]] = {}
+
+
+def access_token(refresh_token: str) -> str:
+    cached = _token_cache.get(refresh_token)
+    if cached and cached[1] > time.time() + 60:
+        return cached[0]
+    r = http.post(TOKEN_URL, data={
+        "refresh_token": refresh_token, "client_id": settings.google_client_id, "client_secret": settings.google_client_secret,
+        "grant_type": "refresh_token",
+    })
+    _raise(r)
+    body = r.json()
+    _token_cache[refresh_token] = (body["access_token"], time.time() + int(body.get("expires_in", 3600)))
+    return body["access_token"]
+
+
+def userinfo_email(token: str) -> str:
+    r = http.get(USERINFO_URL, headers={"Authorization": f"Bearer {token}"})
+    _raise(r)
+    return r.json().get("email", "")
+
+
+# ---------- Business Profile ----------
+
+class Gbp:
+    def __init__(self, token: str):
+        self.h = {"Authorization": f"Bearer {token}"}
+
+    def _get(self, url: str, **params) -> dict:
+        r = http.get(url, headers=self.h, params={k: v for k, v in params.items() if v is not None})
+        _raise(r)
+        return r.json()
+
+    def _paged(self, url: str, key: str, **params) -> list[dict]:
+        out, token = [], None
+        while True:
+            body = self._get(url, pageToken=token, **params)
+            out += body.get(key, [])
+            token = body.get("nextPageToken")
+            if not token:
+                return out
+
+    def accounts(self) -> list[dict]:
+        return self._paged(ACCOUNTS_URL, "accounts", pageSize=20)
+
+    def locations(self, account: str) -> list[dict]:
+        return self._paged(f"{INFO_BASE}/{account}/locations", "locations", pageSize=100,
+                           readMask="name,title,storefrontAddress,websiteUri,phoneNumbers,metadata")
+
+    def reviews(self, account: str, location: str, max_pages: int = 10) -> dict:
+        """Returns {"reviews": [...], "averageRating": x, "totalReviewCount": n} (newest first)."""
+        url = f"{V4_BASE}/{account}/{location}/reviews"
+        out: dict = {"reviews": []}
+        token = None
+        for _ in range(max_pages):
+            body = self._get(url, pageSize=50, pageToken=token, orderBy="updateTime desc")
+            out["reviews"] += body.get("reviews", [])
+            out["averageRating"] = body.get("averageRating", out.get("averageRating"))
+            out["totalReviewCount"] = body.get("totalReviewCount", out.get("totalReviewCount"))
+            token = body.get("nextPageToken")
+            if not token:
+                break
+        return out
+
+    def reply(self, account: str, location: str, review_id: str, comment: str) -> dict:
+        r = http.put(f"{V4_BASE}/{account}/{location}/reviews/{review_id}/reply", headers=self.h, json={"comment": comment})
+        _raise(r)
+        return r.json()
+
+    def create_post(self, account: str, location: str, summary: str, url: str | None = None) -> dict:
+        body: dict = {"languageCode": "en", "summary": summary[:1500], "topicType": "STANDARD"}
+        if url:
+            body["callToAction"] = {"actionType": "LEARN_MORE", "url": url}
+        r = http.post(f"{V4_BASE}/{account}/{location}/localPosts", headers=self.h, json=body)
+        _raise(r)
+        return r.json()
+
+    def daily_metrics(self, location: str, start: date, end: date) -> dict[str, dict[date, int]]:
+        metrics = ["BUSINESS_IMPRESSIONS_DESKTOP_MAPS", "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH", "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
+                   "BUSINESS_IMPRESSIONS_MOBILE_SEARCH", "CALL_CLICKS", "WEBSITE_CLICKS", "BUSINESS_DIRECTION_REQUESTS"]
+        params = [("dailyMetrics", m) for m in metrics] + [
+            ("dailyRange.start_date.year", start.year), ("dailyRange.start_date.month", start.month), ("dailyRange.start_date.day", start.day),
+            ("dailyRange.end_date.year", end.year), ("dailyRange.end_date.month", end.month), ("dailyRange.end_date.day", end.day),
+        ]
+        r = http.get(f"{PERF_BASE}/{location}:fetchMultiDailyMetricsTimeSeries", headers=self.h, params=params)
+        _raise(r)
+        out: dict[str, dict[date, int]] = {}
+        for group in r.json().get("multiDailyMetricTimeSeries", []):
+            for series in group.get("dailyMetricTimeSeries", []):
+                vals = out.setdefault(series["dailyMetric"], {})
+                for dv in series.get("timeSeries", {}).get("datedValues", []):
+                    d = dv["date"]
+                    vals[date(d["year"], d["month"], d["day"])] = int(dv.get("value", 0) or 0)
+        return out

@@ -1,19 +1,36 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 
 from .ai import ai_enabled
 from .config import settings
-from .routers import analytics, auth, clients, content, dashboard, reports, reviews, seo, tasks
+from .routers import analytics, auth, clients, content, dashboard, google, reports, reviews, seo, tasks
 from .routers import settings as settings_router
 from .seed import init_db
+
+
+async def _scheduler(minutes: int) -> None:
+    from .jobs import run_once
+
+    while True:
+        try:
+            logging.getLogger("greenmedia.jobs").info("scheduler: %s", await run_in_threadpool(run_once))
+        except Exception:  # noqa: BLE001 — never let the loop die
+            logging.getLogger("greenmedia.jobs").exception("scheduler pass failed")
+        await asyncio.sleep(minutes * 60)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db(seed_if_empty=settings.seed_demo)
+    task = asyncio.create_task(_scheduler(settings.scheduler_minutes)) if settings.scheduler_minutes > 0 else None
     yield
+    if task:
+        task.cancel()
 
 
 app = FastAPI(title="Green Media AI Command Center API", version="1.0.0", lifespan=lifespan)
@@ -21,7 +38,7 @@ app = FastAPI(title="Green Media AI Command Center API", version="1.0.0", lifesp
 # Browsers only: the Django frontend calls the API server-to-server and Flutter is native, so neither needs CORS.
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, tasks, settings_router):
+for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, tasks, settings_router, google):
     app.include_router(r.router)
 
 

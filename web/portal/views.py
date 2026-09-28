@@ -122,8 +122,15 @@ def gmb(request):
     cl = _clients(request)
     cid = _client_filter(request, cl[0]["id"])
     if request.method == "POST":
-        request.api.post(f"/api/clients/{cid}/gmb/sync")
-        messages.success(request, "Google Business Profile synced.")
+        out = request.api.post(f"/api/clients/{cid}/gmb/sync")
+        if "sync" in out:
+            s = out["sync"]
+            messages.success(request, f"Synced from Google: {s['new_reviews']} new reviews, {s['total_on_google']} total on Google"
+                                      + (f", {s['metric_days']} days of insights." if "metric_days" in s else "."))
+            if s.get("metrics_error"):
+                messages.warning(request, f"Insights not updated: {s['metrics_error']}")
+        else:
+            messages.success(request, "Profile synced (demo data — link a real Google location to go live).")
         return _back(request)
     c = request.api.get(f"/api/clients/{cid}")
     insights = request.api.get(f"/api/clients/{cid}/insights", days=45)
@@ -136,6 +143,51 @@ def gmb(request):
     })
 
 
+# ---------- Google Business Profile connections ----------
+
+@login_required("gmb")
+def google_connections(request):
+    result = request.GET.get("google", "")
+    if result.startswith("connected:"):
+        messages.success(request, f"Connected {result.split(':', 1)[1]}. Now link its locations to clients below.")
+    elif result.startswith("error:"):
+        messages.error(request, f"Google connection failed: {result.split(':', 1)[1]}")
+    if result:
+        return redirect("google")  # drop the query string so a refresh doesn't repeat the message
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "connect":
+            return ShareRedirect(request.api.post("/api/google/connect")["auth_url"])
+        if action == "link":
+            out = request.api.post("/api/google/link", {
+                "client_id": _int(request.POST.get("client_id")), "connection_id": _int(request.POST.get("connection_id")),
+                "account": request.POST["account"], "location": request.POST["location"], "title": request.POST.get("title", ""),
+            })
+            if "sync_error" in out:
+                messages.warning(request, f"Linked, but the first sync failed: {out['sync_error']}")
+            else:
+                s = out["sync"]
+                messages.success(request, f"Linked and synced: {s['new_reviews']} reviews imported ({s['total_on_google']} on Google).")
+        elif action == "unlink":
+            request.api.post("/api/google/unlink", {"client_id": _int(request.POST.get("client_id"))})
+            messages.success(request, "Location unlinked — the client is back on demo data.")
+        elif action == "disconnect":
+            request.api.delete(f"/api/google/connections/{_int(request.POST.get('connection_id'))}")
+            messages.success(request, "Google account disconnected and access revoked.")
+        return redirect("google")
+
+    can_manage = can(request, "client.edit")
+    status = request.api.get("/api/google/status") if can_manage else None
+    locations, loc_errors = [], []
+    if status and status["configured"] and any(c["status"] == "active" for c in status["connections"]):
+        data = request.api.get("/api/google/locations")
+        locations, loc_errors = data["locations"], data["errors"]
+    return render(request, "portal/google.html", {
+        "status": status, "locations": locations, "loc_errors": loc_errors, "clients": _clients(request), "can_manage": can_manage,
+    })
+
+
 # ---------- reviews ----------
 
 @login_required("reviews")
@@ -144,7 +196,12 @@ def reviews(request):
         rid, action = request.POST.get("review_id"), request.POST.get("action")
         if action == "sync":
             r = request.api.post("/api/reviews/sync", {"client_id": _client_filter(request)})
-            messages.success(request, f"New {r['rating']}★ review for {r['client_name']} — {'auto-published' if r['reply_status'] == 'published' else 'AI draft ready'}.")
+            if r["mode"] == "live":
+                messages.success(request, f"Pulled {r['new_reviews']} new review(s) from {r['profiles']} live Google profile(s).")
+                for err in r["errors"]:
+                    messages.error(request, err)
+            else:
+                messages.success(request, f"Demo: new {r['rating']}★ review for {r['client_name']} — {'auto-published' if r['reply_status'] == 'published' else 'AI draft ready'}.")
         elif action == "save":
             request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST.get("reply", "")})
             messages.success(request, "Reply saved.")

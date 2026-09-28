@@ -45,11 +45,17 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
 
   Future<void> _sync() async {
     await runAction(context, (api) async {
-      final r = Review.fromJson(await api.post('/api/reviews/sync', {'client_id': _clientId}) as Map<String, dynamic>);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('New ${r.rating}★ review for ${r.clientName} — ${r.replyStatus == 'published' ? 'auto-published' : 'AI draft ready'}')));
+      final out = await api.post('/api/reviews/sync', {'client_id': _clientId}) as Map<String, dynamic>;
+      if (!mounted) return;
+      final String msg;
+      if (out['mode'] == 'live') {
+        final errors = (out['errors'] as List).cast<String>();
+        msg = 'Pulled ${out['new_reviews']} new review(s) from ${out['profiles']} live Google profile(s)${errors.isEmpty ? '' : ' · ${errors.join('; ')}'}';
+      } else {
+        final r = Review.fromJson(out);
+        msg = 'Demo: new ${r.rating}★ review for ${r.clientName} — ${r.replyStatus == 'published' ? 'auto-published' : 'AI draft ready'}';
       }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     });
     _listKey.currentState?.reload();
   }

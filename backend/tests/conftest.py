@@ -7,6 +7,11 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_db.name}"
 os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["SEED_DEMO"] = "1"
+os.environ["GOOGLE_CLIENT_ID"] = "test-client.apps.googleusercontent.com"
+os.environ["GOOGLE_CLIENT_SECRET"] = "test-secret"
+os.environ["GOOGLE_REDIRECT_URI"] = "http://testserver/api/google/callback"
+os.environ["WEB_APP_URL"] = "http://web.test"
+os.environ["SCHEDULER_INTERVAL_MINUTES"] = "0"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

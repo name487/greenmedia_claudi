@@ -1,11 +1,13 @@
 """Outbound publishing to Google Business Profile and social networks.
 
-These are the integration seams for the official APIs (GBP reviews/localPosts, Meta Graph, LinkedIn,
-YouTube). Until OAuth apps are approved they simulate success and return a fake external id, so the
-approval workflow, audit trail and failure handling can be exercised end to end."""
+Google Business Profile is live for any client linked to a real location (Settings → Google). Demo
+clients, and the social networks (Meta Graph, LinkedIn, YouTube) until their OAuth apps are approved,
+simulate success with a fake external id so the approval workflow and audit trail work end to end."""
 
 import uuid
 
+from .google import api as google_api
+from .google import service as google
 from .models import Client
 
 
@@ -16,13 +18,22 @@ class PublishError(Exception):
 def publish_review_reply(client: Client, external_review_id: str, reply: str) -> None:
     if not client.gmb or client.gmb.status != "connected":
         raise PublishError("Google Business Profile is not connected")
-    # TODO: PUT https://mybusiness.googleapis.com/v4/{location}/reviews/{id}/reply
+    if client.gmb.is_live:
+        try:
+            google.publish_reply(client, external_review_id, reply)
+        except google_api.GoogleApiError as e:
+            raise PublishError(str(e)) from e
 
 
 def publish_post(client: Client, platform: str, copy: str) -> str:
     if platform == "gmb":
         if not client.gmb or client.gmb.status != "connected":
             raise PublishError("Google Business Profile is not connected")
+        if client.gmb.is_live:
+            try:
+                return google.publish_post(client, copy)
+            except google_api.GoogleApiError as e:
+                raise PublishError(str(e)) from e
     else:
         acct = next((a for a in client.social_accounts if a.platform == platform), None)
         if not acct:

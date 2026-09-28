@@ -15,6 +15,17 @@ class Settings:
     ai_model: str = os.getenv("AI_MODEL", "")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    # Google Business Profile (OAuth web client from Google Cloud Console)
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    # Must exactly match an "Authorized redirect URI" on the OAuth client, e.g. https://api.example.com/api/google/callback
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8001/api/google/callback")
+    # Where the browser lands after connecting (the Django "Google Business Profile" page)
+    web_app_url: str = os.getenv("WEB_APP_URL", "http://localhost:8000").rstrip("/")
+    # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
+    # Background sync/publish loop inside the API process (0 = off; use `python -m app.jobs` from cron instead)
+    scheduler_minutes: int = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "0"))
     cors_origins: list[str] = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",") if o.strip()]
 
     @property
@@ -24,6 +35,10 @@ class Settings:
     @property
     def model(self) -> str:
         return self.ai_model or ("gpt-4.1-mini" if self.ai_provider == "openai" else "claude-sonnet-5")
+
+    @property
+    def google_configured(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
 
 
 settings = Settings()

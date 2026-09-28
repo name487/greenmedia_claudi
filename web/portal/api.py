@@ -46,6 +46,9 @@ class Api:
     def patch(self, path: str, json: dict):
         return self._request("PATCH", path, json=json)
 
+    def delete(self, path: str):
+        return self._request("DELETE", path)
+
 
 def api_for(request) -> Api:
     return Api(request.session.get(SESSION_TOKEN))

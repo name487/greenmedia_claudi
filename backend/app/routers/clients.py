@@ -7,6 +7,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..google import api as google_api
+from ..google import service as google_service
 from ..metrics import compare, periods, series, totals
 from ..models import Client, ClientContact, ContentItem, GmbAccount, Keyword, Report, Review, Task, User
 from ..security import audit, get_client, require, require_section, visible_client_ids
@@ -109,8 +111,17 @@ def update_client(client_id: int, body: ClientPatch, user: User = Depends(requir
 
 @router.post("/{client_id}/gmb/sync")
 def gmb_sync(client_id: int, user: User = Depends(require_section("gmb")), db: Session = Depends(get_db)):
-    """Connect (demo) or refresh the Google Business Profile link. Production: Google OAuth + reviews/insights pull."""
+    """Live profiles: pull reviews + insights from Google. Demo profiles: just mark them synced."""
     c = get_client(db, user, client_id)
+    if c.gmb and c.gmb.is_live:
+        try:
+            result = google_service.sync_client(db, c)
+        except google_api.GoogleApiError as e:
+            db.commit()  # keep the recorded error/status
+            raise HTTPException(502, str(e))
+        audit(db, user, f"Google sync: {result['new_reviews']} new reviews", client_id=c.id, entity_type="gmb_account", entity_id=c.gmb.id)
+        db.commit()
+        return {**client_out(c), "sync": result}
     was = c.gmb.status if c.gmb else None
     if not c.gmb:
         c.gmb = GmbAccount(tenant_id=user.tenant_id, location_id="locations/pending")

@@ -67,8 +67,16 @@ class ClientDetailScreen extends StatelessWidget {
               child: Column(children: [
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Google Business Profile'),
-                  subtitle: Text('Last sync ${fmtDateTime(parseDate(gmb?['last_sync']))}'),
+                  title: Row(children: [
+                    const Flexible(child: Text('Google Business Profile')),
+                    const SizedBox(width: 6),
+                    StatusChip(gmb?['is_live'] == true ? 'published' : 'draft', label: gmb?['is_live'] == true ? 'Live' : 'Demo'),
+                  ]),
+                  subtitle: Text([
+                    if (gmb?['is_live'] == true) '${gmb?['title']} · ${gmb?['google_email']}',
+                    'Last sync ${fmtDateTime(parseDate(gmb?['last_sync']))}',
+                    if ((gmb?['last_error'] as String? ?? '').isNotEmpty) '⚠ ${gmb?['last_error']}',
+                  ].join('\n')),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     StatusChip(gmb?['status'] as String? ?? 'disconnected'),
                     if (me.sees('gmb'))
@@ -76,7 +84,17 @@ class ClientDetailScreen extends StatelessWidget {
                         tooltip: 'Sync',
                         icon: const Icon(Icons.sync),
                         onPressed: () async {
-                          if (await runAction(context, (api) => api.post('/api/clients/$clientId/gmb/sync'), success: 'Google Business Profile synced')) reload();
+                          final ok = await runAction(context, (api) async {
+                            final out = await api.post('/api/clients/$clientId/gmb/sync') as Map<String, dynamic>;
+                            final sync = out['sync'] as Map<String, dynamic>?;
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  content: Text(sync == null
+                                      ? 'Synced (demo data)'
+                                      : 'Synced from Google: ${sync['new_reviews']} new reviews, ${sync['total_on_google']} total')));
+                            }
+                          });
+                          if (ok) reload();
                         },
                       ),
                   ]),

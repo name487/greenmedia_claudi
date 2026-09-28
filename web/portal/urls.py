@@ -9,6 +9,7 @@ urlpatterns = [
     path("clients/", views.clients, name="clients"),
     path("clients/<int:client_id>/", views.client_detail, name="client_detail"),
     path("gmb/", views.gmb, name="gmb"),
+    path("gmb/google/", views.google_connections, name="google"),
     path("reviews/", views.reviews, name="reviews"),
     path("content/", views.content, name="content"),
     path("creative/", views.creative, name="creative"),

@@ -1,0 +1,251 @@
+{
+ "kpis": {
+  "active_clients": 1,
+  "onboarding_clients": 0,
+  "gmb_connected": 1,
+  "gmb_disconnected": 0,
+  "pending_reviews": 3,
+  "negative_reviews": 1,
+  "scheduled_posts": 3,
+  "failed_posts": 0,
+  "leads": 253,
+  "leads_change_pct": 10,
+  "seo_alerts": 2
+ },
+ "growth": [
+  {
+   "date": "2026-08-28",
+   "gmb_views": 520,
+   "social_reach": 2448,
+   "leads": 10
+  },
+  {
+   "date": "2026-08-29",
+   "gmb_views": 393,
+   "social_reach": 2418,
+   "leads": 7
+  },
+  {
+   "date": "2026-08-30",
+   "gmb_views": 400,
+   "social_reach": 2283,
+   "leads": 7
+  },
+  {
+   "date": "2026-08-31",
+   "gmb_views": 551,
+   "social_reach": 2729,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-01",
+   "gmb_views": 418,
+   "social_reach": 2061,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-02",
+   "gmb_views": 524,
+   "social_reach": 2341,
+   "leads": 10
+  },
+  {
+   "date": "2026-09-03",
+   "gmb_views": 539,
+   "social_reach": 2670,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-04",
+   "gmb_views": 693,
+   "social_reach": 3149,
+   "leads": 10
+  },
+  {
+   "date": "2026-09-05",
+   "gmb_views": 413,
+   "social_reach": 2304,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-06",
+   "gmb_views": 398,
+   "social_reach": 1772,
+   "leads": 7
+  },
+  {
+   "date": "2026-09-07",
+   "gmb_views": 485,
+   "social_reach": 2641,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-08",
+   "gmb_views": 489,
+   "social_reach": 2408,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-09",
+   "gmb_views": 508,
+   "social_reach": 3003,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-10",
+   "gmb_views": 579,
+   "social_reach": 2478,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-11",
+   "gmb_views": 511,
+   "social_reach": 3172,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-12",
+   "gmb_views": 364,
+   "social_reach": 2037,
+   "leads": 6
+  },
+  {
+   "date": "2026-09-13",
+   "gmb_views": 333,
+   "social_reach": 2266,
+   "leads": 6
+  },
+  {
+   "date": "2026-09-14",
+   "gmb_views": 454,
+   "social_reach": 2804,
+   "leads": 10
+  },
+  {
+   "date": "2026-09-15",
+   "gmb_views": 489,
+   "social_reach": 3148,
+   "leads": 10
+  },
+  {
+   "date": "2026-09-16",
+   "gmb_views": 587,
+   "social_reach": 2409,
+   "leads": 10
+  },
+  {
+   "date": "2026-09-17",
+   "gmb_views": 528,
+   "social_reach": 2214,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-18",
+   "gmb_views": 684,
+   "social_reach": 2726,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-19",
+   "gmb_views": 395,
+   "social_reach": 2691,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-20",
+   "gmb_views": 378,
+   "social_reach": 2133,
+   "leads": 7
+  },
+  {
+   "date": "2026-09-21",
+   "gmb_views": 536,
+   "social_reach": 2662,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-22",
+   "gmb_views": 611,
+   "social_reach": 2645,
+   "leads": 11
+  },
+  {
+   "date": "2026-09-23",
+   "gmb_views": 554,
+   "social_reach": 2641,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-24",
+   "gmb_views": 525,
+   "social_reach": 2218,
+   "leads": 8
+  },
+  {
+   "date": "2026-09-25",
+   "gmb_views": 528,
+   "social_reach": 3580,
+   "leads": 9
+  },
+  {
+   "date": "2026-09-26",
+   "gmb_views": 473,
+   "social_reach": 2127,
+   "leads": 7
+  }
+ ],
+ "negative_reviews": [
+  {
+   "id": 5,
+   "client_id": 1,
+   "client_name": "Smile Dental Studio",
+   "author": "Karan D.",
+   "rating": 1,
+   "text": "Very rude behaviour at the front desk and nobody called me back. Terrible experience.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-16T11:00:27.941232+00:00",
+   "published_at": null
+  }
+ ],
+ "seo_alerts": [
+  {
+   "keyword": "top rated dental clinic",
+   "client_name": "Smile Dental Studio",
+   "previous_rank": 17,
+   "current_rank": 21
+  },
+  {
+   "keyword": "dental clinic open now",
+   "client_name": "Smile Dental Studio",
+   "previous_rank": 8,
+   "current_rank": 13
+  }
+ ],
+ "client_performance": [
+  {
+   "id": 1,
+   "company_name": "Smile Dental Studio",
+   "industry": "Dental Clinic",
+   "city": "Pune",
+   "status": "active",
+   "plan": "Starter",
+   "rating": 3.7,
+   "gmb_connected": true,
+   "contact_name": "Dev Gupta",
+   "gmb_views": 14860,
+   "leads": 253,
+   "leads_change_pct": 10,
+   "pending_reviews": 3
+  }
+ ],
+ "lead_sources": {
+  "calls": 504,
+  "directions": 786,
+  "website_clicks": 1178,
+  "social_engagement": 4914
+ }
+}

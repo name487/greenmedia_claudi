@@ -1,0 +1,39 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Team &amp; Tasks</h1><p class="muted">Assignments, approvals and audit trail</p></div>
+  <div class="page-actions">
+    <a class="btn ghost sm" href="{% if mine %}{% qs mine='' %}{% else %}{% qs mine='1' %}{% endif %}">{% if mine %}Show everyone's{% else %}Only mine{% endif %}</a>
+    {% include "portal/_client_select.html" with allow_all=True %}
+  </div>
+</div>
+<section class="card"><header class="card-head"><h3>New task</h3></header>
+  <form method="post" class="toolbar" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="create">
+    <input class="input" name="title" placeholder="What needs doing?" required minlength="2">
+    <select class="input" name="client_id" aria-label="Client">{% for c in clients %}<option value="{{ c.id }}"{% if c.id == cid %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select>
+    <select class="input" name="assigned_to" aria-label="Assignee">{% for u in staff %}<option value="{{ u.id }}"{% if u.id == me.id %} selected{% endif %}>{{ u.name }} · {{ u.role_label }}</option>{% endfor %}</select>
+    <select class="input" name="priority" aria-label="Priority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
+    <input class="input" style="flex:none;width:auto" type="date" name="due_date" value="{{ due }}" aria-label="Due date">
+    <button class="btn">Add</button>
+  </form>
+</section>
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
+{% for key, label, list in columns %}
+  <section class="card"><header class="card-head"><h3>{{ label }} ({{ list|length }})</h3></header>
+    <ul class="list">{% for t in list %}
+      <li><div class="row between"><strong>{{ t.title }}</strong>{{ t.priority|badge }}</div>
+        <div class="muted small">{{ t.client_name }} · {{ t.assignee_name }} · due {{ t.due_date|when:"date" }}</div>
+        <form method="post" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="task_id" value="{{ t.id }}">
+          <select class="input" name="status" style="min-height:30px;padding:2px 8px" onchange="this.form.submit()" aria-label="Status">
+            {% for sk, sl in statuses %}<option value="{{ sk }}"{% if sk == t.status %} selected{% endif %}>{{ sl }}</option>{% endfor %}
+          </select><noscript><button class="btn sm">Save</button></noscript></form></li>
+    {% endfor %}</ul>
+  </section>
+{% endfor %}
+</div>
+<section class="card"><header class="card-head"><h3>Audit trail</h3></header>
+  <ul class="list">{% for a in audit %}
+    <li class="row between small"><span><strong>{{ a.user_name }}</strong> {{ a.action }}{% if a.client_name %}<span class="muted"> · {{ a.client_name }}</span>{% endif %}</span><span class="muted">{{ a.created_at|when }}</span></li>
+  {% empty %}<li class="muted">Actions taken in the app are logged here.</li>{% endfor %}</ul>
+</section>
+{% endblock %}

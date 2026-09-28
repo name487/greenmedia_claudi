@@ -1,0 +1,53 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Clients</h1><p class="muted">{{ rows|length }} clients</p></div>
+</div>
+<form method="get" class="toolbar">
+  <input class="input" name="q" value="{{ f.q }}" placeholder="Search client, city or contact…">
+  <select class="input" name="industry" onchange="this.form.submit()" aria-label="Industry"><option value="">All industries</option>{% for i in facets.industries %}<option{% if i == f.industry %} selected{% endif %}>{{ i }}</option>{% endfor %}</select>
+  <select class="input" name="service" onchange="this.form.submit()" aria-label="Service"><option value="">All services</option>{% for i in facets.services %}<option{% if i == f.service %} selected{% endif %}>{{ i }}</option>{% endfor %}</select>
+  <select class="input" name="status" onchange="this.form.submit()" aria-label="Status"><option value="">Any status</option>{% for i in facets.statuses %}<option value="{{ i }}"{% if i == f.status %} selected{% endif %}>{{ i|capfirst }}</option>{% endfor %}</select>
+  <button class="btn soft">Search</button>
+</form>
+<section class="card">
+  <div class="table-wrap"><table class="table responsive">
+    <thead><tr><th>Client</th><th>Industry</th><th>Plan</th><th>Rating</th><th>Status</th><th>Quick actions</th></tr></thead>
+    <tbody>
+    {% for c in rows %}
+      <tr>
+        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit">{{ c.company_name }}</a><div class="muted small">{{ c.city }} · {{ c.contact_name }}</div></td>
+        <td data-label="Industry">{{ c.industry }}</td>
+        <td data-label="Plan">{{ c.plan }}</td>
+        <td data-label="Rating">{{ c.rating|stars }} {{ c.rating }}</td>
+        <td data-label="Status">{{ c.status|badge }}</td>
+        <td><div class="btn-row">
+          <a class="btn soft sm" href="{% url 'client_detail' c.id %}">Open</a>
+          <a class="btn soft sm" href="{% url 'reviews' %}?client={{ c.id }}">Reviews{% if c.pending_reviews %} ({{ c.pending_reviews }}){% endif %}</a>
+          <a class="btn soft sm" href="{% url 'content' %}?client={{ c.id }}">Content</a>
+          <a class="btn soft sm" href="{% url 'reports' %}?client={{ c.id }}">Report</a>
+        </div></td>
+      </tr>
+    {% empty %}<tr><td colspan="6" class="empty">No clients match.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% if 'client.edit' in perms %}
+<details class="card">
+  <summary>+ Add client</summary>
+  <form method="post" class="form">{% csrf_token %}
+    <div class="grid cols-2">
+      <label class="field">Company name <input class="input" name="company_name" required></label>
+      <label class="field">Website <input class="input" name="website" type="url" placeholder="https://"></label>
+      <label class="field">Industry <input class="input" name="industry"></label>
+      <label class="field">City <input class="input" name="city"></label>
+      <label class="field">Plan <select class="input" name="plan">{% for p in plans %}<option>{{ p }}</option>{% endfor %}</select></label>
+      <label class="field">Contact name <input class="input" name="contact_name"></label>
+      <label class="field">Contact email <input class="input" name="contact_email" type="email"></label>
+      <label class="field">Contact phone <input class="input" name="contact_phone"></label>
+    </div>
+    <div><button class="btn">Create client</button></div>
+  </form>
+</details>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Google Business Profile</h1><p class="muted">Posts, reviews, offers, photos, Q&amp;A and insights</p></div>
+  <div class="page-actions">{% include "portal/_client_select.html" with allow_all=False %}</div>
+</div>
+<div class="grid cols-3">
+  <section class="card"><header class="card-head"><h3>Connection health</h3></header>
+    <div class="form">
+      <div class="row between"><span>Status</span>{{ c.gmb.status|badge }}</div>
+      <div class="row between"><span>Location</span><span class="muted small">{{ c.gmb.location_id }}</span></div>
+      <div class="row between"><span>Last sync</span><span class="muted small">{{ c.gmb.last_sync|when|default:"—" }}</span></div>
+      <form method="post">{% csrf_token %}<button class="btn soft block">{% if c.gmb.status == 'connected' %}Sync now{% else %}Connect with Google{% endif %}</button></form>
+      {% if c.gmb.status != 'connected' %}<p class="muted small" style="margin:0">Uses Google's official OAuth flow; tokens are stored encrypted on the server.</p>{% endif %}
+    </div>
+  </section>
+  <section class="card span-2"><header class="card-head"><h3>Profile</h3></header>
+    <div class="grid stats">
+      <div class="stat"><span class="stat-label">Rating</span><strong class="stat-value">{{ c.gmb.rating|stars }} {{ c.gmb.rating }}</strong><span class="stat-hint">{{ c.gmb.review_count }} total</span></div>
+      <div class="stat"><span class="stat-label">Unanswered (recent)</span><strong class="stat-value">{{ unanswered }}</strong></div>
+      <div class="stat"><span class="stat-label">Profile views</span><strong class="stat-value">{{ k.gmb_views.current|compact }}</strong>{{ k.gmb_views.change_pct|delta }}</div>
+      <div class="stat"><span class="stat-label">Calls</span><strong class="stat-value">{{ k.gmb_calls.current }}</strong>{{ k.gmb_calls.change_pct|delta }}</div>
+    </div>
+  </section>
+</div>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Insights — 45 days</h3></header>{% line_chart series "gmb_views|Views|var(--c1)" "web_clicks|Web clicks ×10|var(--c3)|10" %}</section>
+  <section class="card"><header class="card-head"><h3>Customer actions (30d)</h3></header>{% bar_list actions %}</section>
+</div>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Posts &amp; offers</h3>{% if 'content.create' in perms %}<a class="btn sm" href="{% url 'content' %}?client={{ cid }}">New post</a>{% endif %}</header>
+    <ul class="list">{% for p in posts %}
+      <li class="row between"><span>{{ p.topic }}<div class="muted small">{{ p.content_type }} · {{ p.scheduled_at|when|default:"unscheduled" }}</div></span>{{ p.status|badge }}</li>
+    {% empty %}<li class="muted">No GMB posts yet.</li>{% endfor %}</ul>
+  </section>
+  <section class="card"><header class="card-head"><h3>Recent reviews</h3>{% if 'reviews' in me.sections %}<a class="small" href="{% url 'reviews' %}?client={{ cid }}">Review queue</a>{% endif %}</header>
+    <ul class="list">{% for r in c.reviews %}
+      <li><div class="row between"><span>{{ r.rating|stars }} <span class="small">{{ r.author }}</span></span>{{ r.reply_status|badge }}</div><p class="small" style="margin:4px 0 0">{{ r.text }}</p></li>
+    {% endfor %}</ul>
+  </section>
+</div>
+{% endblock %}

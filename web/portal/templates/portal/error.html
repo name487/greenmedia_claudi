@@ -1,0 +1,5 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<div class="page-header"><div><h1>Can't reach the API</h1><p class="muted">{{ error }}</p></div></div>
+<div class="card"><p>Start the FastAPI backend (<code>cd backend && uvicorn app.main:app --port 8001</code>) and reload.</p></div>
+{% endblock %}

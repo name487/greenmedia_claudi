@@ -1,0 +1,25 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Analytics</h1><p class="muted">GMB + SEO + Social + leads in one place</p></div>
+  <div class="page-actions">
+    {% include "portal/_client_select.html" with allow_all=True %}
+    <div class="pill-tabs" style="margin:0"><a href="{% qs days=7 %}" class="{% if days == 7 %}on{% endif %}">7d</a><a href="{% qs days=30 %}" class="{% if days == 30 %}on{% endif %}">30d</a><a href="{% qs days=45 %}" class="{% if days == 45 %}on{% endif %}">45d</a></div>
+  </div>
+</div>
+<div class="grid stats">
+  <div class="stat"><span class="stat-label">GMB views</span><strong class="stat-value">{{ t.gmb_views.current|compact }}</strong>{{ t.gmb_views.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">GMB actions</span><strong class="stat-value">{{ actions.current|compact }}</strong>{{ actions.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Website traffic</span><strong class="stat-value">{{ t.organic_sessions.current|compact }}</strong>{{ t.organic_sessions.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Social reach</span><strong class="stat-value">{{ t.social_reach.current|compact }}</strong>{{ t.social_reach.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Engagement</span><strong class="stat-value">{{ t.engagement.current|compact }}</strong>{{ t.engagement.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Leads</span><strong class="stat-value">{{ t.leads.current|compact }}</strong>{{ t.leads.change_pct|delta }}</div>
+</div>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Google Business Profile</h3></header>{% line_chart d.series "gmb_views|Views|var(--c1)" "gmb_actions|Actions ×5|var(--c3)|5" %}</section>
+  <section class="card"><header class="card-head"><h3>Website (GA4)</h3></header>{% line_chart d.series "organic_sessions|Organic sessions|var(--c2)" %}</section>
+  <section class="card"><header class="card-head"><h3>Social</h3></header>{% line_chart d.series "social_reach|Reach|var(--c4)" "engagement|Engagement ×10|var(--c3)|10" %}</section>
+  <section class="card"><header class="card-head"><h3>Leads by source</h3></header>{% bar_list sources %}</section>
+</div>
+{% if top %}<section class="card"><header class="card-head"><h3>Top clients by leads</h3></header>{% bar_list top %}</section>{% endif %}
+{% endblock %}

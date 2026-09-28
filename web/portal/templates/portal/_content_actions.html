@@ -1,0 +1,8 @@
+<form method="post" class="btn-row">{% csrf_token %}<input type="hidden" name="content_id" value="{{ c.id }}">
+  {% if c.status == 'draft' and 'content.create' in perms %}<button class="btn soft sm" name="action" value="submit">Send for approval</button>{% endif %}
+  {% if c.status == 'in_review' and 'content.approve' in perms %}
+    <button class="btn ghost sm" name="action" value="request_changes">Request changes</button>
+    <button class="btn sm" name="action" value="approve">Approve</button>
+  {% endif %}
+  {% if c.status == 'scheduled' or c.status == 'failed' %}{% if 'content.publish' in perms %}<button class="btn sm" name="action" value="publish">{% if c.status == 'failed' %}Retry{% else %}Publish now{% endif %}</button>{% endif %}{% endif %}
+</form>

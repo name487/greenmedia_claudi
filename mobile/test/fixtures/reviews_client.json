@@ -1,0 +1,56 @@
+{
+ "counts": {
+  "pending": 3,
+  "approved": 0,
+  "negative": 1,
+  "published": 4,
+  "all": 7
+ },
+ "items": [
+  {
+   "id": 5,
+   "client_id": 1,
+   "client_name": "Smile Dental Studio",
+   "author": "Karan D.",
+   "rating": 1,
+   "text": "Very rude behaviour at the front desk and nobody called me back. Terrible experience.",
+   "language": "en",
+   "sentiment": "negative",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": true,
+   "created_at": "2026-09-16T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 6,
+   "client_id": 1,
+   "client_name": "Smile Dental Studio",
+   "author": "Farhan P.",
+   "rating": 5,
+   "text": "Best in the city! Quick service and great value for money.",
+   "language": "en",
+   "sentiment": "positive",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": false,
+   "created_at": "2026-09-24T11:00:27.941232+00:00",
+   "published_at": null
+  },
+  {
+   "id": 4,
+   "client_id": 1,
+   "client_name": "Smile Dental Studio",
+   "author": "Rahul R.",
+   "rating": 4,
+   "text": "Clean place, polite team. Parking is a bit difficult.",
+   "language": "en",
+   "sentiment": "positive",
+   "reply": null,
+   "reply_status": "new",
+   "needs_escalation": false,
+   "created_at": "2026-09-08T11:00:27.941232+00:00",
+   "published_at": null
+  }
+ ]
+}

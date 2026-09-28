@@ -1,0 +1,24 @@
+{
+ "access_token": "test-token-client",
+ "token_type": "bearer",
+ "user": {
+  "id": 6,
+  "name": "Dr. Anjali Rao",
+  "email": "anjali@smiledental.in",
+  "role": "client",
+  "role_label": "Client",
+  "client_id": 1,
+  "client_name": "Smile Dental Studio",
+  "sections": [
+   "dashboard",
+   "reviews",
+   "content",
+   "analytics",
+   "reports"
+  ],
+  "permissions": [
+   "review.approve",
+   "content.approve"
+  ]
+ }
+}

@@ -1,0 +1,193 @@
+"""AI orchestration (blueprint §6): review replies, platform content and monthly report narratives.
+
+Calls Anthropic or OpenAI when a key is configured; otherwise (or if the provider fails) falls back to
+deterministic templates so the product keeps working. Every function returns (result, source)."""
+
+import json
+import logging
+import re
+
+import httpx
+
+from .config import settings
+
+log = logging.getLogger("greenmedia.ai")
+
+PLATFORM_FORMAT = {"gmb": "4:3", "facebook": "1:1", "instagram": "4:5", "linkedin": "1.91:1", "youtube": "16:9", "x": "16:9"}
+PLATFORM_LIMIT = {"gmb": 1500, "facebook": 2000, "instagram": 2200, "linkedin": 3000, "youtube": 5000, "x": 280}
+PLATFORM_GUIDE = {
+    "gmb": "Google Business Profile post: up to 1500 chars, plain text, no hashtags, local and specific, ends with the CTA.",
+    "facebook": "Facebook: conversational, 1-3 short paragraphs, up to 3 hashtags.",
+    "instagram": "Instagram: hook in the first line, line breaks, emojis sparingly, 5-10 hashtags at the end.",
+    "linkedin": "LinkedIn: professional, value-first, 2-4 short paragraphs, up to 3 hashtags.",
+    "youtube": "YouTube description: title line, 2-3 sentence description, website link.",
+    "x": "X: under 280 characters including hashtags.",
+}
+
+
+def ai_enabled() -> bool:
+    return bool(settings.ai_key)
+
+
+def _complete(system: str, user: str, max_tokens: int = 800) -> str:
+    if settings.ai_provider == "openai":
+        r = httpx.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"authorization": f"Bearer {settings.ai_key}"},
+            json={"model": settings.model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
+    r = httpx.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": settings.ai_key, "anthropic-version": "2023-06-01"},
+        json={"model": settings.model, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": user}]},
+        timeout=60,
+    )
+    r.raise_for_status()
+    return "".join(b["text"] for b in r.json()["content"] if b["type"] == "text").strip()
+
+
+def _try(system: str, user: str, max_tokens: int) -> str | None:
+    if not ai_enabled():
+        return None
+    try:
+        return _complete(system, user, max_tokens)
+    except Exception as exc:  # provider down, bad key, rate limit: fall back to templates
+        log.warning("AI provider failed, using template: %s", exc)
+        return None
+
+
+def _voice(bv: dict) -> str:
+    parts = [f"Tone: {bv.get('tone') or 'warm and professional'}."]
+    if bv.get("preferred_phrases"):
+        parts.append(f"Preferred phrases (use naturally, not all at once): {'; '.join(bv['preferred_phrases'])}.")
+    if bv.get("prohibited_claims"):
+        parts.append(f"Never claim or imply: {'; '.join(bv['prohibited_claims'])}.")
+    if bv.get("cta_style"):
+        parts.append(f"Call-to-action style: {bv['cta_style']}.")
+    return "\n".join(parts)
+
+
+# ---------- review replies ----------
+
+def review_reply(*, company: str, industry: str, city: str, phone: str, brand_voice: dict, author: str, rating: int, text: str, language: str, sentiment: str) -> tuple[str, str]:
+    system = (
+        f"You write public replies to Google reviews on behalf of {company}, a {industry} business in {city}.\n{_voice(brand_voice)}\n"
+        f"Rules: reply in the same language as the review (language code: {language}). 2-4 sentences. Address the reviewer by first name. "
+        "Never reveal private details, admit legal liability, or offer compensation publicly. For negative reviews: apologise sincerely, "
+        "acknowledge the specific issue, and invite them to continue offline. Output only the reply text."
+    )
+    out = _try(system, f'Rating: {rating}/5\nReviewer: {author}\nReview: """{text}"""', 400)
+    if out:
+        return out, "ai"
+
+    name = author.split(" ")[0]
+    sign = f"— Team {company}"
+    phrases = brand_voice.get("preferred_phrases") or []
+    if language == "hi":
+        return f"{name} जी, आपके सुंदर शब्दों के लिए धन्यवाद! हमें ख़ुशी है कि आपका अनुभव अच्छा रहा। फिर मिलेंगे। {sign}", "template"
+    if sentiment == "negative":
+        return (f"Hi {name}, we're truly sorry to hear about your experience — this isn't the standard we hold ourselves to. We'd like to make it right; "
+                f"please reach out to us at {phone} so our team can look into this personally. {sign}"), "template"
+    if sentiment == "neutral":
+        return (f"Hi {name}, thank you for taking the time to share your feedback. We're always working to improve, and your comments help us do that. "
+                f"We hope to give you an even better experience on your next visit. {sign}"), "template"
+    first = phrases[0] if phrases else "We appreciate you"
+    second = phrases[1] if len(phrases) > 1 else "at your service"
+    return f"Hi {name}, thank you so much for the kind words! {first} — we're glad to be {second}. See you again soon! {sign}", "template"
+
+
+# ---------- content ----------
+
+def _parse_json(text: str) -> dict:
+    m = re.search(r"\{[\s\S]*\}", text)
+    return json.loads(m.group(0) if m else text)
+
+
+def generate_content(*, company: str, industry: str, city: str, website: str, brand_voice: dict, topic: str, content_type: str, platforms: list[str]) -> tuple[dict, str]:
+    system = (
+        f"You are the social media copywriter for {company} ({industry}, {city}, {website}).\n{_voice(brand_voice)}\n"
+        'Respond with JSON only, matching: {"master_copy": string, "hashtags": string[], "variants": [{"platform": string, "copy": string}], "creative_brief": string}.'
+    )
+    user = (
+        f"Create a {content_type} about: {topic}\nWrite one master copy, then one variant per platform following these rules:\n"
+        + "\n".join(f"- {p}: {PLATFORM_GUIDE.get(p, '')}" for p in platforms)
+        + "\nThe creative_brief describes one master visual (mood, subject, headline under 6 words, CTA) for a designer."
+    )
+    out = _try(system, user, 2000)
+    if out:
+        try:
+            data = _parse_json(out)
+            data["variants"] = [
+                {"platform": v["platform"], "copy": v["copy"][: PLATFORM_LIMIT[v["platform"]]], "format": PLATFORM_FORMAT[v["platform"]]}
+                for v in data.get("variants", [])
+                if v.get("platform") in platforms
+            ]
+            if data.get("master_copy") and data["variants"]:
+                return data, "ai"
+        except (ValueError, KeyError, TypeError) as exc:
+            log.warning("AI content was not valid JSON, using template: %s", exc)
+
+    cta = brand_voice.get("cta_style") or "Contact us"
+    phrases = brand_voice.get("preferred_phrases") or []
+    tag = lambda s: "#" + re.sub(r"[^A-Za-z0-9]", "", s.title())  # noqa: E731
+    tags = [tag(city), tag(industry), tag(topic), "#ShopLocal"]
+    trusted = phrases[1] if len(phrases) > 1 else f"a trusted name in {city}"
+    master = f"{topic} at {company}! As {trusted}, we're bringing you something worth checking out. {cta} today."
+
+    def variant(p: str) -> str:
+        if p == "gmb":
+            return f"{master} Visit {website}"
+        if p == "instagram":
+            return f"✨ {topic} ✨\n\n{master}\n\n{' '.join(tags)}"
+        if p == "linkedin":
+            return f"We're excited to share: {topic}.\n\nAt {company}, we believe in serving {city} with care and consistency. {cta} to learn more.\n\n{' '.join(tags[:3])}"
+        if p == "x":
+            return f"{topic} at {company} 🎉 {cta}! {' '.join(tags[:2])}"
+        if p == "youtube":
+            return f"{topic} | {company}, {city}\n\n{master}\n\nWebsite: {website}"
+        return f"{master} {' '.join(tags[:3])}"
+
+    return {
+        "master_copy": master,
+        "hashtags": tags,
+        "variants": [{"platform": p, "copy": variant(p)[: PLATFORM_LIMIT[p]], "format": PLATFORM_FORMAT[p]} for p in platforms],
+        "creative_brief": (
+            f'Visual for "{topic}" — {(brand_voice.get("tone") or "friendly").lower()} mood, {industry.lower()} setting in {city}. '
+            f'Logo bottom-right, headline max 6 words, CTA button "{cta}". Export sizes: {", ".join(f"{p} {PLATFORM_FORMAT[p]}" for p in platforms)}.'
+        ),
+    }, "template"
+
+
+# ---------- reports ----------
+
+def pct(cur: float, prev: float) -> int:
+    return round((cur - prev) / prev * 100) if prev else 0
+
+
+def report_summary(*, company: str, industry: str, current: dict, previous: dict, rank_up: int, rank_down: int, reviews_replied: int, posts_published: int) -> tuple[str, str]:
+    system = (
+        f"You are a marketing analyst at Green Media Technology writing the monthly report for {company} ({industry}). Plain language for a business owner. "
+        "Four short paragraphs: performance summary with the key numbers and % changes, search visibility, actions taken, and a concrete 3-point plan for next month. "
+        "No markdown headings. Only use numbers given to you."
+    )
+    facts = {"current": current, "previous": previous, "keywords_improved": rank_up, "keywords_declined": rank_down, "reviews_replied": reviews_replied, "posts_published": posts_published}
+    out = _try(system, json.dumps(facts), 900)
+    if out:
+        return out, "ai"
+
+    def d(n: int) -> str:
+        return f"up {n}%" if n >= 0 else f"down {abs(n)}%"
+
+    views, leads, organic = pct(current["gmb_views"], previous["gmb_views"]), pct(current["leads"], previous["leads"]), pct(current["organic_sessions"], previous["organic_sessions"])
+    return "\n\n".join([
+        f"Performance summary: Google Business Profile views were {d(views)} ({current['gmb_views']:,}), organic sessions {d(organic)}, and total leads {d(leads)} at {current['leads']}.",
+        f"Search visibility: {rank_up} keyword(s) improved and {rank_down} declined.",
+        f"Actions taken: {reviews_replied} review replies published and {posts_published} posts published across channels.",
+        "Next month: "
+        + ("prioritise conversion — refresh GMB offers and add call-to-action posts; " if leads < 0 else "scale what is working — increase posting cadence on top channels; ")
+        + ("recover slipping keywords with on-page updates; " if rank_down > rank_up else "build content for keywords close to page one; ")
+        + "keep review response time under 24 hours.",
+    ]), "template"

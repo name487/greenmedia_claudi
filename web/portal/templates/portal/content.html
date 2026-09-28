@@ -1,0 +1,60 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header"><div><h1>AI Content Studio</h1><p class="muted">Topic → AI draft → platform variants → creative brief → approval → schedule</p></div></div>
+
+{% if can_create %}
+<form method="post" class="grid cols-2">{% csrf_token %}
+  <section class="card"><header class="card-head"><h3>1. Brief</h3></header>
+    <div class="form">
+      <label class="field">Client
+        <select class="input" name="client_id" onchange="location.href='?client='+this.value">
+          {% for c in clients %}<option value="{{ c.id }}"{% if c.id == brief_cid %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}
+        </select></label>
+      <label class="field">Topic or offer <input class="input" name="topic" value="{{ topic }}" placeholder="e.g. Diwali 20% off teeth whitening"></label>
+      <div class="field">Type
+        <div class="chips">{% for t in types %}<label class="chip"><input type="radio" name="content_type" value="{{ t }}"{% if t == ctype %} checked{% endif %} hidden> {{ t }}</label>{% endfor %}</div></div>
+      <div class="field">Platforms
+        <div class="chips">{% for p in platforms %}<label class="chip"><input type="checkbox" name="platforms" value="{{ p }}"{% if p in selected %} checked{% endif %} hidden> {{ p|platform }}</label>{% endfor %}</div></div>
+      <p class="muted small" style="margin:0">Voice: {{ brand_voice.tone }} · CTA “{{ brand_voice.cta_style }}” · avoids {{ brand_voice.prohibited_claims|join:", " }}</p>
+      <button class="btn" name="action" value="generate">{% icon 'sparkle' 16 %} {% if draft %}Regenerate{% else %}Generate with AI{% endif %}</button>
+    </div>
+  </section>
+
+  <section class="card"><header class="card-head"><h3>2. Review &amp; schedule</h3>{% if draft %}<span class="badge badge-{% if draft.source == 'ai' %}purple{% else %}gray{% endif %}">{% if draft.source == 'ai' %}AI{% elif draft.source == 'edited' %}Edited{% else %}Offline template{% endif %}</span>{% endif %}</header>
+    {% if not draft %}<div class="empty">Your AI draft and platform variants appear here.</div>{% else %}
+    <div class="form">
+      <input type="hidden" name="hashtags" value="{{ draft_hashtags_json }}">
+      <label class="field">Master copy <textarea class="input" name="master_copy">{{ draft.master_copy }}</textarea></label>
+      {% for v in draft.variants %}
+        <input type="hidden" name="variant_platforms" value="{{ v.platform }}"><input type="hidden" name="format_{{ v.platform }}" value="{{ v.format }}">
+        <label class="field"><span>{{ v.platform|platform }} · {{ v.format }} · {{ v.copy|length }} chars</span><textarea class="input" name="copy_{{ v.platform }}">{{ v.copy }}</textarea></label>
+      {% endfor %}
+      <input type="hidden" name="creative_brief" value="{{ draft.creative_brief }}">
+      <div class="notice info"><strong>Creative brief:</strong> {{ draft.creative_brief }} <a href="{% url 'creative' %}?client={{ brief_cid }}&headline={{ topic|urlencode }}">Open Creative Studio →</a></div>
+      <label class="field">Schedule for <input class="input" type="datetime-local" name="scheduled_at" value="{{ when }}"></label>
+      <div class="btn-row">
+        <button class="btn ghost" name="action" value="save_draft">Save draft</button>
+        <button class="btn soft" name="action" value="save_review">Send for approval</button>
+        {% if can_schedule %}<button class="btn" name="action" value="save_schedule">Approve &amp; schedule</button>{% endif %}
+      </div>
+    </div>{% endif %}
+  </section>
+</form>
+{% endif %}
+
+<section class="card">
+  <header class="card-head"><h3>Content pipeline</h3>{% include "portal/_client_select.html" with clients=clients cid=pipeline_cid allow_all=True %}</header>
+  <ul class="list">
+  {% for c in items %}
+    <li>
+      <div class="row between">
+        <div><strong>{{ c.topic }}</strong> {{ c.status|badge }}
+          <div class="muted small">{{ c.client_name }} · {% for v in c.variants %}{{ v.platform|platform }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ c.scheduled_at|when|default:"unscheduled" }}</div></div>
+        {% include "portal/_content_actions.html" %}
+      </div>
+      <p class="small" style="margin:6px 0 0">{{ c.master_copy }}</p>
+    </li>
+  {% empty %}<li class="empty">No content yet.</li>{% endfor %}
+  </ul>
+</section>
+{% endblock %}

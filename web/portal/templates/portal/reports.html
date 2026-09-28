@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Reports</h1><p class="muted">AI monthly report → PDF → email / WhatsApp</p></div>
+  <div class="page-actions">
+    {% include "portal/_client_select.html" with allow_all=False %}
+    {% if can_deliver %}<form method="post" class="inline">{% csrf_token %}<button class="btn" name="action" value="generate">{% icon 'sparkle' 16 %} Generate monthly report</button></form>{% endif %}
+  </div>
+</div>
+{% if not rep %}
+  <section class="card"><div class="empty">No reports yet for {{ client_name }}.{% if can_deliver %} Generate the first one above.{% endif %}</div></section>
+{% else %}
+<section class="card">
+  <header class="card-head"><h3>{{ rep.client_name }} · {{ rep.period_start|when:"date" }} – {{ rep.period_end|when:"long" }}</h3>
+    <div class="btn-row no-print">
+      {% if rep.delivered_at %}<span class="badge badge-green">Sent via {{ rep.delivered_via }}</span>{% endif %}
+      <button class="btn ghost sm" onclick="window.print()">PDF</button>
+      {% if can_deliver %}<form method="post" class="btn-row" target="_blank">{% csrf_token %}<input type="hidden" name="report_id" value="{{ rep.id }}">
+        <button class="btn soft sm" name="action" value="email">Email</button><button class="btn soft sm" name="action" value="whatsapp">WhatsApp</button></form>{% endif %}
+    </div>
+  </header>
+  <pre class="report">{{ rep.summary }}</pre>
+</section>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>KPI comparison</h3></header>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Metric</th><th class="num">This period</th><th class="num">Previous</th><th class="num">Change</th></tr></thead>
+      <tbody>{% for label, v in kpi_rows %}<tr><td>{{ label }}</td><td class="num">{{ v.current }}</td><td class="num">{{ v.previous }}</td><td class="num">{{ v.change_pct|delta }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <section class="card"><header class="card-head"><h3>Ranking movement</h3></header>
+    <ul class="list">{% for k in rep.keywords %}<li class="row between"><span>{{ k.keyword }}</span><span class="small">#{{ k.previous_rank }} → <strong>#{{ k.current_rank }}</strong></span></li>{% endfor %}</ul>
+  </section>
+</div>
+{% if reports|length > 1 %}
+<section class="card no-print"><header class="card-head"><h3>History</h3></header>
+  <ul class="list">{% for r in reports %}<li class="row between"><a href="{% qs report=r.id %}">{{ r.period_start|when:"date" }} – {{ r.period_end|when:"date" }}</a><span class="muted small">created {{ r.created_at|when }}</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

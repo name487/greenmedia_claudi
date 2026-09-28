@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  api:
+    name: FastAPI tests
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12', cache: pip, cache-dependency-path: backend/requirements.txt }
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+
+  web:
+    name: Django checks + smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r backend/requirements.txt -r web/requirements.txt
+      - run: python manage.py check --deploy --fail-level ERROR
+        working-directory: web
+        env: { DJANGO_DEBUG: '0', DJANGO_SECRET_KEY: ci-secret-key-that-is-long-enough-for-the-deploy-check-1234567890 }
+      - name: Render every page against a live API
+        run: |
+          (cd backend && uvicorn app.main:app --port 8001 &) && sleep 4
+          (cd web && API_URL=http://127.0.0.1:8001 python manage.py runserver 8000 --noreload &) && sleep 4
+          python - <<'PY'
+          import re, sys, urllib.request, http.cookiejar
+          jar = http.cookiejar.CookieJar()
+          op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+          html = op.open("http://127.0.0.1:8000/login/").read().decode()
+          token = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', html).group(1)
+          data = f"csrfmiddlewaretoken={token}&email=admin@greenmedia.in&password=demo1234".encode()
+          req = urllib.request.Request("http://127.0.0.1:8000/login/", data=data, headers={"Referer": "http://127.0.0.1:8000/login/"})
+          op.open(req)
+          bad = []
+          for p in ["/", "/clients/", "/clients/1/", "/gmb/", "/reviews/", "/content/", "/creative/", "/social/", "/seo/", "/analytics/", "/reports/", "/tasks/", "/settings/"]:
+              r = op.open("http://127.0.0.1:8000" + p)
+              body = r.read().decode()
+              if r.status != 200 or "/login/" in r.geturl() or 'class="error"' in body:
+                  bad.append(p)
+          print("failed:", bad) if bad else print("all pages OK")
+          sys.exit(1 if bad else 0)
+          PY
+
+  flutter:
+    name: Flutter analyze + test
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    name: Android APK
+    needs: flutter
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter build apk --release --dart-define=API_URL=${{ vars.API_URL || 'https://api.example.com' }}
+      - uses: actions/upload-artifact@v4
+        with: { name: greenmedia-android-apk, path: mobile/build/app/outputs/flutter-apk/app-release.apk }
+
+  ios:
+    name: iOS build (unsigned)
+    needs: flutter
+    runs-on: macos-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: flutter build ios --release --no-codesign --dart-define=API_URL=${{ vars.API_URL || 'https://api.example.com' }}
+      - run: cd build/ios/iphoneos && mkdir Payload && cp -r Runner.app Payload/ && zip -qr greenmedia-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: greenmedia-ios-unsigned, path: mobile/build/ios/iphoneos/greenmedia-unsigned.ipa }

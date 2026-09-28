@@ -1,0 +1,37 @@
+{
+ "access_token": "test-token-admin",
+ "token_type": "bearer",
+ "user": {
+  "id": 1,
+  "name": "Aarav Mehta",
+  "email": "admin@greenmedia.in",
+  "role": "admin",
+  "role_label": "Admin",
+  "client_id": null,
+  "client_name": null,
+  "sections": [
+   "dashboard",
+   "clients",
+   "gmb",
+   "reviews",
+   "content",
+   "creative",
+   "social",
+   "seo",
+   "analytics",
+   "reports",
+   "tasks",
+   "settings"
+  ],
+  "permissions": [
+   "review.publish",
+   "review.approve",
+   "content.create",
+   "content.approve",
+   "content.publish",
+   "client.edit",
+   "report.deliver",
+   "settings.edit"
+  ]
+ }
+}

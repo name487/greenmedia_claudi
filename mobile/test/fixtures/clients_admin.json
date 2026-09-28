@@ -1,0 +1,428 @@
+[
+ {
+  "id": 7,
+  "company_name": "AutoCare Pro",
+  "industry": "Automotive",
+  "city": "Ahmedabad",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 3.7,
+  "gmb_connected": true,
+  "contact_name": "Neha Bose",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 22,
+  "company_name": "BookWorm Library Cafe",
+  "industry": "Cafe",
+  "city": "Bhopal",
+  "status": "active",
+  "plan": "Growth",
+  "rating": 4.6,
+  "gmb_connected": true,
+  "contact_name": "Ananya Patel",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 6,
+  "company_name": "BrightKids Academy",
+  "industry": "Education",
+  "city": "Chennai",
+  "status": "onboarding",
+  "plan": "Growth",
+  "rating": 4.4,
+  "gmb_connected": false,
+  "contact_name": "Pooja Menon",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 18,
+  "company_name": "CloudNine IVF Centre",
+  "industry": "Healthcare",
+  "city": "Pune",
+  "status": "active",
+  "plan": "Growth",
+  "rating": 4.8,
+  "gmb_connected": true,
+  "contact_name": "Farhan Gupta",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 5
+ },
+ {
+  "id": 12,
+  "company_name": "CraftWood Interiors",
+  "industry": "Interior Design",
+  "city": "Surat",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.5,
+  "gmb_connected": true,
+  "contact_name": "Karan Bose",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 1
+ },
+ {
+  "id": 3,
+  "company_name": "FitNation Gym",
+  "industry": "Fitness",
+  "city": "Mumbai",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 4.0,
+  "gmb_connected": true,
+  "contact_name": "Tara Bose",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 1
+ },
+ {
+  "id": 5,
+  "company_name": "GlowUp Salon & Spa",
+  "industry": "Beauty",
+  "city": "Delhi",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "Pooja Patel",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 4
+ },
+ {
+  "id": 19,
+  "company_name": "GreenLeaf Organics",
+  "industry": "Grocery",
+  "city": "Mysuru",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 4.5,
+  "gmb_connected": true,
+  "contact_name": "Simran Joshi",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 5
+ },
+ {
+  "id": 13,
+  "company_name": "Heritage Stay Homestay",
+  "industry": "Hospitality",
+  "city": "Udaipur",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "Simran Bose",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 0
+ },
+ {
+  "id": 24,
+  "company_name": "IronCore Constructions",
+  "industry": "Construction",
+  "city": "Coimbatore",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "Isha Bose",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 10,
+  "company_name": "LegalEase Associates",
+  "industry": "Legal",
+  "city": "Kolkata",
+  "status": "active",
+  "plan": "Growth",
+  "rating": 3.6,
+  "gmb_connected": true,
+  "contact_name": "Meera Joshi",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 0
+ },
+ {
+  "id": 16,
+  "company_name": "MediPlus Pharmacy",
+  "industry": "Pharmacy",
+  "city": "Lucknow",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.1,
+  "gmb_connected": true,
+  "contact_name": "Isha Khan",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 11,
+  "company_name": "PetPals Veterinary",
+  "industry": "Veterinary",
+  "city": "Indore",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 3.9,
+  "gmb_connected": true,
+  "contact_name": "Vikram Bose",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 20,
+  "company_name": "PixelPerfect Studio",
+  "industry": "Photography",
+  "city": "Goa",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "Karan Joshi",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 4
+ },
+ {
+  "id": 14,
+  "company_name": "QuickFix Electricals",
+  "industry": "Home Services",
+  "city": "Nagpur",
+  "status": "paused",
+  "plan": "Growth",
+  "rating": 4.4,
+  "gmb_connected": true,
+  "contact_name": "Neha Singh",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 21,
+  "company_name": "SafeHands Physiotherapy",
+  "industry": "Healthcare",
+  "city": "Nashik",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 4.2,
+  "gmb_connected": true,
+  "contact_name": "Vikram Bose",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 23,
+  "company_name": "SkyHigh Travels",
+  "industry": "Travel",
+  "city": "Vadodara",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 3.8,
+  "gmb_connected": true,
+  "contact_name": "Isha Menon",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 1,
+  "company_name": "Smile Dental Studio",
+  "industry": "Dental Clinic",
+  "city": "Pune",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 3.7,
+  "gmb_connected": true,
+  "contact_name": "Dev Gupta",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 2,
+  "company_name": "Spice Route Kitchen",
+  "industry": "Restaurant",
+  "city": "Bengaluru",
+  "status": "active",
+  "plan": "Growth",
+  "rating": 3.8,
+  "gmb_connected": true,
+  "contact_name": "Vikram Gupta",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media"
+  ],
+  "pending_reviews": 1
+ },
+ {
+  "id": 17,
+  "company_name": "StyleStreet Boutique",
+  "industry": "Retail",
+  "city": "Chandigarh",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 4.4,
+  "gmb_connected": true,
+  "contact_name": "Pooja Patel",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 2
+ },
+ {
+  "id": 8,
+  "company_name": "Sunrise Eye Hospital",
+  "industry": "Healthcare",
+  "city": "Jaipur",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "John Joshi",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 1
+ },
+ {
+  "id": 9,
+  "company_name": "The Coffee Collective",
+  "industry": "Cafe",
+  "city": "Kochi",
+  "status": "active",
+  "plan": "Starter",
+  "rating": 4.2,
+  "gmb_connected": true,
+  "contact_name": "Ananya Gupta",
+  "services": [
+   "GMB Management",
+   "Review Management"
+  ],
+  "pending_reviews": 4
+ },
+ {
+  "id": 4,
+  "company_name": "UrbanNest Realty",
+  "industry": "Real Estate",
+  "city": "Hyderabad",
+  "status": "active",
+  "plan": "Agency",
+  "rating": 4.3,
+  "gmb_connected": true,
+  "contact_name": "John Kapoor",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 3
+ },
+ {
+  "id": 15,
+  "company_name": "Zen Yoga Shala",
+  "industry": "Wellness",
+  "city": "Rishikesh",
+  "status": "active",
+  "plan": "Pro",
+  "rating": 3.9,
+  "gmb_connected": true,
+  "contact_name": "Sanjay Khan",
+  "services": [
+   "GMB Management",
+   "Review Management",
+   "Social Media",
+   "SEO",
+   "Monthly Reports"
+  ],
+  "pending_reviews": 1
+ }
+]

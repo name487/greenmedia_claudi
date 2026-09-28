@@ -1,0 +1,11 @@
+{% load gm %}{% comment %}Auto-submitting client picker. Expects: clients, cid, allow_all. Keeps the other GET filters.{% endcomment %}
+{% if clients %}
+<form method="get" class="inline">
+  {% keep_params 'client' %}
+  <select class="input" name="client" onchange="this.form.submit()" aria-label="Client">
+    {% if allow_all %}<option value="">All clients ({{ clients|length }})</option>{% endif %}
+    {% for c in clients %}<option value="{{ c.id }}"{% if c.id == cid %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}
+  </select>
+  <noscript><button class="btn sm">Go</button></noscript>
+</form>
+{% endif %}

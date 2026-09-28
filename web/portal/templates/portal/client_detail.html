@@ -1,0 +1,92 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<a class="back small muted" href="{% url 'clients' %}">{% icon 'back' 16 %} Clients</a>
+<div class="page-header">
+  <div><h1>{{ c.company_name }}</h1><p class="muted">{{ c.industry }} · {{ c.city }} · {{ c.plan }} plan</p></div>
+  <div class="page-actions">
+    {{ c.status|badge }}
+    <a class="btn soft" href="{% url 'content' %}?client={{ c.id }}">Create content</a>
+    <a class="btn" href="{% url 'reports' %}?client={{ c.id }}">Monthly report</a>
+  </div>
+</div>
+<div class="grid stats">
+  <div class="stat"><span class="stat-label">Google rating</span><strong class="stat-value">{{ c.gmb.rating|stars }} {{ c.gmb.rating }}</strong><span class="stat-hint">{{ c.gmb.review_count }} reviews</span></div>
+  <div class="stat"><span class="stat-label">GMB views (30d)</span><strong class="stat-value">{{ k.gmb_views.current|compact }}</strong>{{ k.gmb_views.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Calls (30d)</span><strong class="stat-value">{{ k.gmb_calls.current }}</strong>{{ k.gmb_calls.change_pct|delta }}</div>
+  <div class="stat"><span class="stat-label">Leads (30d)</span><strong class="stat-value">{{ k.leads.current }}</strong>{{ k.leads.change_pct|delta }}</div>
+</div>
+
+<div class="grid cols-3">
+  <section class="card"><header class="card-head"><h3>Company profile</h3></header>
+    <dl class="kv">
+      <dt>Website</dt><dd><a href="{{ c.website }}" target="_blank" rel="noopener">{{ c.website|cut:"https://" }}</a></dd>
+      {% with ct=c.contacts.0 %}{% if ct %}
+      <dt>Contact</dt><dd>{{ ct.name }} ({{ ct.designation }})</dd><dt>Email</dt><dd>{{ ct.email }}</dd><dt>Phone</dt><dd>{{ ct.phone }}</dd>
+      {% endif %}{% endwith %}
+      <dt>Manager</dt><dd>{{ c.account_manager_name|default:"—" }}</dd>
+      <dt>Services</dt><dd><div class="chips">{% for s in c.services %}<span class="badge badge-blue">{{ s }}</span>{% endfor %}</div></dd>
+    </dl>
+  </section>
+  <section class="card"><header class="card-head"><h3>Connected accounts</h3></header>
+    <ul class="list">
+      <li class="row between"><span>Google Business Profile</span>{{ c.gmb.status|badge }}</li>
+      {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.handle }}</span></span>{{ s.status|badge }}</li>{% endfor %}
+    </ul>
+  </section>
+  <section class="card"><header class="card-head"><h3>AI brand voice</h3></header>
+    <dl class="kv">
+      <dt>Tone</dt><dd>{{ c.brand_voice.tone }}</dd><dt>CTA</dt><dd>{{ c.brand_voice.cta_style }}</dd>
+      <dt>Languages</dt><dd>{{ c.brand_voice.languages|join:", " }}</dd><dt>Never say</dt><dd>{{ c.brand_voice.prohibited_claims|join:", " }}</dd>
+      <dt>Escalation</dt><dd>{{ c.brand_voice.escalation_rule }}</dd>
+    </dl>
+  </section>
+</div>
+
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Publishing safety</h3><span class="badge badge-amber">Human approval by default</span></header>
+    <p class="muted small" style="margin-top:0">Nothing publishes without approval unless auto-publish is switched on for that channel.</p>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="auto_publish">
+      <ul class="list">
+        {% for ch in channels %}
+        <li class="row between"><span>{% if ch == 'reviews' %}Positive review replies{% else %}{{ ch|platform }}{% endif %}</span>
+          <input type="hidden" name="channels" value="{{ ch }}">
+          <label class="check"><input type="checkbox" name="on" value="{{ ch }}"{% if c.auto_publish|get:ch %} checked{% endif %}{% if not editable %} disabled{% endif %}> Auto-publish</label></li>
+        {% endfor %}
+      </ul>
+      {% if editable %}<button class="btn sm">Save</button>{% endif %}
+    </form>
+  </section>
+  <section class="card"><header class="card-head"><h3>SEO keywords</h3>{% if 'seo' in me.sections %}<a class="small" href="{% url 'seo' %}?client={{ c.id }}">SEO Center</a>{% endif %}</header>
+    <ul class="list">{% for kw in c.keywords %}
+      <li class="row between"><span>{{ kw.keyword }}</span><span class="badge badge-{% if kw.change >= 0 %}green{% else %}red{% endif %}">#{{ kw.current_rank }} {% if kw.change > 0 %}▲{{ kw.change }}{% elif kw.change < 0 %}▼{{ kw.change|stringformat:"d"|cut:"-" }}{% endif %}</span></li>
+    {% empty %}<li class="muted">No keywords tracked.</li>{% endfor %}</ul>
+  </section>
+</div>
+
+<div class="grid cols-3">
+  <section class="card"><header class="card-head"><h3>Latest reviews</h3><a class="small" href="{% url 'reviews' %}?client={{ c.id }}&filter=all">All</a></header>
+    <ul class="list">{% for r in c.reviews %}
+      <li><div class="row between">{{ r.rating|stars }}{{ r.reply_status|badge }}</div><p class="small" style="margin:4px 0 0">{{ r.text|truncatechars:80 }}</p></li>
+    {% endfor %}</ul>
+  </section>
+  <section class="card"><header class="card-head"><h3>Content calendar</h3><a class="small" href="{% url 'social' %}?client={{ c.id }}">Calendar</a></header>
+    <ul class="list">{% for x in c.content %}
+      <li class="row between"><span>{{ x.topic }}<div class="muted small">{{ x.scheduled_at|when|default:"Unscheduled" }}</div></span>{{ x.status|badge }}</li>
+    {% empty %}<li class="muted">No content yet.</li>{% endfor %}</ul>
+  </section>
+  <section class="card"><header class="card-head"><h3>Open tasks & reports</h3></header>
+    <ul class="list">
+      {% for t in c.open_tasks %}<li class="row between"><span>{{ t.title }}<div class="muted small">Due {{ t.due_date|when:"date" }} · {{ t.assignee_name }}</div></span>{{ t.status|badge }}</li>{% endfor %}
+      {% for r in c.reports %}<li class="row between"><a href="{% url 'reports' %}?client={{ c.id }}&report={{ r.id }}">Report {{ r.period_start|when:"date" }} – {{ r.period_end|when:"date" }}</a><span class="badge badge-{% if r.delivered_at %}green{% else %}gray{% endif %}">{% if r.delivered_at %}Delivered{% else %}Draft{% endif %}</span></li>{% endfor %}
+      {% if not c.open_tasks and not c.reports %}<li class="muted">Nothing open.</li>{% endif %}
+    </ul>
+  </section>
+</div>
+
+<section class="card"><header class="card-head"><h3>Notes</h3></header>
+  <form method="post" class="form">{% csrf_token %}<input type="hidden" name="action" value="notes">
+    <textarea class="input" name="notes" placeholder="Meeting notes, preferences, context for the team…"{% if not editable %} readonly{% endif %}>{{ c.notes }}</textarea>
+    {% if editable %}<div><button class="btn sm">Save notes</button></div>{% endif %}
+  </form>
+</section>
+{% endblock %}

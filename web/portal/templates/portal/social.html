@@ -1,0 +1,42 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Social Hub</h1><p class="muted">Unified calendar, publishing status and connected accounts</p></div>
+  <div class="page-actions">{% include "portal/_client_select.html" with allow_all=True %}</div>
+</div>
+{% if broken %}
+<div class="notice" style="margin-bottom:16px">{{ broken|length }} account{{ broken|length|pluralize:" needs,s need" }} reconnection (token expired):
+  {% for b in broken %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="reconnect"><input type="hidden" name="client_id" value="{{ b.client_id }}"><input type="hidden" name="platform" value="{{ b.platform }}"><button class="btn ghost sm" style="margin-left:6px">{{ b.client_name }} · {{ b.platform|platform }}</button></form>{% endfor %}
+</div>
+{% endif %}
+<section class="card">
+  <header class="card-head"><h3>{{ month|date:"F Y" }}</h3>
+    <div class="btn-row"><a class="btn ghost sm" href="{% qs month=prev_m %}">‹</a><a class="btn ghost sm" href="{% qs month='' %}">Today</a><a class="btn ghost sm" href="{% qs month=next_m %}">›</a></div>
+  </header>
+  <div class="calendar">
+    {% for w in weekdays %}<div class="cal-head">{{ w }}</div>{% endfor %}
+    {% for week in weeks %}{% for d in week %}
+      <div class="cal-day{% if d.other %} other{% endif %}{% if d.today %} today{% endif %}">
+        <span class="cal-num">{{ d.date.day }}</span>
+        {% for p in d.posts %}<span class="cal-post" title="{{ p.topic }} — {{ p.client_name }} ({{ p.status }})">{{ p.topic }}</span>{% endfor %}
+      </div>
+    {% endfor %}{% endfor %}
+  </div>
+</section>
+<div class="grid cols-2">
+  <section class="card"><header class="card-head"><h3>Publishing queue</h3></header>
+    <ul class="list">{% for c in queue %}
+      <li><div class="row between">
+        <span><strong>{{ c.topic }}</strong> {{ c.status|badge }}<div class="muted small">{{ c.client_name }} · {{ c.scheduled_at|when|default:"unscheduled" }}</div></span>
+        {% include "portal/_content_actions.html" %}
+      </div>
+      <div class="chips" style="margin-top:6px">{% for v in c.variants %}<span class="badge badge-blue">{{ v.platform|platform }}</span>{% endfor %}</div></li>
+    {% empty %}<li class="muted">Queue is empty.</li>{% endfor %}</ul>
+  </section>
+  <section class="card"><header class="card-head"><h3>Connected accounts ({{ accounts|length }})</h3></header>
+    <ul class="list">{% for a in accounts %}
+      <li class="row between"><span>{{ a.platform|platform }} <span class="muted small">{{ a.client_name }}</span></span>{{ a.status|badge }}</li>
+    {% endfor %}</ul>
+  </section>
+</div>
+{% endblock %}

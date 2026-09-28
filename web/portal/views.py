@@ -183,8 +183,13 @@ def google_connections(request):
     if status and status["configured"] and any(c["status"] == "active" for c in status["connections"]):
         data = request.api.get("/api/google/locations")
         locations, loc_errors = data["locations"], data["errors"]
+    # Google returns the browser to WEB_APP_URL. If that is a different origin (e.g. localhost vs 127.0.0.1),
+    # the browser arrives without this session and the result appears to vanish.
+    here = f"{request.scheme}://{request.get_host()}"
+    wrong_host = bool(status and status.get("web_app_url") and status["web_app_url"].rstrip("/") != here)
     return render(request, "portal/google.html", {
         "status": status, "locations": locations, "loc_errors": loc_errors, "clients": _clients(request), "can_manage": can_manage,
+        "here": here, "wrong_host": wrong_host,
     })
 
 

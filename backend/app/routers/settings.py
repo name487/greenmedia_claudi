@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..ai import ai_enabled
 from ..config import settings as cfg
 from ..db import get_db
-from ..models import Tenant, User
-from ..security import ACTIONS, ALL_SECTIONS, ROLE_LABELS, SECTIONS, audit, require, require_section
+from ..models import Role, Tenant, User
+from ..security import ALL_SECTIONS, audit, require, require_section
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -18,21 +19,25 @@ INTEGRATIONS = [
 ]
 
 
-def _out(t: Tenant) -> dict:
+def _out(t: Tenant, roles: list[Role]) -> dict:
     return {
         "tenant_name": t.name,
         "notify_on_negative_review": t.notify_on_negative_review,
         "require_client_approval": t.require_client_approval,
         "ai": {"enabled": ai_enabled(), "provider": cfg.ai_provider, "model": cfg.model},
         "integrations": [{"name": n, "description": d, "status": "not_configured"} for n, d in INTEGRATIONS],
-        "roles": [{"role": r, "label": ROLE_LABELS[r], "sections": SECTIONS[r], "permissions": ACTIONS[r]} for r in ROLE_LABELS],
+        "roles": [{"role": r.name, "label": r.label, "sections": r.sections, "permissions": r.permissions} for r in roles],
         "sections": ALL_SECTIONS,
     }
 
 
+def _tenant_roles(db: Session, tenant_id: int) -> list[Role]:
+    return list(db.scalars(select(Role).where(Role.tenant_id == tenant_id).order_by(Role.id)))
+
+
 @router.get("")
 def get_settings(user: User = Depends(require_section("settings")), db: Session = Depends(get_db)):
-    return _out(db.get(Tenant, user.tenant_id))
+    return _out(db.get(Tenant, user.tenant_id), _tenant_roles(db, user.tenant_id))
 
 
 class SettingsPatch(BaseModel):
@@ -48,4 +53,4 @@ def patch_settings(body: SettingsPatch, user: User = Depends(require("settings.e
         setattr(t, k, v)
     audit(db, user, f"settings: {', '.join(changes)}", entity_type="settings")
     db.commit()
-    return _out(t)
+    return _out(t, _tenant_roles(db, user.tenant_id))

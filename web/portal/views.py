@@ -49,6 +49,10 @@ def login_view(request):
         ("SEO Specialist", "Rohit Verma", "rohit@greenmedia.in"), ("Content Writer", "Sneha Iyer", "sneha@greenmedia.in"),
         ("Designer", "Kabir Shah", "kabir@greenmedia.in"), ("Client", "Dr. Anjali Rao", "anjali@smiledental.in"),
     ]}
+    try:  # only offer the one-tap demo accounts when the API seeds demo data
+        ctx["demo"] = bool(Api().get("/api/health").get("demo"))
+    except ApiError:
+        ctx["demo"] = False
     if request.method == "POST":
         try:
             out = Api().post("/api/auth/login", {"email": request.POST.get("email", ""), "password": request.POST.get("password", "")})
@@ -439,10 +443,35 @@ def tasks(request):
 @login_required("settings")
 def settings_view(request):
     if request.method == "POST":
-        request.api.patch("/api/settings", {"notify_on_negative_review": "notify" in request.POST, "require_client_approval": "client_approval" in request.POST})
-        messages.success(request, "Settings saved.")
+        action = request.POST.get("action", "workflow")
+        if action == "workflow":
+            request.api.patch("/api/settings", {"notify_on_negative_review": "notify" in request.POST, "require_client_approval": "client_approval" in request.POST})
+            messages.success(request, "Settings saved.")
+        elif action == "create_user":
+            body = {k: request.POST.get(k, "").strip() for k in ("name", "email", "password", "role")}
+            body["client_id"] = _int(request.POST.get("client_id")) if body["role"] == "client" else None
+            u = request.api.post("/api/users", body)
+            messages.success(request, f"Created {u['email']} as {u['role_label']}. Share the password with them securely.")
+        elif action == "update_user":
+            patch = {"role": request.POST["role"], "status": request.POST["status"]}
+            if request.POST["role"] == "client":
+                patch["client_id"] = _int(request.POST.get("client_id"))
+            if request.POST.get("password"):
+                patch["password"] = request.POST["password"]
+            u = request.api.patch(f"/api/users/{_int(request.POST.get('user_id'))}", patch)
+            messages.success(request, f"Updated {u['email']}.")
+        elif action == "update_role":
+            name = request.POST["role"]
+            request.api.patch(f"/api/roles/{name}", {"label": request.POST.get("label", "").strip() or None,
+                                                     "sections": request.POST.getlist("sections"), "permissions": request.POST.getlist("permissions")})
+            messages.success(request, f"Role “{name}” updated. Changes apply to signed-in users on their next page load.")
         return _back(request)
     s = request.api.get("/api/settings")
     health = request.api.get("/api/health")
-    matrix = [(sec, [sec in r["sections"] for r in s["roles"]]) for sec in s["sections"]]
-    return render(request, "portal/settings.html", {"s": s, "health": health, "matrix": matrix, "can_edit": can(request, "settings.edit")})
+    can_edit = can(request, "settings.edit")
+    roles = request.api.get("/api/roles")
+    matrix = [(sec, [sec in r["sections"] for r in roles["roles"]]) for sec in roles["sections"]]
+    return render(request, "portal/settings.html", {
+        "s": s, "health": health, "matrix": matrix, "can_edit": can_edit, "roles": roles,
+        "users": request.api.get("/api/users"), "clients": _clients(request), "me_id": request.me["id"],
+    })

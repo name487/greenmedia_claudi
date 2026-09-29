@@ -62,14 +62,24 @@ def login_required(section: str | None = None):
     def deco(view):
         @wraps(view)
         def wrapped(request, *args, **kwargs):
-            me = request.session.get(SESSION_ME)
-            if not request.session.get(SESSION_TOKEN) or not me:
+            if not request.session.get(SESSION_TOKEN) or not request.session.get(SESSION_ME):
                 # Keep the query string (e.g. the ?google=... result from Google's OAuth return) through login.
                 return redirect(f"/login/?next={quote(request.get_full_path())}")
+            request.api = api_for(request)
+            try:
+                # Re-read the user every request: role/permission edits and disabled accounts apply immediately.
+                me = request.api.get("/api/auth/me")
+                request.session[SESSION_ME] = me
+            except ApiError as e:
+                if e.status == 401:
+                    request.session.flush()
+                    messages.error(request, "Your session ended. Please sign in again.")
+                    return redirect(f"/login/?next={quote(request.get_full_path())}")
+                me = request.session[SESSION_ME]  # API briefly unreachable: fall back to the last known role
+            request.me = me
             if section and section not in me["sections"]:
                 messages.error(request, "Your role does not have access to that page.")
                 return redirect("dashboard")
-            request.api, request.me = api_for(request), me
             try:
                 return view(request, *args, **kwargs)
             except ApiError as e:

@@ -2,8 +2,12 @@ import os
 import tempfile
 
 # Must be set before the app (and its engine) is imported.
-_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-os.environ["DATABASE_URL"] = f"sqlite:///{_db.name}"
+# TEST_DATABASE_URL=postgresql+psycopg://… runs the suite against PostgreSQL (CI does both); default is a temp SQLite file.
+if os.environ.get("TEST_DATABASE_URL"):
+    os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+else:
+    _db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    os.environ["DATABASE_URL"] = f"sqlite:///{_db.name}"
 os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["SEED_DEMO"] = "1"

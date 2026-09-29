@@ -8,6 +8,14 @@
   {% endif %}
 </div>
 
+{% if wrong_host %}
+  <div class="notice" style="margin-bottom:16px">
+    <strong>Open the app at <a href="{{ status.web_app_url }}/gmb/google/">{{ status.web_app_url }}</a> before connecting.</strong>
+    You're on <code>{{ here }}</code>, but after you approve on Google the browser returns to <code>{{ status.web_app_url }}</code> (<code>WEB_APP_URL</code> in <code>backend/.env</code>).
+    Browsers treat these as different sites, so you'd come back signed out and not see the result.
+  </div>
+{% endif %}
+
 {% if not can_manage %}
   <section class="card"><div class="empty">Only Admins and Account Managers can connect Google accounts.</div></section>
 {% elif not status.configured %}

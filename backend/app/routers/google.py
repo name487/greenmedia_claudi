@@ -35,6 +35,7 @@ def status(user: User = Depends(require("client.edit")), db: Session = Depends(g
     return {
         "configured": settings.google_configured,
         "redirect_uri": settings.google_redirect_uri,
+        "web_app_url": settings.web_app_url,  # where Google's return lands; must be the address people use for the web app
         "connections": [_conn_out(c, sum(g.connection_id == c.id for g in linked)) for c in conns],
         "linked": [{"client_id": g.client_id, "client_name": names.get(g.client_id), "title": g.title, "location": g.location_id, "status": g.status,
                     "last_sync": g.last_sync.isoformat() if g.last_sync else None, "last_error": g.last_error, "connection_id": g.connection_id} for g in linked],

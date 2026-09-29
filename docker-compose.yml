@@ -1,0 +1,24 @@
+# Local PostgreSQL for the Green Media API.
+#   docker compose up -d db
+# then in backend/.env:
+#   DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: greenmedia
+      POSTGRES_PASSWORD: greenmedia   # local development only — use a strong password anywhere else
+      POSTGRES_DB: greenmedia
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U greenmedia -d greenmedia"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

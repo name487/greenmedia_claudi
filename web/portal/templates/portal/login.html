@@ -17,6 +17,7 @@
     <label class="field">Password <input class="input" type="password" name="password" id="password" autocomplete="current-password" required></label>
     {% if error %}<div class="notice">{{ error }}</div>{% endif %}
     <button class="btn block" type="submit">Sign in</button>
+    {% if demo %}
     <div>
       <p class="muted small" style="margin-bottom:6px">Demo accounts (password <code>demo1234</code>) — tap to fill:</p>
       <div class="demo-users">
@@ -25,6 +26,9 @@
         {% endfor %}
       </div>
     </div>
+    {% else %}
+    <p class="muted small" style="margin:0">Forgot your password? Ask your agency admin to reset it in Settings → Team members.</p>
+    {% endif %}
   </form>
 </div>
 <script>

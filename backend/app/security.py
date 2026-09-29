@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import get_db
-from .models import AuditLog, Client, User
+from .models import AuditLog, Client, Role, User
 
+# Built-in roles. They seed the `roles` table for every tenant; after that the table is the source of truth
+# (admins can change a role's sections and permissions per agency).
 ROLE_LABELS = {
     "admin": "Admin",
     "account_manager": "Account Manager",
@@ -21,6 +23,7 @@ ROLE_LABELS = {
 }
 
 ALL_SECTIONS = ["dashboard", "clients", "gmb", "reviews", "content", "creative", "social", "seo", "analytics", "reports", "tasks", "settings"]
+ALL_ACTIONS = ["review.publish", "review.approve", "content.create", "content.approve", "content.publish", "client.edit", "report.deliver", "settings.edit"]
 
 SECTIONS = {
     "admin": ALL_SECTIONS,
@@ -32,13 +35,31 @@ SECTIONS = {
 }
 
 ACTIONS = {
-    "admin": ["review.publish", "review.approve", "content.create", "content.approve", "content.publish", "client.edit", "report.deliver", "settings.edit"],
-    "account_manager": ["review.publish", "review.approve", "content.create", "content.approve", "content.publish", "client.edit", "report.deliver"],
+    "admin": ALL_ACTIONS,
+    "account_manager": [a for a in ALL_ACTIONS if a != "settings.edit"],
     "seo": ["content.create"],
     "content": ["content.create"],
     "designer": ["content.create"],
     "client": ["review.approve", "content.approve"],
 }
+
+
+def ensure_default_roles(db: Session, tenant_id: int) -> None:
+    """Create any built-in role the tenant is missing (new tenants, and databases from before the roles table)."""
+    have = set(db.scalars(select(Role.name).where(Role.tenant_id == tenant_id)))
+    for name, label in ROLE_LABELS.items():
+        if name not in have:
+            db.add(Role(tenant_id=tenant_id, name=name, label=label, sections=list(SECTIONS[name]), permissions=list(ACTIONS[name])))
+    db.flush()
+
+
+def load_role(db: Session, user: User) -> User:
+    """Attach the user's role (sections, permissions, label) from the roles table. Unknown role = no access."""
+    role = db.scalar(select(Role).where(Role.tenant_id == user.tenant_id, Role.name == user.role))
+    user.role_label = role.label if role else user.role
+    user.sections = list(role.sections) if role else []
+    user.permissions = list(role.permissions) if role else []
+    return user
 
 
 def hash_password(pw: str) -> str:
@@ -75,11 +96,11 @@ def current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer), d
     user = db.get(User, int(payload["sub"]))
     if not user or user.status != "active" or user.tenant_id != payload["tid"]:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account disabled")
-    return user
+    return load_role(db, user)
 
 
 def can(user: User, action: str) -> bool:
-    return action in ACTIONS.get(user.role, [])
+    return action in getattr(user, "permissions", [])
 
 
 def require(action: str):
@@ -93,7 +114,7 @@ def require(action: str):
 
 def require_section(section: str):
     def dep(user: User = Depends(current_user)) -> User:
-        if section not in SECTIONS.get(user.role, []):
+        if section not in getattr(user, "sections", []):
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your role cannot access {section}")
         return user
 

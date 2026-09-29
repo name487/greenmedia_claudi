@@ -14,7 +14,7 @@ from .models import (
     Client, ClientContact, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, SocialAccount, Task, Tenant, User,
 )
 from .ai import PLATFORM_FORMAT
-from .security import hash_password
+from .security import ensure_default_roles, hash_password
 from .upgrade import add_missing_columns
 from .sentiment import detect_sentiment
 
@@ -72,6 +72,7 @@ def seed(db: Session) -> None:
     tenant = Tenant(name="Green Media Technology")
     db.add(tenant)
     db.flush()
+    ensure_default_roles(db, tenant.id)
 
     pw = hash_password(DEMO_PASSWORD)
     users = {role: User(tenant_id=tenant.id, name=n, email=e, password_hash=pw, role=role) for n, e, role in USERS}
@@ -163,6 +164,10 @@ def seed(db: Session) -> None:
 def init_db(seed_if_empty: bool = True) -> None:
     Base.metadata.create_all(engine)
     add_missing_columns(engine)  # older databases: add columns introduced since they were created
+    with SessionLocal() as db:  # databases from before the roles table: give every tenant the built-in roles
+        for tid in db.scalars(select(Tenant.id)):
+            ensure_default_roles(db, tid)
+        db.commit()
     if seed_if_empty:
         with SessionLocal() as db:
             if not db.scalar(select(func.count()).select_from(Tenant)):

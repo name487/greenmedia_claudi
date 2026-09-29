@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .ai import ai_enabled
 from .config import settings
-from .routers import analytics, auth, clients, content, dashboard, google, reports, reviews, seo, tasks
+from .routers import analytics, auth, clients, content, dashboard, google, reports, reviews, seo, tasks, users
 from .routers import settings as settings_router
 from .seed import init_db
 
@@ -38,10 +38,10 @@ app = FastAPI(title="Green Media AI Command Center API", version="1.0.0", lifesp
 # Browsers only: the Django frontend calls the API server-to-server and Flutter is native, so neither needs CORS.
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, tasks, settings_router, google):
+for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, tasks, settings_router, google, users):
     app.include_router(r.router)
 
 
 @app.get("/api/health", tags=["meta"])
 def health():
-    return {"ok": True, "ai": ai_enabled(), "provider": settings.ai_provider, "model": settings.model}
+    return {"ok": True, "ai": ai_enabled(), "provider": settings.ai_provider, "model": settings.model, "demo": settings.seed_demo}

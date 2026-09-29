@@ -70,6 +70,38 @@ flutter run --dart-define=API_URL=https://api.yourdomain  # point at a deployed 
 
 Sign in with any demo account; the password is `demo1234`. The login screens have one-tap buttons for each role. The API seeds 24 sample clients with 90 days of metrics on first start (`SEED_DEMO=1`). Run `python -m app.seed --reset` to reset them.
 
+### PostgreSQL
+
+The API runs on PostgreSQL (recommended) or SQLite (a zero-setup file for quick demos). To use PostgreSQL:
+
+```bash
+docker compose up -d db          # PostgreSQL 16 on 127.0.0.1:5432 (or use any existing server)
+# backend/.env
+DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia
+```
+
+Tables are created on first start. Upgrading to a newer version adds any new tables and columns automatically, and your data is kept.
+
+**For a real installation (no demo data)**, set `SEED_DEMO=0` and create your first admin. The password is prompted for, never typed on the command line:
+
+```bash
+cd backend
+python -m app.manage create-admin --email you@greenmedia.in --name "Your Name"
+```
+
+Then sign in on the web app and add the rest of the team under **Settings → Team members**.
+
+### Users, roles and login
+
+- **Login.** The Django login page posts to the API (`POST /api/auth/login`). Passwords are checked with bcrypt, and the API returns a JWT. Django keeps the token in a signed, HttpOnly session cookie, and the Flutter app keeps it in the Keychain / Keystore.
+- **Roles table.** Every agency has six built-in roles (Admin, Account Manager, SEO Specialist, Content Writer, Designer, Client). Each role stores which **sections** it can open and which **actions** it may perform. A database foreign key guarantees every user's role exists.
+- **Enforced on every request.** The API re-reads the user and their role on each call. Editing a role, changing a user's role or disabling an account therefore takes effect immediately, even for people who are already signed in.
+- **Admin screens** (**Settings → Team members / Roles & permissions**):
+  - Create users, change roles, reset passwords and disable accounts.
+  - Edit what each role can open and do.
+  - Admins can't disable or demote themselves, and the Admin role always keeps Settings access, so nobody gets locked out.
+- **Client-portal users** have the Client role and are linked to one client, so they only ever see that company's data.
+
 **AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `ANTHROPIC_API_KEY` (or `AI_PROVIDER=openai` plus `OPENAI_API_KEY`) on the API server to switch to real model output. Keys never ship inside the apps.
 
 ## Going live with Google Business Profile
@@ -115,8 +147,9 @@ Clients linked to a real Google location are **live**. Their reviews, rating and
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 23 tests: permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 38 tests: users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (OAuth, locations, review import, reply, posts, insights, revoked access)
+TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```
 

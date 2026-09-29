@@ -3,7 +3,7 @@
 from datetime import timezone
 
 from .models import AuditLog, Client, ContentItem, Keyword, Report, Review, Task, User
-from .security import ACTIONS, ROLE_LABELS, SECTIONS
+from .security import ROLE_LABELS
 
 
 def iso(dt):
@@ -14,11 +14,13 @@ def iso(dt):
 
 
 def user_out(u: User) -> dict:
-    return {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "role_label": ROLE_LABELS[u.role], "client_id": u.client_id}
+    label = getattr(u, "role_label", None) or ROLE_LABELS.get(u.role, u.role)
+    return {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "role_label": label, "client_id": u.client_id, "status": u.status}
 
 
 def me_out(u: User, client_name: str | None) -> dict:
-    return {**user_out(u), "client_name": client_name, "sections": SECTIONS[u.role], "permissions": ACTIONS[u.role]}
+    # u must have been through security.load_role (sections/permissions come from the roles table)
+    return {**user_out(u), "client_name": client_name, "sections": u.sections, "permissions": u.permissions}
 
 
 def client_brief(c: Client) -> dict:

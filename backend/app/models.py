@@ -3,7 +3,7 @@ can become a multi-tenant SaaS without a rebuild; every query in the routers fil
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -22,15 +22,32 @@ class Tenant(Base):
     require_client_approval: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class Role(Base):
+    """Per-tenant role: which app sections it can open and which actions it may perform (blueprint: roles table)."""
+
+    __tablename__ = "roles"
+    __table_args__ = (UniqueConstraint("tenant_id", "name"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(30))  # slug: admin | account_manager | seo | content | designer | client
+    label: Mapped[str] = mapped_column(String(60))
+    sections: Mapped[list] = mapped_column(JSON, default=list)
+    permissions: Mapped[list] = mapped_column(JSON, default=list)
+
+
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("tenant_id", "email"),)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "email"),
+        # Every user's role must exist for their tenant.
+        ForeignKeyConstraint(["tenant_id", "role"], ["roles.tenant_id", "roles.name"], name="fk_users_role_roles"),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(200), index=True)
     password_hash: Mapped[str] = mapped_column(String(100))
-    role: Mapped[str] = mapped_column(String(30))  # admin | account_manager | seo | content | designer | client
+    role: Mapped[str] = mapped_column(String(30))  # roles.name within the same tenant
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)  # client-portal users
     status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

@@ -33,10 +33,22 @@ class Api:
                 detail = r.json().get("detail", r.text)
             except ValueError:
                 detail = r.text
-            if isinstance(detail, list):  # FastAPI validation errors
+            if isinstance(detail, dict) and "errors" in detail:  # e.g. CSV import row errors
+                detail = " • ".join(detail["errors"])
+            elif isinstance(detail, list):  # FastAPI validation errors
                 detail = "; ".join(f"{'.'.join(map(str, d.get('loc', [])[1:]))}: {d.get('msg')}" for d in detail)
             raise ApiError(r.status_code, str(detail))
         return r.json() if r.content else None
+
+    def _request_text(self, path: str) -> str:
+        headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
+        try:
+            r = httpx.get(f"{settings.API_URL}{path}", headers=headers, timeout=settings.API_TIMEOUT)
+        except httpx.HTTPError as e:
+            raise ApiError(503, f"API unavailable ({e.__class__.__name__})")
+        if r.status_code >= 400:
+            raise ApiError(r.status_code, r.text[:300])
+        return r.text
 
     def get(self, path: str, **params):
         return self._request("GET", path, params={k: v for k, v in params.items() if v not in (None, "", "all")})

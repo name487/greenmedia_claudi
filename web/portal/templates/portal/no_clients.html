@@ -1,0 +1,14 @@
+{% extends "portal/base.html" %}
+{% block content %}
+<div class="page-header"><div><h1>{{ title }}</h1></div></div>
+<section class="card">
+  <div class="empty">
+    <p style="margin-top:0"><strong>No clients yet.</strong> {{ title }} works per client, so add your first client to get started.</p>
+    {% if 'client.edit' in perms %}
+      <a class="btn" href="{% url 'clients' %}#add">+ Add a client</a>
+    {% else %}
+      <p class="muted small">Ask an Admin or Account Manager to add clients.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

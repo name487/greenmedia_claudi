@@ -89,7 +89,18 @@ cd backend
 python -m app.manage create-admin --email you@greenmedia.in --name "Your Name"
 ```
 
-Then sign in on the web app and add the rest of the team under **Settings → Team members**.
+Then sign in on the web app and add your data. With `SEED_DEMO=0` the database starts empty:
+
+| What | How |
+|---|---|
+| Team members | **Settings → Team members → Add team member** (name, email, role, temporary password) |
+| One client | **Clients → + Add client** |
+| Many clients | **Clients → Import clients from CSV** (click *Download template* for the columns), or from the command line: `python -m app.manage import-clients clients.csv` |
+| Client-portal logins | **Settings → Team members**, role **Client**, pick the client |
+| Reviews, rating, insights | **GMB Center → Google connections**, then *Link & sync* each location (pulled from Google, not typed in) |
+| Content, tasks, keywords | Created in the app as you work (Content Studio, Team & Tasks, SEO Center) |
+
+The CSV needs only `company_name`. Optional columns are `website, industry, city, plan, status, services` (separated by `;`), `contact_name, contact_email, contact_phone`. The import is all-or-nothing: if any row is invalid, nothing is imported and you get the line numbers to fix. Clients that already exist, matched by name, are skipped, so re-running the same file is safe.
 
 ### Users, roles and login
 

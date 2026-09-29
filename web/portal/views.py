@@ -3,7 +3,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -32,6 +32,11 @@ def _client_filter(request, default=None):
 
 def _clients(request):
     return request.api.get("/api/clients")
+
+
+def _no_clients(request, title: str):
+    """Fresh installs (SEED_DEMO=0) start with no clients; per-client pages show a prompt instead of crashing."""
+    return render(request, "portal/no_clients.html", {"title": title})
 
 
 def _back(request, **params):
@@ -92,12 +97,35 @@ def dashboard(request):
 @login_required("clients")
 def clients(request):
     f = {k: request.GET.get(k, "") for k in ("q", "industry", "status", "service")}
+    if request.method == "POST" and can(request, "client.edit") and request.POST.get("action") == "import":
+        upload = request.FILES.get("csv_file")
+        if not upload:
+            messages.error(request, "Choose a CSV file to import.")
+        elif upload.size > 5_000_000:
+            messages.error(request, "That file is over 5 MB — split it into smaller files.")
+        else:
+            try:
+                text = upload.read().decode("utf-8-sig")
+            except UnicodeDecodeError:
+                messages.error(request, "The file isn't UTF-8 text. In Excel use Save As → “CSV UTF-8 (Comma delimited)”.")
+                return redirect("clients")
+            out = request.api.post("/api/clients/import", {"csv": text})  # row errors surface as a flash message
+            messages.success(request, f"Imported {out['created']} client(s)."
+                             + (f" Skipped {len(out['skipped'])} that already exist: {', '.join(out['skipped'][:10])}{'…' if len(out['skipped']) > 10 else ''}." if out["skipped"] else ""))
+        return redirect("clients")
     if request.method == "POST" and can(request, "client.edit"):
         c = request.api.post("/api/clients", {k: request.POST.get(k, "") for k in ("company_name", "website", "industry", "city", "plan", "contact_name", "contact_email", "contact_phone")})
         messages.success(request, f"{c['company_name']} added.")
         return redirect("client_detail", client_id=c["id"])
     rows = request.api.get("/api/clients", **f)
     return render(request, "portal/clients.html", {"rows": rows, "f": f, "facets": request.api.get("/api/clients/facets"), "plans": ["Starter", "Growth", "Pro", "Agency"]})
+
+
+@login_required("clients")
+def clients_template(request):
+    resp = HttpResponse(request.api._request_text("/api/clients/import/template"), content_type="text/csv")
+    resp["Content-Disposition"] = "attachment; filename=clients-template.csv"
+    return resp
 
 
 @login_required("clients")
@@ -124,6 +152,8 @@ def client_detail(request, client_id):
 @login_required("gmb")
 def gmb(request):
     cl = _clients(request)
+    if not cl:
+        return _no_clients(request, "GMB Center")
     cid = _client_filter(request, cl[0]["id"])
     if request.method == "POST":
         out = request.api.post(f"/api/clients/{cid}/gmb/sync")
@@ -249,6 +279,8 @@ def _aware(value: str):
 @login_required("content")
 def content(request):
     cl = _clients(request)
+    if not cl:
+        return _no_clients(request, "AI Content Studio")
     brief_cid = _int(request.POST.get("client_id") or request.GET.get("client")) or cl[0]["id"]
     if request.me.get("client_id"):
         brief_cid = request.me["client_id"]
@@ -298,6 +330,8 @@ def content(request):
 @login_required("creative")
 def creative(request):
     cl = _clients(request)
+    if not cl:
+        return _no_clients(request, "Creative Studio")
     cid = _client_filter(request, cl[0]["id"])
     c = next(x for x in cl if x["id"] == cid)
     detail = request.api.get(f"/api/clients/{cid}")
@@ -397,6 +431,8 @@ KPI_LABELS = [("gmb_views", "GMB profile views"), ("gmb_calls", "Calls"), ("gmb_
 @login_required("reports")
 def reports(request):
     cl = None if request.me.get("client_id") else _clients(request)
+    if cl == []:
+        return _no_clients(request, "Reports")
     cid = _client_filter(request, cl[0]["id"] if cl else None)
     if request.method == "POST":
         if request.POST.get("action") == "generate":

@@ -1,6 +1,8 @@
 """Admin commands for a real (non-demo) installation.
 
     python -m app.manage create-admin --email you@agency.com --name "Your Name" [--agency "Green Media Technology"]
+    python -m app.manage import-clients clients.csv [--agency "Green Media Technology"]
+    python -m app.manage clients-template > clients.csv
 
 Creates the database tables if needed, the agency (tenant) with its built-in roles if it doesn't exist,
 and an Admin user. The password is prompted for (never pass it on the command line)."""
@@ -11,6 +13,7 @@ import sys
 
 from sqlalchemy import func, select
 
+from . import importer
 from .db import SessionLocal
 from .models import Tenant, User
 from .security import ensure_default_roles, hash_password
@@ -41,7 +44,29 @@ def main(argv: list[str] | None = None) -> None:
     c.add_argument("--email", required=True)
     c.add_argument("--name", required=True)
     c.add_argument("--agency", default="Green Media Technology")
+    imp = sub.add_parser("import-clients", help="bulk-create clients from a CSV file")
+    imp.add_argument("csv_file")
+    imp.add_argument("--agency", default="Green Media Technology")
+    sub.add_parser("clients-template", help="print an example clients CSV")
     args = p.parse_args(argv)
+
+    if args.cmd == "clients-template":
+        print(importer.TEMPLATE, end="")
+        return
+    if args.cmd == "import-clients":
+        init_db(seed_if_empty=False)
+        with open(args.csv_file, encoding="utf-8-sig") as fh:
+            text = fh.read()
+        with SessionLocal() as db:
+            tenant = db.scalar(select(Tenant).where(Tenant.name == args.agency))
+            if tenant is None:
+                sys.exit(f"No agency named {args.agency!r}. Run create-admin first.")
+            out = importer.import_clients(db, tenant.id, None, text)
+        if out["errors"]:
+            print("Nothing imported. Fix these rows and run again:", *out["errors"], sep="\n  ")
+            sys.exit(1)
+        print(f"Imported {out['created']} clients." + (f" Skipped (already exist): {', '.join(out['skipped'])}" if out["skipped"] else ""))
+        return
 
     if args.cmd == "create-admin":
         pw = getpass.getpass("Password (min 8 chars): ")

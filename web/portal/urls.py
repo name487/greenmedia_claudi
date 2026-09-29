@@ -7,6 +7,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("", views.dashboard, name="dashboard"),
     path("clients/", views.clients, name="clients"),
+    path("clients/template.csv", views.clients_template, name="clients_template"),
     path("clients/<int:client_id>/", views.client_detail, name="client_detail"),
     path("gmb/", views.gmb, name="gmb"),
     path("gmb/google/", views.google_connections, name="google"),

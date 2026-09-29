@@ -16,10 +16,10 @@
     <tbody>
     {% for c in rows %}
       <tr>
-        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit">{{ c.company_name }}</a><div class="muted small">{{ c.city }} · {{ c.contact_name }}</div></td>
+        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit">{{ c.company_name }}</a><div class="muted small">{{ c.city }}{% if c.city and c.contact_name %} · {% endif %}{{ c.contact_name }}</div></td>
         <td data-label="Industry">{{ c.industry }}</td>
         <td data-label="Plan">{{ c.plan }}</td>
-        <td data-label="Rating">{{ c.rating|stars }} {{ c.rating }}</td>
+        <td data-label="Rating">{% if c.rating %}{{ c.rating|stars }} {{ c.rating }}{% else %}<span class="muted small">Not linked to Google</span>{% endif %}</td>
         <td data-label="Status">{{ c.status|badge }}</td>
         <td><div class="btn-row">
           <a class="btn soft sm" href="{% url 'client_detail' c.id %}">Open</a>
@@ -33,7 +33,7 @@
   </table></div>
 </section>
 {% if 'client.edit' in perms %}
-<details class="card">
+<details class="card" id="add"{% if not rows and not f.q and not f.industry and not f.status and not f.service %} open{% endif %}>
   <summary>+ Add client</summary>
   <form method="post" class="form">{% csrf_token %}
     <div class="grid cols-2">
@@ -48,6 +48,21 @@
     </div>
     <div><button class="btn">Create client</button></div>
   </form>
+</details>
+{% endif %}
+{% if 'client.edit' in perms %}
+<details class="card" id="import"{% if not rows and not f.q and not f.industry and not f.status and not f.service %} open{% endif %}>
+  <summary>⇪ Import clients from CSV</summary>
+  <p class="small" style="margin-top:0">Add many clients at once from a spreadsheet. Only <code>company_name</code> is required; other columns:
+    <code>website, industry, city, plan</code> (Starter/Growth/Pro/Agency), <code>status</code> (active/onboarding/paused),
+    <code>services</code> (separate with <code>;</code>), <code>contact_name, contact_email, contact_phone</code>.
+    Clients whose name already exists are skipped. If any row has a problem, nothing is imported and you'll see which lines to fix.</p>
+  <form method="post" enctype="multipart/form-data" class="toolbar" style="margin:0">{% csrf_token %}<input type="hidden" name="action" value="import">
+    <input class="input" type="file" name="csv_file" accept=".csv,text/csv" required>
+    <button class="btn">Import</button>
+    <a class="btn ghost" href="{% url 'clients_template' %}">Download template</a>
+  </form>
+  <p class="muted small" style="margin-bottom:0">From Excel: File → Save As → “CSV UTF-8 (Comma delimited)”. From Google Sheets: File → Download → CSV.</p>
 </details>
 {% endif %}
 {% endblock %}

@@ -2,10 +2,12 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import importer
 from ..db import get_db
 from ..google import api as google_api
 from ..google import service as google_service
@@ -40,11 +42,11 @@ def list_clients(q: str = "", industry: str | None = None, status: str | None = 
 @router.get("/facets")
 def facets(user: User = Depends(require_section("clients")), db: Session = Depends(get_db)):
     clients = list(db.scalars(select(Client).where(Client.tenant_id == user.tenant_id)))
-    return {"industries": sorted({c.industry for c in clients}), "services": sorted({s for c in clients for s in c.services}), "statuses": ["active", "onboarding", "paused"]}
+    return {"industries": sorted({c.industry for c in clients if c.industry}), "services": sorted({s for c in clients for s in c.services}), "statuses": ["active", "onboarding", "paused"]}
 
 
 class ClientIn(BaseModel):
-    company_name: str
+    company_name: str = Field(min_length=2, max_length=200)
     website: str = ""
     industry: str = ""
     city: str = ""
@@ -67,6 +69,24 @@ def create_client(body: ClientIn, user: User = Depends(require("client.edit")), 
     audit(db, user, f"created client {c.company_name}", client_id=c.id, entity_type="client", entity_id=c.id)
     db.commit()
     return client_out(c)
+
+
+class ImportIn(BaseModel):
+    csv: str = Field(max_length=5_000_000)
+
+
+@router.get("/import/template", response_class=PlainTextResponse)
+def import_template(user: User = Depends(require("client.edit"))):
+    return PlainTextResponse(importer.TEMPLATE, headers={"Content-Disposition": "attachment; filename=clients-template.csv"})
+
+
+@router.post("/import")
+def import_clients(body: ImportIn, user: User = Depends(require("client.edit")), db: Session = Depends(get_db)):
+    """Bulk-create clients from CSV text. All-or-nothing on validation errors; existing names are skipped."""
+    out = importer.import_clients(db, user.tenant_id, user.id, body.csv)
+    if out["errors"]:
+        raise HTTPException(422, {"errors": out["errors"]})
+    return out
 
 
 @router.get("/{client_id}")

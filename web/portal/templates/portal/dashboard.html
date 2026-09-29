@@ -45,7 +45,7 @@
       <tr class="clickable" onclick="location.href='{% url 'client_detail' c.id %}'">
         <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit;text-decoration:none">{{ c.company_name }}</a><div class="muted small">{{ c.industry }} · {{ c.city }}</div></td>
         <td data-label="Plan">{{ c.plan }}</td>
-        <td data-label="Rating">{{ c.rating|stars }} {{ c.rating }}</td>
+        <td data-label="Rating">{% if c.rating %}{{ c.rating|stars }} {{ c.rating }}{% else %}<span class="muted small">Not linked to Google</span>{% endif %}</td>
         <td data-label="GMB views" class="num">{{ c.gmb_views|compact }}</td>
         <td data-label="Leads" class="num">{{ c.leads }} {{ c.leads_change_pct|delta }}</td>
         <td data-label="Pending" class="num">{{ c.pending_reviews|default:"—" }}</td>

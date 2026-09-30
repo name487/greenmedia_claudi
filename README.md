@@ -113,6 +113,24 @@ The CSV needs only `company_name`. Optional columns are `website, industry, city
   - Admins can't disable or demote themselves, and the Admin role always keeps Settings access, so nobody gets locked out.
 - **Client-portal users** have the Client role and are linked to one client, so they only ever see that company's data.
 
+### Clients and contacts API
+
+The interactive docs are at `http://127.0.0.1:8001/docs`. The Django **Clients** and **Client Workspace** screens use these endpoints:
+
+| Method & path | What it does | Who |
+|---|---|---|
+| `GET /api/clients` | List clients. Filters: `q` (name, city, industry, website, or any contact's name/email/phone), `industry`, `service`, `plan`, `status`, `manager_id`. `sort=name\|pending\|rating\|newest` | anyone signed in (portal users see only their company) |
+| `GET /api/clients/facets` | Values for the filter dropdowns (industries, services, plans, statuses, managers) | staff |
+| `POST /api/clients` | Create a client. Names must be unique (case-insensitive). Accepts `contacts: [...]` or a single `contact_name/email/phone` | `client.edit` |
+| `GET /api/clients/{id}` | Workspace: profile, contacts, KPIs, reviews, content, keywords, tasks, reports | anyone who can see it |
+| `PATCH /api/clients/{id}` | Edit any of: name, website, industry, city, plan, status, services, account manager, notes, brand voice, auto-publish | `client.edit` |
+| `DELETE /api/clients/{id}?confirm_name=…` | Permanently delete the client and all its data. You must retype the exact name. Portal logins for the client are disabled, and the audit log keeps a record | `client.edit` |
+| `GET /api/clients/{id}/contacts` | List contacts, primary first | anyone who can see the client |
+| `POST /api/clients/{id}/contacts` | Add a contact (`name`, `email`, `phone`, `designation`, `is_primary`). The first contact becomes primary | `client.edit` |
+| `PATCH /api/clients/{id}/contacts/{cid}` | Edit a contact. `is_primary: true` makes it the primary contact | `client.edit` |
+| `DELETE /api/clients/{id}/contacts/{cid}` | Remove a contact. If it was primary, the next contact is promoted | `client.edit` |
+| `POST /api/clients/import` | Bulk-create clients from CSV (see above) | `client.edit` |
+
 **AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `ANTHROPIC_API_KEY` (or `AI_PROVIDER=openai` plus `OPENAI_API_KEY`) on the API server to switch to real model output. Keys never ship inside the apps.
 
 ## Going live with Google Business Profile
@@ -158,7 +176,7 @@ Clients linked to a real Google location are **live**. Their reviews, rating and
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 38 tests: users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 50 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (OAuth, locations, review import, reply, posts, insights, revoked access)
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract

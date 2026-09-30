@@ -1,6 +1,7 @@
 import calendar
 import json
 from datetime import date, datetime, timedelta
+from urllib.parse import quote
 
 from django.contrib import messages
 from django.http import HttpResponse, HttpResponseRedirect
@@ -94,9 +95,23 @@ def dashboard(request):
 
 # ---------- clients ----------
 
+FILTER_KEYS = ("q", "industry", "status", "service", "plan", "manager_id", "sort")
+DEFAULT_SERVICES = ["GMB Management", "Review Management"]
+
+
+def _client_body(post) -> dict:
+    """Fields shared by the Add client and Edit details forms."""
+    return {
+        "company_name": post.get("company_name", "").strip(), "website": post.get("website", "").strip(),
+        "industry": post.get("industry", "").strip(), "city": post.get("city", "").strip(),
+        "plan": post.get("plan", "Starter"), "status": post.get("status", "onboarding"),
+        "services": post.getlist("services"), "account_manager_id": _int(post.get("account_manager_id")),
+    }
+
+
 @login_required("clients")
 def clients(request):
-    f = {k: request.GET.get(k, "") for k in ("q", "industry", "status", "service")}
+    f = {k: request.GET.get(k, "") for k in FILTER_KEYS}
     if request.method == "POST" and can(request, "client.edit") and request.POST.get("action") == "import":
         upload = request.FILES.get("csv_file")
         if not upload:
@@ -114,11 +129,15 @@ def clients(request):
                              + (f" Skipped {len(out['skipped'])} that already exist: {', '.join(out['skipped'][:10])}{'…' if len(out['skipped']) > 10 else ''}." if out["skipped"] else ""))
         return redirect("clients")
     if request.method == "POST" and can(request, "client.edit"):
-        c = request.api.post("/api/clients", {k: request.POST.get(k, "") for k in ("company_name", "website", "industry", "city", "plan", "contact_name", "contact_email", "contact_phone")})
+        body = {**_client_body(request.POST), **{k: request.POST.get(k, "").strip() for k in ("contact_name", "contact_email", "contact_phone")}}
+        c = request.api.post("/api/clients", body)
         messages.success(request, f"{c['company_name']} added.")
         return redirect("client_detail", client_id=c["id"])
-    rows = request.api.get("/api/clients", **f)
-    return render(request, "portal/clients.html", {"rows": rows, "f": f, "facets": request.api.get("/api/clients/facets"), "plans": ["Starter", "Growth", "Pro", "Agency"]})
+    rows = request.api.get("/api/clients", **{k: v for k, v in f.items() if k != "sort" or v})
+    return render(request, "portal/clients.html", {
+        "rows": rows, "f": f, "facets": request.api.get("/api/clients/facets"), "default_services": DEFAULT_SERVICES,
+        "filtered": any(f[k] for k in FILTER_KEYS if k != "sort"),
+    })
 
 
 @login_required("clients")
@@ -132,7 +151,11 @@ def clients_template(request):
 def client_detail(request, client_id):
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "notes":
+        contacts = f"/api/clients/{client_id}/contacts"
+        if action == "profile":
+            request.api.patch(f"/api/clients/{client_id}", _client_body(request.POST))
+            messages.success(request, "Client details saved.")
+        elif action == "notes":
             request.api.patch(f"/api/clients/{client_id}", {"notes": request.POST.get("notes", "")})
             messages.success(request, "Notes saved.")
         elif action == "auto_publish":
@@ -141,10 +164,37 @@ def client_detail(request, client_id):
             messages.success(request, "Publishing safety updated.")
         elif action == "status":
             request.api.patch(f"/api/clients/{client_id}", {"status": request.POST.get("status")})
+        elif action == "add_contact":
+            x = request.api.post(contacts, {k: request.POST.get(k, "").strip() for k in ("name", "email", "phone", "designation")} | {"is_primary": "is_primary" in request.POST})
+            messages.success(request, f"Added {x['name']}.")
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#contacts")
+        elif action == "update_contact":
+            x = request.api.patch(f"{contacts}/{_int(request.POST.get('contact_id'))}", {k: request.POST.get(k, "").strip() for k in ("name", "email", "phone", "designation")})
+            messages.success(request, f"Saved {x['name']}.")
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#contacts")
+        elif action == "primary_contact":
+            x = request.api.patch(f"{contacts}/{_int(request.POST.get('contact_id'))}", {"is_primary": True})
+            messages.success(request, f"{x['name']} is now the primary contact.")
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#contacts")
+        elif action == "delete_contact":
+            request.api.delete(f"{contacts}/{_int(request.POST.get('contact_id'))}")
+            messages.success(request, "Contact removed.")
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#contacts")
+        elif action == "delete_client":
+            out = request.api.delete(f"/api/clients/{client_id}?confirm_name={quote(request.POST.get('confirm_name', ''))}")
+            msg = "Client deleted."
+            if out["disabled_portal_users"]:
+                msg += f" Disabled portal login(s): {', '.join(out['disabled_portal_users'])}."
+            messages.success(request, msg)
+            return redirect("clients")
         return _back(request)
     c = request.api.get(f"/api/clients/{client_id}")
     channels = ["reviews", "gmb"] + [s["platform"] for s in c["social_accounts"]]
-    return render(request, "portal/client_detail.html", {"c": c, "k": c["kpis"], "channels": channels, "editable": can(request, "client.edit")})
+    editable = can(request, "client.edit")
+    return render(request, "portal/client_detail.html", {
+        "c": c, "k": c["kpis"], "channels": channels, "editable": editable,
+        "facets": request.api.get("/api/clients/facets") if editable else None,
+    })
 
 
 # ---------- GMB ----------

@@ -125,12 +125,14 @@ def visible_client_ids(db: Session, user: User) -> list[int]:
     """Clients this user may see: the whole tenant for staff, only their own company for client-portal users."""
     if user.client_id:
         return [user.client_id]
+    if user.role == "client":  # portal user whose client was removed: sees nothing, never the whole agency
+        return []
     return list(db.scalars(select(Client.id).where(Client.tenant_id == user.tenant_id)))
 
 
 def get_client(db: Session, user: User, client_id: int) -> Client:
     client = db.get(Client, client_id)
-    if not client or client.tenant_id != user.tenant_id or (user.client_id and user.client_id != client_id):
+    if not client or client.tenant_id != user.tenant_id or (user.client_id and user.client_id != client_id) or (user.role == "client" and not user.client_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Client not found")
     return client
 

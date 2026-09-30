@@ -31,12 +31,16 @@ def client_brief(c: Client) -> dict:
     }
 
 
+def contact_out(x) -> dict:
+    return {"id": x.id, "name": x.name, "email": x.email, "phone": x.phone, "designation": x.designation, "is_primary": bool(x.is_primary)}
+
+
 def client_out(c: Client) -> dict:
     return {
         **client_brief(c),
         "website": c.website, "services": c.services, "account_manager_id": c.account_manager_id,
         "brand_voice": c.brand_voice, "auto_publish": c.auto_publish, "notes": c.notes,
-        "contacts": [{"id": x.id, "name": x.name, "email": x.email, "phone": x.phone, "designation": x.designation} for x in c.contacts],
+        "contacts": [contact_out(x) for x in c.contacts],
         "gmb": c.gmb and {"location_id": c.gmb.location_id, "status": c.gmb.status, "last_sync": iso(c.gmb.last_sync), "rating": c.gmb.rating,
                          "review_count": c.gmb.review_count, "is_live": c.gmb.is_live, "title": c.gmb.title, "last_error": c.gmb.last_error,
                          "google_email": c.gmb.connection.email if c.gmb.connection else None},

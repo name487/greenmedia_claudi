@@ -1,0 +1,14 @@
+{% comment %}Shared add/edit fields. Context: x (client dict or None), facets (plans, statuses, services, managers).{% endcomment %}
+<div class="grid cols-2">
+  <label class="field">Company name <input class="input" name="company_name" value="{{ x.company_name|default:'' }}" required minlength="2" maxlength="200"></label>
+  <label class="field">Website <span>https:// is added if missing</span><input class="input" name="website" value="{{ x.website|default:'' }}" placeholder="www.example.com" maxlength="300"></label>
+  <label class="field">Industry <input class="input" name="industry" value="{{ x.industry|default:'' }}" list="industry-list" maxlength="100"></label>
+  <label class="field">City <input class="input" name="city" value="{{ x.city|default:'' }}" maxlength="100"></label>
+  <label class="field">Plan <select class="input" name="plan">{% for p in facets.plans %}<option{% if p == x.plan %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+  <label class="field">Status <select class="input" name="status">{% for st in facets.statuses %}<option value="{{ st }}"{% if st == x.status or not x and st == 'onboarding' %} selected{% endif %}>{{ st|capfirst }}</option>{% endfor %}</select></label>
+  <label class="field">Account manager <select class="input" name="account_manager_id"><option value="">— none —</option>{% for m in facets.managers %}<option value="{{ m.id }}"{% if m.id == x.account_manager_id or not x and m.id == me.id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}</select></label>
+</div>
+<div class="field">Services
+  <div class="chips">{% for sv in facets.services %}<label class="chip"><input type="checkbox" name="services" value="{{ sv }}"{% if x and sv in x.services or not x and sv in default_services %} checked{% endif %} hidden> {{ sv }}</label>{% endfor %}</div>
+</div>
+<datalist id="industry-list">{% for i in facets.industries %}<option value="{{ i }}">{% endfor %}</datalist>

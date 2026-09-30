@@ -1,24 +1,29 @@
 {% extends "portal/base.html" %}{% load gm %}
 {% block content %}
 <div class="page-header">
-  <div><h1>Clients</h1><p class="muted">{{ rows|length }} clients</p></div>
+  <div><h1>Clients</h1><p class="muted">{{ rows|length }} client{{ rows|length|pluralize }}{% if filtered %} match your filters · <a href="{% url 'clients' %}">Clear filters</a>{% endif %}</p></div>
+  {% if 'client.edit' in perms %}<div class="page-actions"><a class="btn" href="#add" onclick="document.getElementById('add').open=true">+ Add client</a><a class="btn ghost" href="#import" onclick="document.getElementById('import').open=true">Import CSV</a></div>{% endif %}
 </div>
 <form method="get" class="toolbar">
-  <input class="input" name="q" value="{{ f.q }}" placeholder="Search client, city or contact…">
+  <input class="input" name="q" value="{{ f.q }}" placeholder="Search name, city, website or any contact's name, email, phone…" type="search">
   <select class="input" name="industry" onchange="this.form.submit()" aria-label="Industry"><option value="">All industries</option>{% for i in facets.industries %}<option{% if i == f.industry %} selected{% endif %}>{{ i }}</option>{% endfor %}</select>
   <select class="input" name="service" onchange="this.form.submit()" aria-label="Service"><option value="">All services</option>{% for i in facets.services %}<option{% if i == f.service %} selected{% endif %}>{{ i }}</option>{% endfor %}</select>
+  <select class="input" name="plan" onchange="this.form.submit()" aria-label="Plan"><option value="">All plans</option>{% for i in facets.plans %}<option{% if i == f.plan %} selected{% endif %}>{{ i }}</option>{% endfor %}</select>
   <select class="input" name="status" onchange="this.form.submit()" aria-label="Status"><option value="">Any status</option>{% for i in facets.statuses %}<option value="{{ i }}"{% if i == f.status %} selected{% endif %}>{{ i|capfirst }}</option>{% endfor %}</select>
+  <select class="input" name="manager_id" onchange="this.form.submit()" aria-label="Account manager"><option value="">Any manager</option>{% for m in facets.managers %}<option value="{{ m.id }}"{% if m.id|stringformat:"d" == f.manager_id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}</select>
+  <select class="input" name="sort" onchange="this.form.submit()" aria-label="Sort"><option value="name">Sort: Name</option><option value="pending"{% if f.sort == 'pending' %} selected{% endif %}>Sort: Pending reviews</option><option value="rating"{% if f.sort == 'rating' %} selected{% endif %}>Sort: Rating</option><option value="newest"{% if f.sort == 'newest' %} selected{% endif %}>Sort: Newest</option></select>
   <button class="btn soft">Search</button>
 </form>
 <section class="card">
   <div class="table-wrap"><table class="table responsive">
-    <thead><tr><th>Client</th><th>Industry</th><th>Plan</th><th>Rating</th><th>Status</th><th>Quick actions</th></tr></thead>
+    <thead><tr><th>Client</th><th>Industry</th><th>Plan</th><th>Manager</th><th>Rating</th><th>Status</th><th>Quick actions</th></tr></thead>
     <tbody>
     {% for c in rows %}
       <tr>
         <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit">{{ c.company_name }}</a><div class="muted small">{{ c.city }}{% if c.city and c.contact_name %} · {% endif %}{{ c.contact_name }}</div></td>
-        <td data-label="Industry">{{ c.industry }}</td>
+        <td data-label="Industry">{{ c.industry|default:"—" }}</td>
         <td data-label="Plan">{{ c.plan }}</td>
+        <td data-label="Manager">{{ c.account_manager_name|default:"—" }}</td>
         <td data-label="Rating">{% if c.rating %}{{ c.rating|stars }} {{ c.rating }}{% else %}<span class="muted small">Not linked to Google</span>{% endif %}</td>
         <td data-label="Status">{{ c.status|badge }}</td>
         <td><div class="btn-row">
@@ -28,30 +33,24 @@
           <a class="btn soft sm" href="{% url 'reports' %}?client={{ c.id }}">Report</a>
         </div></td>
       </tr>
-    {% empty %}<tr><td colspan="6" class="empty">No clients match.</td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="7" class="empty">{% if filtered %}No clients match. <a href="{% url 'clients' %}">Clear filters</a>{% else %}No clients yet.{% endif %}</td></tr>{% endfor %}
     </tbody>
   </table></div>
 </section>
 {% if 'client.edit' in perms %}
-<details class="card" id="add"{% if not rows and not f.q and not f.industry and not f.status and not f.service %} open{% endif %}>
+<details class="card" id="add"{% if not rows and not filtered %} open{% endif %}>
   <summary>+ Add client</summary>
-  <form method="post" class="form">{% csrf_token %}
+  <form method="post" class="form" style="margin-top:12px">{% csrf_token %}<input type="hidden" name="action" value="create">
+    {% include "portal/_client_form.html" with x=None %}
     <div class="grid cols-2">
-      <label class="field">Company name <input class="input" name="company_name" required></label>
-      <label class="field">Website <input class="input" name="website" type="url" placeholder="https://"></label>
-      <label class="field">Industry <input class="input" name="industry"></label>
-      <label class="field">City <input class="input" name="city"></label>
-      <label class="field">Plan <select class="input" name="plan">{% for p in plans %}<option>{{ p }}</option>{% endfor %}</select></label>
-      <label class="field">Contact name <input class="input" name="contact_name"></label>
-      <label class="field">Contact email <input class="input" name="contact_email" type="email"></label>
-      <label class="field">Contact phone <input class="input" name="contact_phone"></label>
+      <label class="field">Primary contact name <input class="input" name="contact_name" maxlength="120"></label>
+      <label class="field">Contact email <input class="input" name="contact_email" type="email" maxlength="200"></label>
+      <label class="field">Contact phone <input class="input" name="contact_phone" maxlength="40"></label>
     </div>
     <div><button class="btn">Create client</button></div>
   </form>
 </details>
-{% endif %}
-{% if 'client.edit' in perms %}
-<details class="card" id="import"{% if not rows and not f.q and not f.industry and not f.status and not f.service %} open{% endif %}>
+<details class="card" id="import"{% if not rows and not filtered %} open{% endif %}>
   <summary>⇪ Import clients from CSV</summary>
   <p class="small" style="margin-top:0">Add many clients at once from a spreadsheet. Only <code>company_name</code> is required; other columns:
     <code>website, industry, city, plan</code> (Starter/Growth/Pro/Agency), <code>status</code> (active/onboarding/paused),

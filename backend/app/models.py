@@ -70,7 +70,9 @@ class Client(Base):
     auto_publish: Mapped[dict] = mapped_column(JSON, default=dict)
     notes: Mapped[str] = mapped_column(Text, default="")
 
-    contacts: Mapped[list["ClientContact"]] = relationship(cascade="all, delete-orphan")
+    # Primary contact first, then in the order they were added.
+    contacts: Mapped[list["ClientContact"]] = relationship(
+        cascade="all, delete-orphan", order_by=lambda: [ClientContact.is_primary.desc(), ClientContact.id])
     gmb: Mapped["GmbAccount | None"] = relationship(cascade="all, delete-orphan", uselist=False)
     social_accounts: Mapped[list["SocialAccount"]] = relationship(cascade="all, delete-orphan")
 
@@ -84,6 +86,7 @@ class ClientContact(Base):
     email: Mapped[str] = mapped_column(String(200), default="")
     phone: Mapped[str] = mapped_column(String(40), default="")
     designation: Mapped[str] = mapped_column(String(80), default="")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class GmbAccount(Base):

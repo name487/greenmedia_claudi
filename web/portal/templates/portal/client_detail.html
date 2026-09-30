@@ -2,7 +2,7 @@
 {% block content %}
 <a class="back small muted" href="{% url 'clients' %}">{% icon 'back' 16 %} Clients</a>
 <div class="page-header">
-  <div><h1>{{ c.company_name }}</h1><p class="muted">{{ c.industry }} · {{ c.city }} · {{ c.plan }} plan</p></div>
+  <div><h1>{{ c.company_name }}</h1><p class="muted">{% if c.industry %}{{ c.industry }} · {% endif %}{% if c.city %}{{ c.city }} · {% endif %}{{ c.plan }} plan</p></div>
   <div class="page-actions">
     {{ c.status|badge }}
     <a class="btn soft" href="{% url 'content' %}?client={{ c.id }}">Create content</a>
@@ -10,26 +10,79 @@
   </div>
 </div>
 <div class="grid stats">
-  <div class="stat"><span class="stat-label">Google rating</span><strong class="stat-value">{{ c.gmb.rating|stars }} {{ c.gmb.rating }}</strong><span class="stat-hint">{{ c.gmb.review_count }} reviews</span></div>
+  <div class="stat"><span class="stat-label">Google rating</span>{% if c.gmb.rating %}<strong class="stat-value">{{ c.gmb.rating|stars }} {{ c.gmb.rating }}</strong><span class="stat-hint">{{ c.gmb.review_count }} reviews</span>{% else %}<strong class="stat-value">—</strong><span class="stat-hint">Not linked to Google yet</span>{% endif %}</div>
   <div class="stat"><span class="stat-label">GMB views (30d)</span><strong class="stat-value">{{ k.gmb_views.current|compact }}</strong>{{ k.gmb_views.change_pct|delta }}</div>
   <div class="stat"><span class="stat-label">Calls (30d)</span><strong class="stat-value">{{ k.gmb_calls.current }}</strong>{{ k.gmb_calls.change_pct|delta }}</div>
   <div class="stat"><span class="stat-label">Leads (30d)</span><strong class="stat-value">{{ k.leads.current }}</strong>{{ k.leads.change_pct|delta }}</div>
 </div>
 
-<div class="grid cols-3">
-  <section class="card"><header class="card-head"><h3>Company profile</h3></header>
+<div class="grid cols-2">
+  <section class="card" id="profile"><header class="card-head"><h3>Company profile</h3></header>
     <dl class="kv">
-      <dt>Website</dt><dd><a href="{{ c.website }}" target="_blank" rel="noopener">{{ c.website|cut:"https://" }}</a></dd>
-      {% with ct=c.contacts.0 %}{% if ct %}
-      <dt>Contact</dt><dd>{{ ct.name }} ({{ ct.designation }})</dd><dt>Email</dt><dd>{{ ct.email }}</dd><dt>Phone</dt><dd>{{ ct.phone }}</dd>
-      {% endif %}{% endwith %}
+      <dt>Website</dt><dd>{% if c.website %}<a href="{{ c.website }}" target="_blank" rel="noopener">{{ c.website|cut:"https://"|cut:"http://" }}</a>{% else %}—{% endif %}</dd>
+      <dt>Industry</dt><dd>{{ c.industry|default:"—" }}</dd>
+      <dt>City</dt><dd>{{ c.city|default:"—" }}</dd>
+      <dt>Plan</dt><dd>{{ c.plan }}</dd>
       <dt>Manager</dt><dd>{{ c.account_manager_name|default:"—" }}</dd>
-      <dt>Services</dt><dd><div class="chips">{% for s in c.services %}<span class="badge badge-blue">{{ s }}</span>{% endfor %}</div></dd>
+      <dt>Services</dt><dd><div class="chips">{% for s in c.services %}<span class="badge badge-blue">{{ s }}</span>{% empty %}—{% endfor %}</div></dd>
     </dl>
+    {% if editable %}
+    <details style="margin-top:12px"{% if edit_open %} open{% endif %}><summary><strong>Edit details</strong></summary>
+      <form method="post" class="form" style="margin-top:12px">{% csrf_token %}<input type="hidden" name="action" value="profile">
+        {% include "portal/_client_form.html" with x=c %}
+        <div><button class="btn sm">Save changes</button></div>
+      </form>
+    </details>
+    {% endif %}
   </section>
+
+  <section class="card" id="contacts"><header class="card-head"><h3>Contacts ({{ c.contacts|length }})</h3></header>
+    <ul class="list">
+    {% for ct in c.contacts %}
+      <li>
+        <div class="row between">
+          <span><strong>{{ ct.name }}</strong>{% if ct.is_primary %} <span class="badge badge-green">Primary</span>{% endif %}{% if ct.designation %} <span class="muted small">· {{ ct.designation }}</span>{% endif %}
+            <div class="small">{% if ct.email %}<a href="mailto:{{ ct.email }}">{{ ct.email }}</a>{% endif %}{% if ct.email and ct.phone %} · {% endif %}{% if ct.phone %}<a href="tel:{{ ct.phone|cut:' ' }}">{{ ct.phone }}</a>{% endif %}{% if not ct.email and not ct.phone %}<span class="muted">No email or phone</span>{% endif %}</div></span>
+          {% if editable %}<span class="btn-row">
+            {% if not ct.is_primary %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="primary_contact"><input type="hidden" name="contact_id" value="{{ ct.id }}"><button class="btn ghost sm">Make primary</button></form>{% endif %}
+            <form method="post" class="inline" onsubmit="return confirm('Remove {{ ct.name|escapejs }} from this client?')">{% csrf_token %}<input type="hidden" name="action" value="delete_contact"><input type="hidden" name="contact_id" value="{{ ct.id }}"><button class="btn ghost sm">Remove</button></form>
+          </span>{% endif %}
+        </div>
+        {% if editable %}
+        <details style="margin-top:6px"><summary class="small">Edit</summary>
+          <form method="post" class="toolbar" style="margin:8px 0 0">{% csrf_token %}<input type="hidden" name="action" value="update_contact"><input type="hidden" name="contact_id" value="{{ ct.id }}">
+            <input class="input" name="name" value="{{ ct.name }}" required minlength="2" aria-label="Name">
+            <input class="input" name="designation" value="{{ ct.designation }}" placeholder="Designation" aria-label="Designation">
+            <input class="input" name="email" type="email" value="{{ ct.email }}" placeholder="Email" aria-label="Email">
+            <input class="input" name="phone" value="{{ ct.phone }}" placeholder="Phone" aria-label="Phone">
+            <button class="btn sm">Save</button>
+          </form>
+        </details>
+        {% endif %}
+      </li>
+    {% empty %}<li class="muted">No contacts yet.</li>{% endfor %}
+    </ul>
+    {% if editable %}
+    <details style="margin-top:8px"{% if not c.contacts %} open{% endif %}><summary><strong>+ Add contact</strong></summary>
+      <form method="post" class="form" style="margin-top:10px">{% csrf_token %}<input type="hidden" name="action" value="add_contact">
+        <div class="grid cols-2">
+          <label class="field">Name <input class="input" name="name" required minlength="2" maxlength="120"></label>
+          <label class="field">Designation <input class="input" name="designation" placeholder="Owner, Marketing head…" maxlength="80"></label>
+          <label class="field">Email <input class="input" name="email" type="email" maxlength="200"></label>
+          <label class="field">Phone <input class="input" name="phone" maxlength="40"></label>
+        </div>
+        <label class="check"><input type="checkbox" name="is_primary"> Make this the primary contact</label>
+        <div><button class="btn sm">Add contact</button></div>
+      </form>
+    </details>
+    {% endif %}
+  </section>
+</div>
+
+<div class="grid cols-2">
   <section class="card"><header class="card-head"><h3>Connected accounts</h3></header>
     <ul class="list">
-      <li class="row between"><span>Google Business Profile {% if c.gmb.is_live %}<span class="badge badge-green">Live</span>{% else %}<span class="badge badge-gray">Demo</span>{% endif %}</span>{{ c.gmb.status|badge }}</li>
+      <li class="row between"><span>Google Business Profile {% if c.gmb.is_live %}<span class="badge badge-green">Live</span>{% elif c.gmb %}<span class="badge badge-gray">Demo</span>{% endif %}</span>{% if c.gmb %}{{ c.gmb.status|badge }}{% else %}<a class="small" href="{% url 'google' %}">Link to Google</a>{% endif %}</li>
       {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.handle }}</span></span>{{ s.status|badge }}</li>{% endfor %}
     </ul>
   </section>
@@ -89,4 +142,14 @@
     {% if editable %}<div><button class="btn sm">Save notes</button></div>{% endif %}
   </form>
 </section>
+{% if editable %}
+<section class="card" id="delete" style="border-color:var(--red)">
+  <header class="card-head"><h3 style="color:var(--red)">Delete client</h3></header>
+  <p class="small" style="margin-top:0">Permanently deletes <strong>{{ c.company_name }}</strong> and all of its reviews, content, analytics, keywords, tasks, reports, contacts and connected accounts. Client-portal logins for this client are disabled. This can't be undone; the audit log keeps a record.</p>
+  <form method="post" class="toolbar" style="margin:0" onsubmit="return confirm('Permanently delete {{ c.company_name|escapejs }}?')">{% csrf_token %}<input type="hidden" name="action" value="delete_client">
+    <input class="input" name="confirm_name" placeholder="Type {{ c.company_name }} to confirm" required autocomplete="off" aria-label="Type the client name to confirm">
+    <button class="btn danger">Delete client</button>
+  </form>
+</section>
+{% endif %}
 {% endblock %}

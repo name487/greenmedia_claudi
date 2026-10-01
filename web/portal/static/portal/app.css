@@ -207,6 +207,8 @@ table.table { width: 100%; border-collapse: collapse; }
 .empty { text-align: center; padding: 32px 12px; color: var(--muted); }
 .notice { padding: 10px 12px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); font-size: 13px; }
 .notice.info { background: var(--blue-bg); color: var(--blue); }
+.notice.error { background: var(--red-bg); color: var(--red); }
+.notice.ok { background: var(--green-bg); color: var(--green); }
 .pill-tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 12px; overflow-x: auto; margin-bottom: 16px; }
 .pill-tabs button { flex: none; border: 0; background: none; padding: 7px 12px; border-radius: 9px; font: inherit; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .pill-tabs button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
@@ -265,3 +267,11 @@ details.card[open] > summary { margin-bottom: 12px; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--brand-2); }
 .pill-tabs a { flex: none; padding: 7px 12px; border-radius: 9px; color: var(--muted); white-space: nowrap; }
 .pill-tabs a.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+
+/* Google Business Profile panel (client workspace) */
+#google { margin-bottom: 16px; }
+.gbp { display: flex; flex-direction: column; gap: 12px; }
+.gbp-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.gbp-rating { text-align: right; }
+.gbp-rating strong { font-size: 22px; }
+.danger-text { color: var(--red); }

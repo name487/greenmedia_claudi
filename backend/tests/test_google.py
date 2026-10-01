@@ -5,7 +5,6 @@ from datetime import date, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-import pytest
 
 from app.google import api
 from app.jobs import publish_due
@@ -29,27 +28,52 @@ class FakeGoogle:
             {"reviewId": "r-rating-only", "reviewer": {"displayName": "Anonymous"}, "starRating": "FOUR", "createTime": "2026-08-01T10:00:00Z"},
         ]
         self.metric_day = yday
+        self.email = "greenmediaseoteam2@gmail.com"
+        self.scope = " ".join(api.SCOPES)
+        self.issued = 0           # access tokens handed out
+        self.valid: set[str] = set()  # access tokens Google currently accepts
+        self.refreshes = 0
+        self.revoked: list[str] = []
+        self.extra_locations: list[dict] = []
+        self.fail: dict[str, httpx.Response] = {}  # URL prefix -> forced error response
+
+    def _issue(self) -> str:
+        self.issued += 1
+        tok = f"at-{self.issued}"
+        self.valid.add(tok)
+        return tok
 
     def __call__(self, req: httpx.Request) -> httpx.Response:
         url, m = str(req.url), req.method
         body = req.content.decode() if req.content else ""
         self.calls.append((m, url.split("?")[0], body))
         j = lambda obj, status=200: httpx.Response(status, json=obj)  # noqa: E731
+        if url.startswith(api.REVOKE_URL):
+            self.revoked.append(parse_qs(body)["token"][0])
+            return j({})
         if url.startswith(api.TOKEN_URL):
             form = parse_qs(body)
             if form["grant_type"] == ["authorization_code"]:
                 assert form["code"] == ["good-code"]
-                return j({"access_token": "at-1", "refresh_token": "rt-secret", "expires_in": 3599, "scope": " ".join(api.SCOPES)})
+                return j({"access_token": self._issue(), "refresh_token": "rt-secret", "expires_in": 3599, "scope": self.scope})
+            assert form["refresh_token"] == ["rt-secret"]
             if not self.refresh_ok:
                 return j({"error": "invalid_grant", "error_description": "Token has been expired or revoked."}, 400)
-            return j({"access_token": "at-2", "expires_in": 3599})
+            self.refreshes += 1
+            return j({"access_token": self._issue(), "expires_in": 3599})
+        if req.headers.get("Authorization", "").removeprefix("Bearer ") not in self.valid:
+            return j({"error": {"code": 401, "message": "Request had invalid authentication credentials.", "status": "UNAUTHENTICATED"}}, 401)
+        for prefix, resp in self.fail.items():
+            if url.startswith(prefix):
+                return resp
         if url.startswith(api.USERINFO_URL):
-            return j({"email": "greenmediaseoteam2@gmail.com"})
+            return j({"email": self.email})
         if url.startswith(api.ACCOUNTS_URL):
             return j({"accounts": [{"name": ACCOUNT, "accountName": "Green Media SEO", "type": "PERSONAL"}]})
         if url.startswith(f"{api.INFO_BASE}/{ACCOUNT}/locations"):
             return j({"locations": [{"name": LOCATION, "title": "Smile Dental Studio - Baner", "websiteUri": "https://smile.example",
-                                     "storefrontAddress": {"addressLines": ["12 Baner Rd"], "locality": "Pune"}, "metadata": {"mapsUri": "https://maps.google.com/?cid=1"}}]})
+                                     "storefrontAddress": {"addressLines": ["12 Baner Rd"], "locality": "Pune"}, "metadata": {"mapsUri": "https://maps.google.com/?cid=1"}},
+                                    *self.extra_locations]})
         if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/reviews") and m == "GET":
             return j({"reviews": self.reviews, "averageRating": 4.6, "totalReviewCount": 212})
         if "/reviews/" in url and url.endswith("/reply") and m == "PUT":
@@ -72,14 +96,6 @@ class FakeGoogle:
                 {"dailyMetric": "BUSINESS_DIRECTION_REQUESTS", "timeSeries": dv(9)},
             ]}]})
         return j({"error": {"code": 404, "message": f"unexpected {m} {url}"}}, 404)
-
-
-@pytest.fixture()
-def google(monkeypatch):
-    fake = FakeGoogle()
-    monkeypatch.setattr(api, "http", httpx.Client(transport=httpx.MockTransport(fake)))
-    api._token_cache.clear()
-    return fake
 
 
 def _connect(client, admin):
@@ -163,7 +179,7 @@ def test_gmb_post_goes_live_and_scheduler_publishes_due_posts(client, admin, goo
 def test_revoked_google_access_is_reported_not_silent(client, admin, google):
     _link(client, admin, google)
     google.refresh_ok = False
-    api._token_cache.clear()
+    google.valid.clear()  # access token revoked too: the API answers 401, the refresh gets invalid_grant
     r = client.post("/api/clients/1/gmb/sync", headers=admin)
     assert r.status_code == 502 and "invalid_grant" in r.json()["detail"]
     c = client.get("/api/clients/1", headers=admin).json()
@@ -187,3 +203,4 @@ def test_unlink_and_disconnect(client, admin, google):
     assert client.get("/api/clients/1", headers=admin).json()["gmb"]["is_live"] is False
     assert client.delete(f"/api/google/connections/{conn['id']}", headers=admin).json()["ok"]
     assert client.get("/api/google/status", headers=admin).json()["connections"] == []
+    assert google.revoked == ["rt-secret"]

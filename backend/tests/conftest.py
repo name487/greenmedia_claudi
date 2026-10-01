@@ -49,3 +49,17 @@ def admin(client):
 @pytest.fixture()
 def portal(client):
     return login(client, "anjali@smiledental.in")
+
+
+@pytest.fixture()
+def google(monkeypatch):
+    """Route all Google HTTP traffic to an in-process fake that speaks the real API shapes."""
+    import httpx
+
+    from app.google import api
+
+    from .test_google import FakeGoogle
+
+    fake = FakeGoogle()
+    monkeypatch.setattr(api, "http", httpx.Client(transport=httpx.MockTransport(fake)))
+    return fake

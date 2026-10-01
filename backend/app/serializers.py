@@ -2,6 +2,7 @@
 
 from datetime import timezone
 
+from .google.tokens import expires_at_iso
 from .models import AuditLog, Client, ContentItem, Keyword, Report, Review, Task, User
 from .security import ROLE_LABELS
 
@@ -35,15 +36,26 @@ def contact_out(x) -> dict:
     return {"id": x.id, "name": x.name, "email": x.email, "phone": x.phone, "designation": x.designation, "is_primary": bool(x.is_primary)}
 
 
+def gmb_out(g) -> dict:
+    """The client's Google Business Profile link. Tokens never leave the server; only their state does."""
+    return {
+        "location_id": g.location_id, "status": g.status, "last_sync": iso(g.last_sync), "rating": g.rating,
+        "review_count": g.review_count, "is_live": g.is_live, "title": g.title, "last_error": g.last_error,
+        "google_account": g.google_account, "address": g.address, "maps_uri": g.maps_uri,
+        "via": "agency" if g.connection_id is not None else ("client" if g.is_live else None),
+        "google_email": g.connection.email if g.connection is not None else (g.google_email or None),
+        "own_google": {"email": g.google_email, "status": g.token_status or "active", "scopes": g.scopes,
+                       "access_token_expires_at": expires_at_iso(g)} if g.refresh_token_enc else None,
+    }
+
+
 def client_out(c: Client) -> dict:
     return {
         **client_brief(c),
         "website": c.website, "services": c.services, "account_manager_id": c.account_manager_id,
         "brand_voice": c.brand_voice, "auto_publish": c.auto_publish, "notes": c.notes,
         "contacts": [contact_out(x) for x in c.contacts],
-        "gmb": c.gmb and {"location_id": c.gmb.location_id, "status": c.gmb.status, "last_sync": iso(c.gmb.last_sync), "rating": c.gmb.rating,
-                         "review_count": c.gmb.review_count, "is_live": c.gmb.is_live, "title": c.gmb.title, "last_error": c.gmb.last_error,
-                         "google_email": c.gmb.connection.email if c.gmb.connection else None},
+        "gmb": c.gmb and gmb_out(c.gmb),
         "social_accounts": [{"platform": s.platform, "handle": s.handle, "status": s.status} for s in c.social_accounts],
     }
 

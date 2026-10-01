@@ -40,6 +40,7 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_me
 
 for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, tasks, settings_router, google, users):
     app.include_router(r.router)
+app.include_router(google.client_router)
 
 
 @app.get("/api/health", tags=["meta"])

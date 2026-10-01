@@ -1,0 +1,74 @@
+{% load gm %}
+<section class="card" id="google">
+  <header class="card-head"><h3>Google Business Profile</h3>
+    {% if g.is_live %}<span class="badge badge-green">Live</span>{% elif g.own_google %}<span class="badge badge-amber">Signed in · no location linked</span>{% elif g %}<span class="badge badge-gray">Demo data</span>{% else %}<span class="badge badge-gray">Not connected</span>{% endif %}
+  </header>
+  {% if g.is_live %}
+  <div class="gbp">
+    <div class="gbp-head">
+      <div><strong>{{ g.title|default:g.location_id }}</strong>{% if g.address %}<div class="muted small">{{ g.address }}</div>{% endif %}
+        {% if g.maps_uri %}<a class="small" href="{{ g.maps_uri }}" target="_blank" rel="noopener">View on Google Maps ↗</a>{% endif %}</div>
+      {% if g.rating %}<div class="gbp-rating"><strong>{{ g.rating }}</strong> {{ g.rating|stars }}<div class="muted small">{{ g.review_count }} reviews on Google</div></div>{% endif %}
+    </div>
+    <dl class="kv">
+      <dt>Connected as</dt><dd>{{ g.google_email|default:"—" }} <span class="muted small">· {% if g.via == 'client' %}client's own Google sign-in{% else %}agency Google account{% endif %}</span></dd>
+      <dt>Profile ID</dt><dd><code class="small">{{ g.google_account }}/{{ g.location_id }}</code></dd>
+      <dt>Status</dt><dd>{{ g.status|badge }}</dd>
+      <dt>Last sync</dt><dd>{% if g.last_sync %}{{ g.last_sync|when }}{% else %}<span class="muted">Not yet</span>{% endif %}</dd>
+      {% if g.own_google %}<dt>Access</dt><dd>{{ g.own_google.status|badge }}{% if g.own_google.status == 'active' and g.own_google.access_token_expires_at %} <span class="muted small">token renews automatically · current one valid until {{ g.own_google.access_token_expires_at|when }}</span>{% endif %}</dd>{% endif %}
+    </dl>
+  </div>
+  {% elif g.own_google %}
+  <p class="small">Signed in to Google as <strong>{{ g.own_google.email }}</strong>{% if g.own_google.status == 'revoked' %} — {{ g.own_google.status|badge }} reconnect to continue{% endif %}. Pick the location that belongs to {{ c.company_name }} below.</p>
+  {% else %}
+  <p class="small muted">{% if g %}Showing demo data. {% endif %}Connect the Google account that owns or manages this business's profile to import real reviews, rating and insights, reply to reviews and publish posts. Google asks for permission on its own page — no password is shared with us.</p>
+  {% endif %}
+  {% if g.last_error %}<div class="notice error small" style="margin-top:10px">{{ g.last_error }}</div>{% endif %}
+
+  {% if google.can_manage %}
+    {% if not google.configured %}
+    <div class="notice info small" style="margin-top:12px">Google isn't set up on the server yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).{% if 'gmb' in me.sections %} See <a href="{% url 'google' %}#setup">Google setup</a>.{% endif %}</div>
+    {% else %}
+    <div class="btn-row" style="margin-top:12px">
+      <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="google_connect">
+        <button class="btn{% if g.is_live %} soft{% endif %} sm">{% if g.own_google %}Reconnect Google{% else %}Connect Google{% endif %}</button></form>
+      <a class="btn soft sm" href="?pick=1#google">{% if g.is_live %}Change location{% else %}Choose location{% endif %}</a>
+      {% if g.is_live %}
+      <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="google_sync"><button class="btn soft sm">Sync now</button></form>
+      <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="google_refresh"><button class="btn ghost sm" title="Gets a new access token now — normally automatic">Test connection</button></form>
+      <form method="post" class="inline" onsubmit="return confirm('Unlink this location? The client goes back to demo data.')">{% csrf_token %}<input type="hidden" name="action" value="google_unlink"><button class="btn ghost sm">Unlink location</button></form>
+      {% endif %}
+      {% if g.own_google %}
+      <form method="post" class="inline" onsubmit="return confirm('Remove the client\'s Google sign-in and revoke access?')">{% csrf_token %}<input type="hidden" name="action" value="google_disconnect"><button class="btn ghost sm danger-text">Disconnect Google</button></form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if locations is not None %}
+    <div style="margin-top:14px" id="google-locations">
+      <h4 style="margin:0 0 6px">Locations you can link</h4>
+      {% for e in locations.errors %}<div class="notice small" style="margin-bottom:8px">{{ e.email }}: {{ e.error }}</div>{% endfor %}
+      {% if locations.locations %}
+      <div class="table-wrap"><table class="table responsive">
+        <thead><tr><th>Location</th><th>Google account</th><th></th></tr></thead>
+        <tbody>
+        {% for l in locations.locations %}
+          <tr>
+            <td class="primary">{{ l.title|default:l.location }}<div class="muted small">{{ l.address }}</div></td>
+            <td data-label="Google account">{{ l.email }}<div class="muted small">{% if l.connection_id %}agency connection{% else %}client's sign-in{% endif %}</div></td>
+            <td>{% if l.linked_client_id == c.id and g.location_id == l.location %}<span class="badge badge-green">Linked here</span>
+                {% elif l.linked_client_id %}<span class="muted small">Linked to {{ l.linked_client_name }}</span>
+                {% else %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="google_link">
+                  <input type="hidden" name="connection_id" value="{{ l.connection_id|default_if_none:'' }}"><input type="hidden" name="account" value="{{ l.account }}"><input type="hidden" name="location" value="{{ l.location }}">
+                  <button class="btn sm">Link</button></form>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% elif not locations.errors %}
+      <p class="muted small">No Business Profile locations found. Connect the Google account that manages this business's profile{% if 'gmb' in me.sections %}, or add an agency account on the <a href="{% url 'google' %}">Google page</a>{% endif %}.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% endif %}
+</section>

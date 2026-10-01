@@ -90,9 +90,40 @@
   <section class="card">
     <header class="card-head"><h3>Live clients</h3></header>
     <ul class="list">{% for g in status.linked %}
-      <li class="row between"><span><a href="{% url 'gmb' %}?client={{ g.client_id }}">{{ g.client_name }}</a> → {{ g.title|default:g.location }}<div class="muted small">Last sync {{ g.last_sync|when|default:"never" }}{% if g.last_error %} · <span style="color:var(--red)">{{ g.last_error }}</span>{% endif %}</div></span>{{ g.status|badge }}</li>
+      <li class="row between"><span><a href="{% url 'client_detail' g.client_id %}#google">{{ g.client_name }}</a> → {{ g.title|default:g.location }}<div class="muted small">{{ g.google_email }} ({% if g.via == 'client' %}client's sign-in{% else %}agency{% endif %}) · Last sync {{ g.last_sync|when|default:"never" }}{% if g.last_error %} · <span style="color:var(--red)">{{ g.last_error }}</span>{% endif %}</div></span>{{ g.status|badge }}</li>
     {% endfor %}</ul>
   </section>
   {% endif %}
+{% endif %}
+{% if can_manage and diag %}
+<section class="card" id="setup" style="margin-top:16px">
+  <header class="card-head"><h3>Check Google setup</h3>
+    {% if diag.project_number %}<span class="muted small">Cloud project <code>{{ diag.project_number }}</code></span>{% endif %}</header>
+  <ul class="list">
+    {% for x in diag.checks %}
+    <li class="row between"><span><strong>{{ x.label }}</strong><div class="muted small">{{ x.detail }}</div></span>
+      <span class="btn-row">{% if x.fix_url %}<a class="small" href="{{ x.fix_url }}" target="_blank" rel="noopener">Open in Cloud ↗</a>{% endif %}
+        <span class="badge badge-{% if x.status == 'ok' %}green{% elif x.status == 'warn' %}amber{% else %}red{% endif %}">{% if x.status == 'ok' %}OK{% elif x.status == 'warn' %}Check{% else %}Fix{% endif %}</span></span></li>
+    {% endfor %}
+  </ul>
+  <h4 style="margin:16px 0 6px">APIs this app calls</h4>
+  {% if diag.live.status == 'skipped' or diag.live.status == 'fail' %}<div class="notice small" style="margin-bottom:8px">{{ diag.live.detail }}</div>{% endif %}
+  {% if diag.live.email %}<p class="muted small" style="margin:0 0 6px">Live check ran as {{ diag.live.email }}.</p>{% endif %}
+  <div class="table-wrap"><table class="table responsive">
+    <thead><tr><th>API</th><th>Used for</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for a in diag.apis %}
+      <tr><td class="primary">{{ a.name }}<div class="muted small"><code>{{ a.api }}</code></div></td>
+        <td data-label="Used for" class="small">{{ a.used_for }}</td>
+        <td data-label="Status">{% if a.status == 'ok' %}<span class="badge badge-green">Working</span>{% elif a.status == 'unknown' %}<span class="badge badge-gray">Not checked</span>{% elif a.status == 'quota' %}<span class="badge badge-amber">Quota 0</span>{% elif a.status == 'disabled' %}<span class="badge badge-red">Not enabled</span>{% else %}<span class="badge badge-red">{{ a.status }}</span>{% endif %}
+          {% if a.detail and a.status != 'unknown' and a.status != 'ok' %}<div class="small" style="color:var(--red)">{{ a.detail }}</div>{% elif a.status == 'unknown' and a.detail %}<div class="muted small">{{ a.detail }}</div>{% endif %}</td>
+        <td><span class="btn-row"><a class="small" href="{{ a.enable_url }}" target="_blank" rel="noopener">Enable ↗</a><a class="small" href="{{ a.quota_url }}" target="_blank" rel="noopener">Quotas ↗</a></span></td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  <div class="btn-row" style="margin-top:12px">
+    {% if status.configured %}<a class="btn soft sm" href="?live=1#setup">Run live check</a>{% endif %}
+    <a class="btn ghost sm" href="{{ diag.access_request_url }}" target="_blank" rel="noopener">Request Business Profile API access ↗</a>
+  </div>
+  <p class="muted small" style="margin-bottom:0">“Quota 0” means Google hasn't approved API access for this project yet — use “Request Business Profile API access”; approval arrives by email. The live check calls each API once with a connected Google account.</p>
+</section>
 {% endif %}
 {% endblock %}

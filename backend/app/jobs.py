@@ -25,7 +25,9 @@ def _log(db: Session, tenant_id: int, action: str, client_id: int | None = None,
 
 def sync_google(db: Session) -> dict:
     done = failed = 0
-    for gmb in db.scalars(select(GmbAccount).where(GmbAccount.connection_id.is_not(None), GmbAccount.status == "connected")):
+    for gmb in db.scalars(select(GmbAccount).where(GmbAccount.google_account != "", GmbAccount.status == "connected")):
+        if not gmb.is_live:
+            continue
         client = db.get(Client, gmb.client_id)
         try:
             out = google.sync_client(db, client)

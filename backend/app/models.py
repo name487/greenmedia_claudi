@@ -100,17 +100,33 @@ class GmbAccount(Base):
     last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=0)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
-    # Live link to a real Google Business Profile. When connection_id is NULL the profile is simulated (demo data).
+    # Agency-level Google account this location is reached through (NULL when using the client's own sign-in).
     connection_id: Mapped[int | None] = mapped_column(ForeignKey("google_connections.id"), nullable=True)
     google_account: Mapped[str] = mapped_column(String(100), default="")  # "accounts/123"
     title: Mapped[str] = mapped_column(String(200), default="")
     last_error: Mapped[str] = mapped_column(Text, default="")
+    address: Mapped[str] = mapped_column(String(300), default="")
+    maps_uri: Mapped[str] = mapped_column(String(500), default="")
+    # The client's own Google sign-in (per-client OAuth). Tokens are Fernet-encrypted; the access token is
+    # cached here with its expiry and refreshed from the refresh token shortly before it runs out.
+    google_email: Mapped[str] = mapped_column(String(200), default="")
+    scopes: Mapped[str] = mapped_column(Text, default="")
+    refresh_token_enc: Mapped[str] = mapped_column(Text, default="")
+    access_token_enc: Mapped[str] = mapped_column(Text, default="")
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_status: Mapped[str] = mapped_column(String(20), default="")  # "" (none) | active | revoked
 
     connection: Mapped["GoogleConnection | None"] = relationship()
 
     @property
+    def has_own_token(self) -> bool:
+        return bool(self.refresh_token_enc) and self.token_status != "revoked"
+
+    @property
     def is_live(self) -> bool:
-        return self.connection_id is not None
+        """Linked to a real Google location, through an agency connection or the client's own sign-in.
+        Otherwise the profile is simulated (demo data)."""
+        return bool(self.google_account) and (self.connection_id is not None or bool(self.refresh_token_enc))
 
 
 class GoogleConnection(Base):
@@ -125,6 +141,8 @@ class GoogleConnection(Base):
     scopes: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="active")  # active | revoked
     last_error: Mapped[str] = mapped_column(Text, default="")
+    access_token_enc: Mapped[str] = mapped_column(Text, default="")
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     connected_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 

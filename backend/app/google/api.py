@@ -7,7 +7,6 @@ APIs used (enable all of them in Google Cloud Console):
 - Business Profile Performance API        daily insights
 """
 
-import time
 from datetime import date
 from urllib.parse import urlencode
 
@@ -17,6 +16,7 @@ from ..config import settings
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts"
 INFO_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1"
@@ -81,21 +81,23 @@ def exchange_code(code: str) -> dict:
     return r.json()
 
 
-_token_cache: dict[str, tuple[str, float]] = {}
-
-
-def access_token(refresh_token: str) -> str:
-    cached = _token_cache.get(refresh_token)
-    if cached and cached[1] > time.time() + 60:
-        return cached[0]
+def refresh(refresh_token: str) -> dict:
+    """Trade a refresh token for a new access token: {"access_token", "expires_in", maybe "refresh_token"}.
+    Callers persist the result (see tokens.py), so every worker and restart reuses it until it expires."""
     r = http.post(TOKEN_URL, data={
         "refresh_token": refresh_token, "client_id": settings.google_client_id, "client_secret": settings.google_client_secret,
         "grant_type": "refresh_token",
     })
     _raise(r)
-    body = r.json()
-    _token_cache[refresh_token] = (body["access_token"], time.time() + int(body.get("expires_in", 3600)))
-    return body["access_token"]
+    return r.json()
+
+
+def revoke(token: str) -> None:
+    """Best effort: tell Google to drop the grant. Never raises."""
+    try:
+        http.post(REVOKE_URL, data={"token": token})
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def userinfo_email(token: str) -> str:
@@ -107,13 +109,23 @@ def userinfo_email(token: str) -> str:
 # ---------- Business Profile ----------
 
 class Gbp:
-    def __init__(self, token: str):
+    def __init__(self, token: str, renew=None):
+        """renew: optional callable returning a fresh access token; used once if Google answers 401
+        (token revoked or expired early), so a stale stored token heals itself."""
         self.h = {"Authorization": f"Bearer {token}"}
+        self._renew = renew
+
+    def _send(self, method: str, url: str, **kw) -> httpx.Response:
+        r = http.request(method, url, headers=self.h, **kw)
+        if r.status_code == 401 and self._renew:
+            self.h = {"Authorization": f"Bearer {self._renew()}"}
+            self._renew = None
+            r = http.request(method, url, headers=self.h, **kw)
+        _raise(r)
+        return r
 
     def _get(self, url: str, **params) -> dict:
-        r = http.get(url, headers=self.h, params={k: v for k, v in params.items() if v is not None})
-        _raise(r)
-        return r.json()
+        return self._send("GET", url, params={k: v for k, v in params.items() if v is not None}).json()
 
     def _paged(self, url: str, key: str, **params) -> list[dict]:
         out, token = [], None
@@ -147,17 +159,13 @@ class Gbp:
         return out
 
     def reply(self, account: str, location: str, review_id: str, comment: str) -> dict:
-        r = http.put(f"{V4_BASE}/{account}/{location}/reviews/{review_id}/reply", headers=self.h, json={"comment": comment})
-        _raise(r)
-        return r.json()
+        return self._send("PUT", f"{V4_BASE}/{account}/{location}/reviews/{review_id}/reply", json={"comment": comment}).json()
 
     def create_post(self, account: str, location: str, summary: str, url: str | None = None) -> dict:
         body: dict = {"languageCode": "en", "summary": summary[:1500], "topicType": "STANDARD"}
         if url:
             body["callToAction"] = {"actionType": "LEARN_MORE", "url": url}
-        r = http.post(f"{V4_BASE}/{account}/{location}/localPosts", headers=self.h, json=body)
-        _raise(r)
-        return r.json()
+        return self._send("POST", f"{V4_BASE}/{account}/{location}/localPosts", json=body).json()
 
     def daily_metrics(self, location: str, start: date, end: date) -> dict[str, dict[date, int]]:
         metrics = ["BUSINESS_IMPRESSIONS_DESKTOP_MAPS", "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH", "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
@@ -166,8 +174,7 @@ class Gbp:
             ("dailyRange.start_date.year", start.year), ("dailyRange.start_date.month", start.month), ("dailyRange.start_date.day", start.day),
             ("dailyRange.end_date.year", end.year), ("dailyRange.end_date.month", end.month), ("dailyRange.end_date.day", end.day),
         ]
-        r = http.get(f"{PERF_BASE}/{location}:fetchMultiDailyMetricsTimeSeries", headers=self.h, params=params)
-        _raise(r)
+        r = self._send("GET", f"{PERF_BASE}/{location}:fetchMultiDailyMetricsTimeSeries", params=params)
         out: dict[str, dict[date, int]] = {}
         for group in r.json().get("multiDailyMetricTimeSeries", []):
             for series in group.get("dailyMetricTimeSeries", []):

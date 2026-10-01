@@ -16,6 +16,8 @@
   <div class="stat"><span class="stat-label">Leads (30d)</span><strong class="stat-value">{{ k.leads.current }}</strong>{{ k.leads.change_pct|delta }}</div>
 </div>
 
+{% include "portal/_google_panel.html" %}
+
 <div class="grid cols-2">
   <section class="card" id="profile"><header class="card-head"><h3>Company profile</h3></header>
     <dl class="kv">
@@ -82,7 +84,7 @@
 <div class="grid cols-2">
   <section class="card"><header class="card-head"><h3>Connected accounts</h3></header>
     <ul class="list">
-      <li class="row between"><span>Google Business Profile {% if c.gmb.is_live %}<span class="badge badge-green">Live</span>{% elif c.gmb %}<span class="badge badge-gray">Demo</span>{% endif %}</span>{% if c.gmb %}{{ c.gmb.status|badge }}{% else %}<a class="small" href="{% url 'google' %}">Link to Google</a>{% endif %}</li>
+      <li class="row between"><span>Google Business Profile {% if c.gmb.is_live %}<span class="badge badge-green">Live</span>{% elif c.gmb %}<span class="badge badge-gray">Demo</span>{% endif %}</span>{% if c.gmb.is_live %}{{ c.gmb.status|badge }}{% else %}<a class="small" href="#google">Connect Google</a>{% endif %}</li>
       {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.handle }}</span></span>{{ s.status|badge }}</li>{% endfor %}
     </ul>
   </section>

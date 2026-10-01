@@ -14,7 +14,7 @@ TONE = {
     "positive": "green", "neutral": "amber", "negative": "red",
     "todo": "gray", "in_progress": "blue", "review": "amber", "done": "green",
     "low": "gray", "medium": "amber", "high": "red",
-    "connected": "green", "expired": "red", "disconnected": "red",
+    "connected": "green", "expired": "red", "disconnected": "red", "revoked": "red",
 }
 
 ICONS = {

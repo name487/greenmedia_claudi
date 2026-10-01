@@ -12,6 +12,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from .api import SESSION_ME, SESSION_TOKEN, Api, ApiError, can, login_required
+from .templatetags import gm
 
 PLATFORMS = ["gmb", "facebook", "instagram", "linkedin", "youtube", "x"]
 CONTENT_TYPES = ["post", "offer", "event", "update"]
@@ -147,11 +148,60 @@ def clients_template(request):
     return resp
 
 
+def _google_result(request, result: str) -> None:
+    """Show the outcome of Google's consent screen (the API's callback redirects here with ?google=...)."""
+    kind, _, detail = result.partition(":")
+    if kind == "linked":
+        messages.success(request, f"Google connected and “{detail}” linked. Reviews, rating and insights are now live.")
+    elif kind == "connected":
+        messages.success(request, f"Signed in to Google as {detail}. Choose which Business Profile location belongs to this client.")
+    elif kind == "error":
+        messages.error(request, f"Google connection failed: {detail}")
+
+
+def _google_action(request, client_id, action: str):
+    base = f"/api/clients/{client_id}/google"
+    here = reverse("client_detail", args=[client_id])
+    if action == "google_connect":
+        return ShareRedirect(request.api.post(f"{base}/connect")["auth_url"])
+    if action == "google_link":
+        out = request.api.post(f"{base}/link", {"connection_id": _int(request.POST.get("connection_id")),
+                                                "account": request.POST.get("account", ""), "location": request.POST.get("location", "")})
+        if "sync_error" in out:
+            messages.warning(request, f"Linked “{out['gmb']['title']}”, but the first sync failed: {out['sync_error']}")
+        else:
+            messages.success(request, f"Linked “{out['gmb']['title']}”: {out['sync']['new_reviews']} reviews imported ({out['sync']['total_on_google']} on Google).")
+    elif action == "google_sync":
+        out = request.api.post(f"/api/clients/{client_id}/gmb/sync")
+        if "sync" in out:
+            s = out["sync"]
+            messages.success(request, f"Synced from Google: {s['new_reviews']} new reviews, {s['total_on_google']} on Google.")
+            if s.get("metrics_error"):
+                messages.warning(request, f"Insights not updated: {s['metrics_error']}")
+    elif action == "google_refresh":
+        out = request.api.post(f"{base}/refresh")
+        messages.success(request, f"Google connection works. New access token valid until {gm.when(out['access_token_expires_at'])}.")
+    elif action == "google_unlink":
+        request.api.post(f"{base}/unlink")
+        messages.success(request, "Location unlinked — this client is back on demo data.")
+    elif action == "google_disconnect":
+        request.api.delete(base)
+        messages.success(request, "Client's Google sign-in removed and access revoked.")
+    return HttpResponseRedirect(here + "#google")
+
+
 @login_required("clients")
 def client_detail(request, client_id):
+    result = request.GET.get("google", "")
+    if result:
+        _google_result(request, result)
+        # Drop ?google= so a refresh doesn't repeat it; open the location picker when there is a choice to make
+        return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + ("?pick=1#google" if result.startswith("connected:") else "#google"))
     if request.method == "POST":
-        action = request.POST.get("action")
+        action = request.POST.get("action", "")
         contacts = f"/api/clients/{client_id}/contacts"
+        if action.startswith("google_"):
+            return _google_action(request, client_id, action)
         if action == "profile":
             request.api.patch(f"/api/clients/{client_id}", _client_body(request.POST))
             messages.success(request, "Client details saved.")
@@ -191,9 +241,16 @@ def client_detail(request, client_id):
     c = request.api.get(f"/api/clients/{client_id}")
     channels = ["reviews", "gmb"] + [s["platform"] for s in c["social_accounts"]]
     editable = can(request, "client.edit")
+    google = request.api.get(f"/api/clients/{client_id}/google")
+    locations = None
+    p = google["profile"] or {}
+    # Listing locations calls Google, so only when choosing (or when signed in but nothing is linked yet)
+    if editable and google["configured"] and (request.GET.get("pick") or (p.get("own_google") and not p.get("is_live"))):
+        locations = request.api.get(f"/api/clients/{client_id}/google/locations")
     return render(request, "portal/client_detail.html", {
         "c": c, "k": c["kpis"], "channels": channels, "editable": editable,
         "facets": request.api.get("/api/clients/facets") if editable else None,
+        "google": google, "g": p, "locations": locations,
     })
 
 
@@ -271,9 +328,10 @@ def google_connections(request):
     # the browser arrives without this session and the result appears to vanish.
     here = f"{request.scheme}://{request.get_host()}"
     wrong_host = bool(status and status.get("web_app_url") and status["web_app_url"].rstrip("/") != here)
+    diag = request.api.get("/api/google/diagnostics", live=request.GET.get("live")) if can_manage else None
     return render(request, "portal/google.html", {
         "status": status, "locations": locations, "loc_errors": loc_errors, "clients": _clients(request), "can_manage": can_manage,
-        "here": here, "wrong_host": wrong_host,
+        "here": here, "wrong_host": wrong_host, "diag": diag,
     })
 
 

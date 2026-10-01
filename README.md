@@ -97,7 +97,7 @@ Then sign in on the web app and add your data. With `SEED_DEMO=0` the database s
 | One client | **Clients → + Add client** |
 | Many clients | **Clients → Import clients from CSV** (click *Download template* for the columns), or from the command line: `python -m app.manage import-clients clients.csv` |
 | Client-portal logins | **Settings → Team members**, role **Client**, pick the client |
-| Reviews, rating, insights | **GMB Center → Google connections**, then *Link & sync* each location (pulled from Google, not typed in) |
+| Reviews, rating, insights | **Connect Google** on the client's workspace, or **GMB Center → Google connections**, then link the location (pulled from Google, not typed in) |
 | Content, tasks, keywords | Created in the app as you work (Content Studio, Team & Tasks, SEO Center) |
 
 The CSV needs only `company_name`. Optional columns are `website, industry, city, plan, status, services` (separated by `;`), `contact_name, contact_email, contact_phone`. The import is all-or-nothing: if any row is invalid, nothing is imported and you get the line numbers to fix. Clients that already exist, matched by name, are skipped, so re-running the same file is safe.
@@ -154,30 +154,89 @@ Clients linked to a real Google location are **live**. Their reviews, rating and
    SCHEDULER_INTERVAL_MINUTES=15
    ```
 
-### Connect and link (in the app)
+### Check the setup
 
-1. Sign in to the web app as an Admin or Account Manager, then open **GMB Center → Google connections**.
-2. Click **Connect Google account**, sign in as **greenmediaseoteam2@gmail.com** (the account with management rights), and approve.
-3. Every location that account manages is listed. For each one, pick the matching client and click **Link & sync**. Reviews, rating and 90 days of insights are imported immediately.
-4. From then on:
-   - **AI Reviews:** the "Sync new reviews" button pulls reviews from Google. Approved replies are posted to Google, and 2★ replies still need approval first.
-   - **Content Studio:** GMB variants of approved content are posted to the profile as Google posts when you click "Publish now", or at their scheduled time.
-   - **Scheduler:** every `SCHEDULER_INTERVAL_MINUTES`, the API re-syncs every live profile and publishes posts that are due. You can also run it from cron: `python -m app.jobs`.
-   - **Errors:** if access is revoked or expires, the profile shows **Expired** with Google's error message, and **Reconnect** fixes it.
+**GMB Center → Google connections → Check Google setup** reads your configuration and shows:
+- the Cloud project number, taken from the client ID (`437254480587-….apps.googleusercontent.com`)
+- whether the client ID, secret and redirect URI look right, and whether the API and web app share a host
+- direct links to enable each API, its quota page, the credentials page and the consent screen
+
+**Run live check** calls each of the four APIs once with a connected Google account. Each one comes back as *Working*, *Not enabled* or *Quota 0* (access not approved yet). The same data is available from `GET /api/google/diagnostics?live=1`.
+
+### Connect Google per client (Client Workspace)
+
+Open a client and use the **Google Business Profile** panel:
+
+1. Click **Connect Google**, sign in with the Google account that owns or manages *this* business's profile, and approve.
+2. If that account manages one free location, it is linked and synced straight away. If it manages several, choose the right one under **Locations you can link** and click **Link**.
+3. The panel then shows:
+   - the connected profile: name, address, *View on Google Maps*, rating and review count
+   - the Google account it is connected as
+   - status and last sync
+   - token state, with the expiry time of the current access token
+4. Panel actions:
+   - **Sync now**
+   - **Test connection** (gets a fresh token now)
+   - **Change location**
+   - **Unlink location** (back to demo data)
+   - **Disconnect Google** (revokes the client's sign-in)
+
+### Or connect one agency account for many clients
+
+1. Open **GMB Center → Google connections**. You need to be an Admin or Account Manager.
+2. Click **Connect Google account** and sign in as **greenmediaseoteam2@gmail.com** (the account with management rights).
+3. Every location that account manages is listed. Pick the matching client for each one and click **Link & sync**. These locations also appear in each client's location picker.
+
+### After linking
+
+- **AI Reviews:** "Sync new reviews" pulls reviews from Google. Approved replies are posted to Google. 2★ replies still need approval first.
+- **Content Studio:** GMB variants of approved content are posted to the profile as Google posts, either on "Publish now" or at their scheduled time.
+- **Scheduler:** every `SCHEDULER_INTERVAL_MINUTES`, the API re-syncs every live profile and publishes posts that are due. You can also run it from cron: `python -m app.jobs`.
+- **Errors:** if access is revoked, the profile shows **Expired** with Google's error message. **Reconnect** fixes it.
+
+### How tokens are stored and refreshed
+
+| | Per-client sign-in | Agency connection |
+|---|---|---|
+| Table | `gmb_accounts` (that client's row) | `google_connections` |
+| Refresh token | `refresh_token_enc` (Fernet-encrypted with `TOKEN_ENCRYPTION_KEY`) | `refresh_token_enc` (encrypted) |
+| Access token | `access_token_enc` + `token_expires_at` (encrypted) | same columns |
+| Also stored | `google_email`, `scopes`, `token_status`, linked `title`, `address`, `maps_uri` | `email`, `scopes`, `status` |
+
+How refresh works:
+- Before each Google call, a stored access token that expires within 2 minutes is swapped for a new one using the refresh token.
+- The new token is saved back to the database. API workers, the scheduler and restarts all reuse it instead of each refreshing on their own.
+- If Google rejects an access token early (401), the app refreshes once and retries the call.
+- If the refresh token itself is revoked (`invalid_grant`), the sign-in is marked revoked, the profile shows *Expired*, and **Reconnect** heals it.
+- Tokens are never returned by the API, which only reports their state and expiry.
+
+**Endpoints** (Bearer token; changes need `client.edit`):
+
+| Method & path | What it does |
+|---|---|
+| `POST /api/clients/{id}/google/connect` | Google consent URL for this client. The callback stores the tokens on the client's `gmb_accounts` row. |
+| `GET /api/clients/{id}/google` | Connected profile, location, token state (never the tokens) |
+| `GET /api/clients/{id}/google/locations` | Locations available from the client's sign-in and the agency connections, plus which client each is linked to |
+| `POST /api/clients/{id}/google/link` | `{account, location, connection_id?}`: link, verified against Google, then sync |
+| `POST /api/clients/{id}/google/unlink` | Back to demo data |
+| `POST /api/clients/{id}/google/refresh` | Force a token refresh (a connection test) |
+| `DELETE /api/clients/{id}/google` | Remove and revoke the client's sign-in |
+| `GET /api/google/diagnostics[?live=1]` | Google Cloud project checks |
 
 **Security:**
 - The app never sees the Google password. Access uses OAuth only.
-- The refresh token is encrypted at rest (Fernet).
-- **Disconnect** removes the stored token and also revokes it on Google's side.
-- The OAuth `state` is signed and expires after 15 minutes.
+- Tokens are encrypted at rest (Fernet).
+- The callback rejects a sign-in where the Business Profile permission was unticked.
+- The OAuth `state` is signed, names the user and the client, and expires after 15 minutes. The user must still have `client.edit` when Google returns.
+- **Disconnect** removes the stored token and revokes it on Google's side. It skips the revoke when another client or the agency connection uses the same Google account, because revoking cancels the whole grant.
 
 **Still simulated:** Facebook, Instagram, LinkedIn and YouTube publishing, plus the GA4/Search Console/social columns in analytics. After you link a client, those columns show 0 until their integrations are added.
 
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 50 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
-                                 #   and the Google flow (OAuth, locations, review import, reply, posts, insights, revoked access)
+cd backend && pytest -q          # 66 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics)
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```

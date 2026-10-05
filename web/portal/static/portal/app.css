@@ -275,3 +275,13 @@ details.card[open] > summary { margin-bottom: 12px; }
 .gbp-rating { text-align: right; }
 .gbp-rating strong { font-size: 22px; }
 .danger-text { color: var(--red); }
+
+/* AI Review Queue */
+.queue-source { margin-bottom: 16px; }
+.queue-stats { margin-bottom: 16px; }
+.bulkbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  padding: 8px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: sticky; top: 8px; z-index: 5; box-shadow: var(--shadow); }
+.review .badges { flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.review.is-sample { border-style: dashed; }
+.review .pick { margin-top: 9px; width: 16px; height: 16px; flex: none; }
+img.avatar { object-fit: cover; background: var(--surface-2); }

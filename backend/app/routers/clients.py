@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .. import importer
 from ..db import get_db
 from ..google import api as google_api
-from ..google import service as google_service
+from .. import review_queue
 from ..metrics import compare, periods, series, totals
 from ..models import AuditLog, Client, ClientContact, ContentItem, GmbAccount, Keyword, MetricDaily, Report, Review, Task, User
 from ..security import audit, get_client, require, require_section, visible_client_ids
@@ -329,7 +329,7 @@ def gmb_sync(client_id: int, user: User = Depends(require_section("gmb")), db: S
     c = get_client(db, user, client_id)
     if c.gmb and c.gmb.is_live:
         try:
-            result = google_service.sync_client(db, c)
+            result = review_queue.sync_live(db, c)
         except google_api.GoogleApiError as e:
             db.commit()  # keep the recorded error/status
             raise HTTPException(502, str(e))

@@ -8,7 +8,7 @@ import uuid
 
 from .google import api as google_api
 from .google import service as google
-from .models import Client
+from .models import SAMPLE_REVIEW_PREFIX, Client
 
 
 class PublishError(Exception):
@@ -16,6 +16,8 @@ class PublishError(Exception):
 
 
 def publish_review_reply(client: Client, external_review_id: str, reply: str) -> None:
+    if external_review_id.startswith(SAMPLE_REVIEW_PREFIX):
+        return  # sample review shown while Google API approval is pending: there is nothing on Google to reply to
     if not client.gmb or client.gmb.status != "connected":
         raise PublishError("Google Business Profile is not connected")
     if client.gmb.is_live:

@@ -96,6 +96,28 @@ def when(value, fmt="time"):
 
 
 @register.filter
+def hours(value):
+    """Compact duration from hours: 0 → "<1h", 30 → "30h", 50 → "2d"."""
+    if value is None or value == "":
+        return "—"
+    h = float(value)
+    if h < 1:
+        return "<1h"
+    return f"{round(h)}h" if h < 48 else f"{round(h / 24)}d"
+
+
+@register.filter
+def split(value, sep=None):
+    return str(value).split(sep)
+
+
+@register.filter
+def initials(name):
+    parts = [p for p in str(name or "").replace(".", " ").split() if p]
+    return "".join(p[0] for p in parts[:2]).upper() or "?"
+
+
+@register.filter
 def get(d, key):
     return d.get(key) if isinstance(d, dict) else None
 

@@ -143,7 +143,8 @@ def test_link_imports_reviews_rating_and_insights(client, admin, google):
     items = {r["author"]: r for r in client.get("/api/reviews?filter=all&client_id=1", headers=admin).json()["items"]}
     assert set(items) == {"Meena K", "Arjun P", "Anonymous"}  # demo reviews were removed on going live
     assert items["Arjun P"]["reply_status"] == "published" and items["Arjun P"]["reply"] == "Thank you Arjun!"  # answered on Google already
-    assert items["Meena K"]["reply_status"] == "new" and items["Meena K"]["sentiment"] == "negative"
+    assert items["Meena K"]["reply_status"] == "drafted" and items["Meena K"]["reply"] and items["Meena K"]["sentiment"] == "negative"  # AI draft waiting
+    assert items["Anonymous"]["reply_status"] == "drafted" and not items["Meena K"]["is_sample"]
     assert items["Anonymous"]["text"] == ""  # rating-only review
     # Insights for yesterday replaced the demo numbers
     a = client.get("/api/clients/1/insights?days=7", headers=admin).json()

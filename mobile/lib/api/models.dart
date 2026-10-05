@@ -57,13 +57,14 @@ class Review {
         reply = j['reply'] as String?,
         replyStatus = j['reply_status'] as String,
         needsEscalation = j['needs_escalation'] as bool,
+        isSample = j['is_sample'] as bool? ?? false,
         createdAt = parseDate(j['created_at']),
         publishedAt = parseDate(j['published_at']);
 
   final int id, clientId, rating;
   final String clientName, author, text, language, sentiment, replyStatus;
   final String? reply;
-  final bool needsEscalation;
+  final bool needsEscalation, isSample;
   final DateTime? createdAt, publishedAt;
 }
 

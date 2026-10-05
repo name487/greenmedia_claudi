@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import review_queue
 from .db import SessionLocal
 from .google import api as google_api
-from .google import service as google
 from .models import AuditLog, Client, ContentItem, GmbAccount
 from .publishers import PublishError, publish_post
 
@@ -30,7 +30,7 @@ def sync_google(db: Session) -> dict:
             continue
         client = db.get(Client, gmb.client_id)
         try:
-            out = google.sync_client(db, client)
+            out = review_queue.sync_live(db, client)
             if out["new_reviews"]:
                 _log(db, client.tenant_id, f"{out['new_reviews']} new Google reviews", client.id, "gmb_account", gmb.id)
             done += 1

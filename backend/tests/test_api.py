@@ -41,7 +41,7 @@ def test_review_flow_and_low_rating_escalation(client, admin):
     pub = client.post(f"/api/reviews/{r['id']}/publish", headers=admin).json()
     assert pub["reply_status"] == "published" and pub["published_at"]
     actions = [a["action"] for a in client.get("/api/audit", headers=admin).json()]
-    assert "published reply to Google" in actions and "approved reply" in actions
+    assert "published reply (sample — not sent to Google)" in actions and "approved reply" in actions  # seeded reviews are samples
 
 
 def test_roles_cannot_exceed_permissions(client, admin):
@@ -53,14 +53,15 @@ def test_roles_cannot_exceed_permissions(client, admin):
     assert client.get("/api/reviews", headers=seo).status_code == 403
 
 
-def test_publish_fails_clearly_when_gmb_disconnected(client, admin):
+def test_sample_reviews_publish_without_google_even_when_disconnected(client, admin):
     clients = client.get("/api/clients", headers=admin).json()
     offline = next(c for c in clients if not c["gmb_connected"])
     r = _first(client, admin, lambda r: r["client_id"] == offline["id"] and r["reply_status"] == "new" and r["rating"] >= 3)
+    assert r["is_sample"]
     client.post(f"/api/reviews/{r['id']}/draft", headers=admin)
     res = client.post(f"/api/reviews/{r['id']}/publish", headers=admin)
-    assert res.status_code == 502 and "not connected" in res.json()["detail"]
-    assert _first(client, admin, lambda x: x["id"] == r["id"])["reply_status"] == "failed"
+    assert res.status_code == 200 and res.json()["reply_status"] == "published"
+    assert client.get("/api/audit", headers=admin).json()[0]["action"] == "published reply (sample — not sent to Google)"
 
 
 def test_content_generate_approve_publish(client, admin):
@@ -98,9 +99,18 @@ def test_client_approval_mode(client, admin, portal):
 
 def test_auto_publish_is_opt_in(client, admin):
     client.patch("/api/clients/1", headers=admin, json={"auto_publish": {"reviews": True}})
+    ids = []
     for _ in range(12):
-        r = client.post("/api/reviews/sync", headers=admin, json={"client_id": 1}).json()
-        assert r["reply_status"] == ("published" if r["sentiment"] == "positive" else "drafted")
+        out = client.post("/api/reviews/sync", headers=admin, json={"client_id": 1}).json()
+        assert out["mode"] == "sample" and out["sample_reviews"] == 1
+        ids += out["clients"][0]["review_ids"]
+    got = {r["id"]: r for r in client.get("/api/reviews?filter=all&client_id=1&limit=200", headers=admin).json()["items"]}
+    for i in ids:
+        r = got[i]
+        assert r["reply_status"] == ("published" if r["sentiment"] == "positive" and r["rating"] >= 4 else "drafted"), r
+    # Off by default: another client's sync only drafts
+    out = client.post("/api/reviews/sync", headers=admin, json={"client_id": 2}).json()
+    assert out["auto_published"] == 0 and out["drafted"] == 1
 
 
 def test_report_generate_and_deliver(client, admin):

@@ -173,6 +173,16 @@ class Review(Base):
     reply_status: Mapped[str] = mapped_column(String(20), default="new")  # new | drafted | approved | published | rejected | failed
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # Google's updateTime (edits)
+    reviewer_photo: Mapped[str] = mapped_column(String(500), default="")
+
+    @property
+    def is_sample(self) -> bool:
+        """Sample/demo review (not from Google): replies are never sent to Google and it is removed when real data arrives."""
+        return self.external_review_id.startswith(SAMPLE_REVIEW_PREFIX)
+
+
+SAMPLE_REVIEW_PREFIX = "demo_"
 
 
 class ContentItem(Base):

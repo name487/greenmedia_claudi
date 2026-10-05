@@ -1,6 +1,6 @@
 """Model → JSON dicts. Kept explicit so the API contract used by Django and Flutter is easy to read."""
 
-from datetime import timezone
+from datetime import datetime, timezone
 
 from .google.tokens import expires_at_iso
 from .models import AuditLog, Client, ContentItem, Keyword, Report, Review, Task, User
@@ -60,11 +60,19 @@ def client_out(c: Client) -> dict:
     }
 
 
+def _utc(dt):
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
 def review_out(r: Review, client_name: str) -> dict:
     return {
         "id": r.id, "client_id": r.client_id, "client_name": client_name, "author": r.author, "rating": r.rating, "text": r.text,
         "language": r.language, "sentiment": r.sentiment, "reply": r.reply, "reply_status": r.reply_status,
         "needs_escalation": r.rating <= 2, "created_at": iso(r.created_at), "published_at": iso(r.published_at),
+        "updated_at": iso(r.updated_at), "edited": bool(r.updated_at and r.created_at and abs((_utc(r.updated_at) - _utc(r.created_at)).total_seconds()) > 60),
+        "reviewer_photo": r.reviewer_photo, "is_sample": r.is_sample,
+        "waiting_hours": round((datetime.now(timezone.utc) - _utc(r.created_at)).total_seconds() / 3600)
+        if r.reply_status in ("new", "drafted", "approved", "failed") and r.created_at else None,
     }
 
 

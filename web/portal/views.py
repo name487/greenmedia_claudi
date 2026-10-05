@@ -153,6 +153,8 @@ def _google_result(request, result: str) -> None:
     kind, _, detail = result.partition(":")
     if kind == "linked":
         messages.success(request, f"Google connected and “{detail}” linked. Reviews, rating and insights are now live.")
+    elif kind == "reconnected":
+        messages.success(request, f"Google reconnected as {detail}. Syncing continues with the fresh sign-in.")
     elif kind == "connected":
         messages.success(request, f"Signed in to Google as {detail}. Choose which Business Profile location belongs to this client.")
     elif kind == "error":
@@ -337,38 +339,76 @@ def google_connections(request):
 
 # ---------- reviews ----------
 
+QUEUE_FILTERS = ("rating", "sentiment", "source", "q", "sort")
+PAGE = 30
+
+
+def _sync_messages(request, out: dict) -> None:
+    parts = []
+    if out["profiles"]:
+        parts.append(f"{out['new_reviews']} new review(s) from {out['profiles']} Google profile(s)")
+    if out["sample_reviews"]:
+        parts.append(f"{out['sample_reviews']} sample review(s)")
+    msg = "Synced: " + (" and ".join(parts) or "nothing new") + "."
+    if out["drafted"]:
+        msg += f" AI drafted {out['drafted']} repl{'y' if out['drafted'] == 1 else 'ies'}"
+        msg += f", {out['auto_published']} auto-published." if out["auto_published"] else "."
+    messages.success(request, msg)
+    if out["approval_pending"]:
+        messages.warning(request, f"Google API approval pending for {', '.join(out['approval_pending'])} — "
+                                  + ("showing sample reviews until Google approves." if out["sample_reviews"] else "no reviews can be fetched yet."))
+    for err in out["errors"]:
+        messages.error(request, err)
+
+
 @login_required("reviews")
 def reviews(request):
     if request.method == "POST":
-        rid, action = request.POST.get("review_id"), request.POST.get("action")
+        rid, action = request.POST.get("review_id"), request.POST.get("action", "")
         if action == "sync":
-            r = request.api.post("/api/reviews/sync", {"client_id": _client_filter(request)})
-            if r["mode"] == "live":
-                messages.success(request, f"Pulled {r['new_reviews']} new review(s) from {r['profiles']} live Google profile(s).")
-                for err in r["errors"]:
-                    messages.error(request, err)
+            _sync_messages(request, request.api.post("/api/reviews/sync", {"client_id": _client_filter(request)}))
+        elif action.startswith("bulk_"):
+            ids = [i for i in map(_int, request.POST.getlist("ids")) if i]
+            if not ids:
+                messages.warning(request, "Select at least one review first.")
             else:
-                messages.success(request, f"Demo: new {r['rating']}★ review for {r['client_name']} — {'auto-published' if r['reply_status'] == 'published' else 'AI draft ready'}.")
+                verb = action.removeprefix("bulk_")
+                out = request.api.post("/api/reviews/bulk", {"ids": ids, "action": verb})
+                label = {"draft": "AI-drafted", "approve": "Approved", "publish": "Published", "reject": "Rejected"}[verb]
+                if out["done"]:
+                    messages.success(request, f"{label} {out['done']} review(s).")
+                for f in out["failed"][:5]:
+                    messages.error(request, f"Review #{f['id']}: {f['error']}")
+                if len(out["failed"]) > 5:
+                    messages.error(request, f"…and {len(out['failed']) - 5} more not done.")
         elif action == "save":
             request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST.get("reply", "")})
             messages.success(request, "Reply saved.")
-        elif action in ("draft",):
-            request.api.post(f"/api/reviews/{rid}/draft")
+        elif action == "draft":
+            out = request.api.post(f"/api/reviews/{rid}/draft")
+            messages.success(request, "AI reply drafted." if out.get("source") == "ai" else "Reply drafted from your brand-voice template (no AI key set).")
         elif action in ("approve", "reject", "publish", "reopen"):
             if action in ("approve", "publish") and request.POST.get("reply") is not None and request.POST.get("reply") != request.POST.get("original"):
                 request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST["reply"]})
-            request.api.post(f"/api/reviews/{rid}/{action}")
+            out = request.api.post(f"/api/reviews/{rid}/{action}")
             if action == "publish":
-                messages.success(request, "Reply published to Google.")
+                messages.success(request, "Marked as published — sample review, nothing was sent to Google." if out["is_sample"] else "Reply published to Google.")
         return _back(request)
     flt = request.GET.get("filter", "pending")
     cid = _client_filter(request)
-    data = request.api.get("/api/reviews", filter=flt, client_id=cid)
+    f = {k: request.GET.get(k, "") for k in QUEUE_FILTERS}
+    limit = min(max(_int(request.GET.get("limit")) or PAGE, PAGE), 200)
+    data = request.api.get("/api/reviews", filter=flt, client_id=cid, limit=limit, **{k: v for k, v in f.items() if v})
     tabs = [("pending", "Needs reply"), ("approved", "Approved"), ("negative", "Negative"), ("published", "Published"), ("all", "All")]
+    src = data["sources"]
+    single = src["clients"][0] if len(src["clients"]) == 1 else None
     return render(request, "portal/reviews.html", {
-        "items": data["items"], "counts": data["counts"], "tabs": tabs, "flt": flt, "cid": cid,
+        "items": data["items"], "counts": data["counts"], "total": data["total"], "stats": data["stats"], "sources": src, "single": single,
+        "tabs": tabs, "flt": flt, "cid": cid, "f": f, "filtered": any(f[k] for k in ("rating", "sentiment", "source", "q")),
+        "more": limit + PAGE if data["total"] > limit else None,
         "clients": None if request.me.get("client_id") else _clients(request),
         "can_publish": can(request, "review.publish"), "can_approve": can(request, "review.approve"),
+        "can_sync": "gmb" in request.me.get("sections", []),
     })
 
 

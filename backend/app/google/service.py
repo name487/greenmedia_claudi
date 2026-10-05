@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..models import Client, GmbAccount, GoogleConnection, MetricDaily, Review
+from ..models import SAMPLE_REVIEW_PREFIX, Client, GmbAccount, GoogleConnection, MetricDaily, Review
 from ..sentiment import detect_language, detect_sentiment
 from . import api, tokens
 
@@ -70,9 +70,6 @@ def list_locations(holder: GoogleConnection | GmbAccount) -> list[dict]:
     return [{**_loc_out(acct, loc), "connection_id": conn_id} for acct in g.accounts() for loc in g.locations(acct["name"])]
 
 
-DEMO_REVIEW_PREFIX = "demo_"
-
-
 def ensure_gmb(client: Client) -> GmbAccount:
     if client.gmb is None:
         client.gmb = GmbAccount(tenant_id=client.tenant_id, location_id="", status="disconnected")
@@ -84,7 +81,7 @@ def link(db: Session, client: Client, conn: GoogleConnection | None, loc: dict) 
     gmb = ensure_gmb(client)
     if not gmb.is_live:
         # Going live: drop this client's simulated reviews and metrics so real Google data isn't mixed with demo data.
-        db.execute(delete(Review).where(Review.client_id == client.id, Review.external_review_id.startswith(DEMO_REVIEW_PREFIX)))
+        db.execute(delete(Review).where(Review.client_id == client.id, Review.external_review_id.startswith(SAMPLE_REVIEW_PREFIX)))
         db.execute(delete(MetricDaily).where(MetricDaily.client_id == client.id))
     if not gmb.is_live or gmb.location_id != loc["location"]:
         gmb.rating, gmb.review_count, gmb.last_sync = 0, 0, None  # demo or other-location figures; the sync fills them in
@@ -100,45 +97,67 @@ def unlink(gmb: GmbAccount) -> None:
     gmb.connection_id, gmb.google_account, gmb.status = None, "", "disconnected"
 
 
-def _parse_time(s: str | None) -> datetime | None:
-    if not s:
-        return None
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+def _aware(dt: datetime | None) -> datetime | None:
+    return dt.replace(tzinfo=timezone.utc) if dt is not None and dt.tzinfo is None else dt
 
 
-def sync_reviews(db: Session, client: Client) -> dict:
+def _clean_text(text: str) -> str:
+    # Google appends machine translations: "(Translated by Google) ... (Original) ..."
+    if "(Original)" in text:
+        return text.split("(Original)", 1)[1].strip()
+    return text.strip()
+
+
+def sync_reviews(db: Session, client: Client, full: bool = False) -> dict:
+    """Fetch the location's reviews from Google into gmb_reviews.
+
+    Incremental: after the first import only reviews updated since the last known update (minus a day of slack)
+    are paged through. New reviews arrive as reply_status "new" (the queue drafts AI replies for them); edited
+    reviews get their text/rating/sentiment refreshed and an approved-but-unpublished reply goes back to
+    "drafted" so it is re-checked against the new text; replies made directly on Google are mirrored."""
     gmb = client.gmb
     g = client_for(source(gmb))
-    data = g.reviews(gmb.google_account, gmb.location_id)
     existing = {r.external_review_id: r for r in db.scalars(select(Review).where(Review.client_id == client.id))}
+    known = [_aware(r.updated_at or r.created_at) for r in existing.values() if not r.is_sample]
+    since = None if full or not known else max(known) - timedelta(days=1)
+    data = g.reviews(gmb.google_account, gmb.location_id, since=since)
+    # Real reviews are coming through: sample reviews shown while API approval was pending go away.
+    samples = db.execute(delete(Review).where(Review.client_id == client.id, Review.external_review_id.startswith(SAMPLE_REVIEW_PREFIX))).rowcount
+    new_ids: list[int] = []  # new and unanswered: these need a reply
     new = updated = 0
     for gr in data["reviews"]:
         rid = gr["reviewId"]
-        text = gr.get("comment", "")
-        # Google appends machine translations: "(Translated by Google) ... (Original) ..."
-        if "(Original)" in text:
-            text = text.split("(Original)", 1)[1].strip()
+        text = _clean_text(gr.get("comment", ""))
         rating = STARS.get(gr.get("starRating", ""), 0)
-        reply = (gr.get("reviewReply") or {}).get("comment")
+        reviewer = gr.get("reviewer") or {}
+        g_reply = gr.get("reviewReply") or {}
         r = existing.get(rid)
         if r is None:
-            r = Review(tenant_id=client.tenant_id, client_id=client.id, external_review_id=rid, author=(gr.get("reviewer") or {}).get("displayName", "Google user"),
+            r = Review(tenant_id=client.tenant_id, client_id=client.id, external_review_id=rid, author=reviewer.get("displayName") or "Google user",
                        rating=rating, text=text, language=detect_language(text), sentiment=detect_sentiment(text, rating),
-                       created_at=_parse_time(gr.get("createTime")) or datetime.now(timezone.utc), reply_status="new")
+                       created_at=api.parse_time(gr.get("createTime")) or datetime.now(timezone.utc), reply_status="new")
             db.add(r)
+            db.flush()
             new += 1
+            if not g_reply.get("comment"):
+                new_ids.append(r.id)
         elif r.text != text or r.rating != rating:
-            r.text, r.rating, r.sentiment = text, rating, detect_sentiment(text, rating)
+            r.text, r.rating, r.language, r.sentiment = text, rating, detect_language(text), detect_sentiment(text, rating)
+            if r.reply_status == "approved":
+                r.reply_status = "drafted"  # approved for the old text: needs another look
             updated += 1
-        if reply and r.reply_status != "published":
+        r.updated_at = api.parse_time(gr.get("updateTime")) or r.updated_at
+        r.reviewer_photo = (reviewer.get("profilePhotoUrl") or "")[:500]
+        if g_reply.get("comment") and r.reply_status != "published":
             # Replied on Google directly (or by us earlier): mirror it so nobody drafts a second reply.
-            r.reply, r.reply_status = reply, "published"
-            r.published_at = _parse_time((gr.get("reviewReply") or {}).get("updateTime"))
+            r.reply, r.reply_status = g_reply["comment"], "published"
+            r.published_at = api.parse_time(g_reply.get("updateTime"))
     if data.get("averageRating") is not None:
         gmb.rating = round(float(data["averageRating"]), 1)
     if data.get("totalReviewCount") is not None:
         gmb.review_count = int(data["totalReviewCount"])
-    return {"new_reviews": new, "updated_reviews": updated, "total_on_google": gmb.review_count}
+    return {"new_reviews": new, "new_review_ids": new_ids, "updated_reviews": updated, "total_on_google": gmb.review_count, "fetched": len(data["reviews"]),
+            "incremental": since is not None, "removed_samples": samples}
 
 
 def sync_metrics(db: Session, client: Client, days: int = 90) -> int:

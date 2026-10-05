@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import get_db
+from .. import review_queue
 from ..google import api, service, tokens
 from ..google.crypto import decrypt
 from ..models import Client, GmbAccount, GoogleConnection, User
@@ -145,7 +146,7 @@ def _client_callback(db: Session, user: User, cid: int, email: str, granted: dic
     gmb.google_email, gmb.scopes, gmb.token_status, gmb.last_error = email, granted.get("scope", ""), "active", ""
     db.flush()
     audit(db, user, f"connected Google account {email}", client_id=client.id, entity_type="gmb_account", entity_id=gmb.id)
-    result = f"connected:{email}"
+    result = f"reconnected:{email}" if gmb.is_live else f"connected:{email}"
     if not gmb.is_live:
         # Most businesses have exactly one profile: link it straight away so the workspace shows real data.
         try:
@@ -155,7 +156,7 @@ def _client_callback(db: Session, user: User, cid: int, email: str, granted: dic
                 audit(db, user, f"linked Google Business Profile “{free[0]['title']}”", client_id=client.id, entity_type="gmb_account", entity_id=gmb.id)
                 result = f"linked:{free[0]['title'] or free[0]['location']}"
                 try:
-                    service.sync_client(db, client)
+                    review_queue.sync_live(db, client)
                 except api.GoogleApiError:
                     pass  # recorded on gmb.last_error and shown on the panel
         except api.GoogleApiError as e:
@@ -225,7 +226,7 @@ def _do_link(db: Session, user: User, c: Client, conn_id: int | None, account: s
     result: dict = {"linked": True, "gmb": gmb_out(c.gmb)}
     if sync_now:
         try:
-            result["sync"] = service.sync_client(db, c)
+            result["sync"] = review_queue.sync_live(db, c)
         except api.GoogleApiError as e:
             result["sync_error"] = str(e)
         result["gmb"] = gmb_out(c.gmb)

@@ -47,14 +47,16 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     await runAction(context, (api) async {
       final out = await api.post('/api/reviews/sync', {'client_id': _clientId}) as Map<String, dynamic>;
       if (!mounted) return;
-      final String msg;
-      if (out['mode'] == 'live') {
-        final errors = (out['errors'] as List).cast<String>();
-        msg = 'Pulled ${out['new_reviews']} new review(s) from ${out['profiles']} live Google profile(s)${errors.isEmpty ? '' : ' · ${errors.join('; ')}'}';
-      } else {
-        final r = Review.fromJson(out);
-        msg = 'Demo: new ${r.rating}★ review for ${r.clientName} — ${r.replyStatus == 'published' ? 'auto-published' : 'AI draft ready'}';
-      }
+      final errors = (out['errors'] as List).cast<String>();
+      final pending = (out['approval_pending'] as List).cast<String>();
+      final parts = [
+        if ((out['profiles'] as int) > 0) '${out['new_reviews']} new from Google',
+        if ((out['sample_reviews'] as int) > 0) '${out['sample_reviews']} sample',
+      ];
+      var msg = 'Synced: ${parts.isEmpty ? 'nothing new' : parts.join(' + ')} · ${out['drafted']} AI draft(s)';
+      if ((out['auto_published'] as int) > 0) msg += ', ${out['auto_published']} auto-published';
+      if (pending.isNotEmpty) msg += ' · Google API approval pending for ${pending.join(', ')}';
+      if (errors.isNotEmpty) msg += ' · ${errors.join('; ')}';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     });
     _listKey.currentState?.reload();
@@ -170,6 +172,7 @@ class _ReviewCardState extends State<ReviewCard> {
           ]),
           const SizedBox(height: 6),
           Wrap(spacing: 6, children: [
+            if (r.isSample) const StatusChip('drafted', label: 'Sample'),
             StatusChip(r.sentiment),
             if (r.language != 'en') StatusChip('scheduled', label: r.language),
             StatusChip(r.replyStatus),

@@ -1,27 +1,25 @@
-import random
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import ai
+from .. import review_queue
+from ..config import settings
 from ..db import get_db
-from ..google import api as google_api
-from ..google import service as google_service
 from ..models import Client, Review, User
-from ..publishers import PublishError, publish_review_reply
+from ..publishers import PublishError
 from ..security import audit, can, get_client, require_section, scoped_ids
-from ..sentiment import detect_language, detect_sentiment
-from ..serializers import review_out
+from ..serializers import iso, review_out
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
+PENDING = ("new", "drafted", "approved", "failed")
+
 FILTERS = {
-    "pending": lambda r: r.reply_status in ("new", "drafted", "approved"),
+    "pending": lambda r: r.reply_status in PENDING,  # failed = publish failed, still needs a reply
     "approved": lambda r: r.reply_status == "approved",
     "negative": lambda r: r.sentiment == "negative" and r.reply_status != "published",
     "published": lambda r: r.reply_status == "published",
@@ -29,16 +27,86 @@ FILTERS = {
 }
 
 
+def _aware(dt: datetime | None) -> datetime | None:
+    return dt.replace(tzinfo=timezone.utc) if dt is not None and dt.tzinfo is None else dt
+
+
+def _stats(rows: list[Review], now: datetime) -> dict:
+    pending = [r for r in rows if r.reply_status in PENDING]
+    recent = [r for r in rows if _aware(r.created_at) >= now - timedelta(days=90)]
+    answered = [r for r in recent if r.reply_status == "published" and r.published_at and _aware(r.published_at) >= _aware(r.created_at)]
+    ages = [(now - _aware(r.created_at)).total_seconds() / 3600 for r in pending]
+    return {
+        "needs_reply": len(pending),
+        "negative_waiting": sum(r.sentiment == "negative" for r in pending),
+        "ai_drafts_ready": sum(r.reply_status == "drafted" for r in pending),
+        "awaiting_approval": sum(r.reply_status == "drafted" and r.rating <= 2 for r in pending),
+        "overdue": sum(a > 48 for a in ages),
+        "oldest_waiting_hours": round(max(ages)) if ages else None,
+        "response_rate": round(100 * sum(r.reply_status == "published" for r in recent) / len(recent)) if recent else None,
+        "avg_response_hours": round(sum((_aware(r.published_at) - _aware(r.created_at)).total_seconds() for r in answered) / len(answered) / 3600, 1) if answered else None,
+        "avg_rating": round(sum(r.rating for r in recent) / len(recent), 1) if recent else None,
+    }
+
+
+def _sources(db: Session, user: User, clients: list[Client], rows: list[Review]) -> dict:
+    samples: dict[int, int] = {}
+    for r in rows:
+        if r.is_sample:
+            samples[r.client_id] = samples.get(r.client_id, 0) + 1
+    items = [{"client_id": c.id, "client_name": c.company_name, "state": review_queue.source_state(c, samples.get(c.id, 0)), "samples": samples.get(c.id, 0),
+              "title": c.gmb.title if c.gmb else "", "last_sync": iso(c.gmb.last_sync) if c.gmb else None, "last_error": c.gmb.last_error if c.gmb else ""}
+             for c in sorted(clients, key=lambda c: c.company_name)]
+    states = [x["state"] for x in items]
+    return {
+        "clients": items,
+        "summary": {k: states.count(k) for k in ("live", "approval_pending", "error", "sample", "none")},
+        "approval_pending": "approval_pending" in states or review_queue.agency_approval_pending(db, user.tenant_id),
+        "sample_data_enabled": settings.review_sample_data,
+    }
+
+
+def _priority(now: datetime):
+    def key(r: Review):
+        if r.reply_status in PENDING:  # waiting: negatives / 2★ first, then longest waiting
+            return (0, r.sentiment != "negative" and r.rating > 2, _aware(r.created_at).timestamp())
+        return (1, 0, -_aware(r.created_at).timestamp())
+    return key
+
+
 @router.get("")
 def list_reviews(filter: Literal["pending", "approved", "negative", "published", "all"] = "pending", client_id: int | None = None,
+                 rating: int | None = None, sentiment: Literal["positive", "neutral", "negative"] | None = None,
+                 source: Literal["google", "sample"] | None = None, q: str = "",
+                 sort: Literal["priority", "newest", "oldest", "rating"] = "priority", limit: int = 50, offset: int = 0,
                  user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """The AI Review Queue. Filters narrow the list and the tab counts; stats and sources describe the whole scope."""
+    if rating is not None and not 1 <= rating <= 5:
+        raise HTTPException(422, "rating must be 1-5")
+    limit, offset = max(1, min(limit, 200)), max(0, offset)
     ids = scoped_ids(db, user, client_id)
-    names = dict(db.execute(select(Client.id, Client.company_name).where(Client.id.in_(ids))).all())
-    rows = list(db.scalars(select(Review).where(Review.client_id.in_(ids)).order_by(Review.created_at.desc())))
-    counts = {k: sum(1 for r in rows if f(r)) for k, f in FILTERS.items()}
-    items = [r for r in rows if FILTERS[filter](r)]
-    items.sort(key=lambda r: r.sentiment != "negative")  # negatives first, stable on recency
-    return {"counts": counts, "items": [review_out(r, names[r.client_id]) for r in items]}
+    clients = list(db.scalars(select(Client).where(Client.id.in_(ids))))
+    names = {c.id: c.company_name for c in clients}
+    rows = list(db.scalars(select(Review).where(Review.client_id.in_(ids))))
+    now = datetime.now(timezone.utc)
+    needle = q.strip().lower()
+    narrowed = [r for r in rows
+                if (rating is None or r.rating == rating) and (sentiment is None or r.sentiment == sentiment)
+                and (source is None or r.is_sample == (source == "sample"))
+                and (not needle or needle in f"{r.author} {r.text} {r.reply or ''} {names[r.client_id]}".lower())]
+    counts = {k: sum(1 for r in narrowed if f(r)) for k, f in FILTERS.items()}
+    items = [r for r in narrowed if FILTERS[filter](r)]
+    if sort == "priority":
+        items.sort(key=_priority(now))
+    elif sort == "rating":
+        items.sort(key=lambda r: (r.rating, -_aware(r.created_at).timestamp()))
+    else:
+        items.sort(key=lambda r: _aware(r.created_at), reverse=sort == "newest")
+    return {
+        "counts": counts, "total": len(items), "limit": limit, "offset": offset,
+        "items": [review_out(r, names[r.client_id]) for r in items[offset:offset + limit]],
+        "stats": _stats(rows, now), "sources": _sources(db, user, clients, rows),
+    }
 
 
 def _load(db: Session, user: User, review_id: int) -> tuple[Review, Client]:
@@ -48,25 +116,15 @@ def _load(db: Session, user: User, review_id: int) -> tuple[Review, Client]:
     return r, get_client(db, user, r.client_id)
 
 
-def _draft(r: Review, c: Client) -> str:
-    reply, source = ai.review_reply(
-        company=c.company_name, industry=c.industry, city=c.city, phone=c.contacts[0].phone if c.contacts else "",
-        brand_voice=c.brand_voice, author=r.author, rating=r.rating, text=r.text, language=r.language, sentiment=r.sentiment,
-    )
-    r.reply, r.reply_status = reply, "drafted"
-    return source
-
-
 def _publish(db: Session, user: User | None, r: Review, c: Client) -> None:
     try:
-        publish_review_reply(c, r.external_review_id, r.reply or "")
+        review_queue.publish(r, c)
     except PublishError as e:
         r.reply_status = "failed"
         if user:
             audit(db, user, f"publish failed: {e}", client_id=c.id, entity_type="review", entity_id=r.id)
         db.commit()
         raise HTTPException(502, str(e))
-    r.reply_status, r.published_at = "published", datetime.now(timezone.utc)
 
 
 @router.post("/{review_id}/draft")
@@ -74,7 +132,7 @@ def draft(review_id: int, user: User = Depends(require_section("reviews")), db: 
     r, c = _load(db, user, review_id)
     if r.reply_status == "published":
         raise HTTPException(409, "Already published")
-    source = _draft(r, c)
+    source = review_queue.draft(r, c)
     audit(db, user, f"AI drafted reply ({source})", client_id=c.id, entity_type="review", entity_id=r.id)
     db.commit()
     return {**review_out(r, c.company_name), "source": source}
@@ -95,10 +153,17 @@ def edit(review_id: int, body: ReplyIn, user: User = Depends(require_section("re
     return review_out(r, c.company_name)
 
 
-@router.post("/{review_id}/{action}")
-def transition(review_id: int, action: Literal["approve", "reject", "publish", "reopen"], user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
-    r, c = _load(db, user, review_id)
-    if action == "approve":
+Action = Literal["approve", "reject", "publish", "reopen"]
+VERB = {"approve": "approved reply", "reject": "rejected reply", "publish": "published reply to Google", "reopen": "reopened review", "draft": "AI drafted reply"}
+
+
+def _act(db: Session, user: User, r: Review, c: Client, action: str) -> None:
+    """One state transition with its permission and escalation rules. Raises HTTPException."""
+    if action == "draft":
+        if r.reply_status == "published":
+            raise HTTPException(409, "Already published")
+        review_queue.draft(r, c)
+    elif action == "approve":
         if not can(user, "review.approve"):
             raise HTTPException(403, "Your role cannot approve replies")
         if not r.reply or r.reply_status not in ("drafted", "failed"):
@@ -122,13 +187,39 @@ def transition(review_id: int, action: Literal["approve", "reject", "publish", "
         if r.reply_status != "rejected":
             raise HTTPException(409, "Only rejected reviews can be reopened")
         r.reply_status = "drafted" if r.reply else "new"
-    audit(db, user, {"approve": "approved reply", "reject": "rejected reply", "publish": "published reply to Google", "reopen": "reopened review"}[action],
-          client_id=c.id, entity_type="review", entity_id=r.id)
+    verb = "published reply (sample — not sent to Google)" if action == "publish" and r.is_sample else VERB[action]
+    audit(db, user, verb, client_id=c.id, entity_type="review", entity_id=r.id)
+
+
+@router.post("/{review_id}/{action}")
+def transition(review_id: int, action: Action, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    r, c = _load(db, user, review_id)
+    _act(db, user, r, c, action)
     db.commit()
     return review_out(r, c.company_name)
 
 
-INCOMING = [(5, "Loved the service today, team was super quick and helpful!"), (1, "Booked online but nobody was there when I arrived. Very poor experience."), (4, "Good experience, will come back again.")]
+class BulkIn(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=100)
+    action: Literal["draft", "approve", "publish", "reject"]
+
+
+@router.post("/bulk")
+def bulk(body: BulkIn, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """Apply one action to many reviews. Each review follows the same rules as the single action (2★ escalation,
+    role permissions); the ones that can't be done are reported, the rest go through."""
+    done, failed = 0, []
+    for rid in dict.fromkeys(body.ids):
+        try:
+            r, c = _load(db, user, rid)
+            _act(db, user, r, c, body.action)
+            db.commit()
+            done += 1
+        except HTTPException as e:
+            if e.status_code != 502:  # a failed publish was already recorded and committed
+                db.rollback()
+            failed.append({"id": rid, "error": e.detail})
+    return {"done": done, "failed": failed}
 
 
 class SyncIn(BaseModel):
@@ -137,40 +228,18 @@ class SyncIn(BaseModel):
 
 @router.post("/sync")
 def sync(body: SyncIn, user: User = Depends(require_section("gmb")), db: Session = Depends(get_db)):
-    """Simulates the Google review webhook: fetch → language → sentiment → AI draft → (optional) auto-publish.
-    Production: triggered by GBP Pub/Sub notifications or a scheduled pull."""
+    """Fetch new reviews: from Google for linked clients, sample reviews while Google API approval is pending or
+    a client isn't linked yet. New reviews get AI drafts; positive ones auto-publish when the client opted in."""
     ids = scoped_ids(db, user, body.client_id)
-    pool = [c for c in db.scalars(select(Client).where(Client.id.in_(ids))) if c.gmb and c.gmb.status == "connected"]
-    live = [c for c in pool if c.gmb.is_live]
-    if live:
-        # Real Google profiles in scope: pull their reviews instead of simulating one.
-        new, errors = 0, []
-        for c in live:
-            try:
-                new += google_service.sync_reviews(db, c)["new_reviews"]
-                c.gmb.last_sync, c.gmb.last_error = datetime.now(timezone.utc), ""
-            except google_api.GoogleApiError as e:
-                c.gmb.last_error = str(e)
-                errors.append(f"{c.company_name}: {e}")
-        audit(db, user, f"Google review sync: {new} new", entity_type="review")
-        db.commit()
-        return {"mode": "live", "profiles": len(live), "new_reviews": new, "errors": errors}
-    if not pool:
-        raise HTTPException(409, "No connected Google Business Profiles")
-    c = random.choice(pool)
-    rating, text = random.choice(INCOMING)
-    r = Review(tenant_id=user.tenant_id, client_id=c.id, external_review_id=f"demo_{uuid.uuid4().hex[:10]}", author="New Customer", rating=rating, text=text,
-               language=detect_language(text), sentiment=detect_sentiment(text, rating))
-    db.add(r)
-    db.flush()
-    audit(db, user, "review received", client_id=c.id, entity_type="review", entity_id=r.id)
-    source = _draft(r, c)
-    auto = bool(c.auto_publish.get("reviews")) and r.sentiment == "positive"
-    if auto:
-        try:
-            _publish(db, None, r, c)
-        except HTTPException:
-            auto = False
-    audit(db, user, "auto-published reply" if auto else f"AI drafted reply ({source})", client_id=c.id, entity_type="review", entity_id=r.id)
+    clients = list(db.scalars(select(Client).where(Client.id.in_(ids)).order_by(Client.id)))
+    if not clients:
+        raise HTTPException(409, "No clients to sync")
+    if not settings.review_sample_data and not any(c.gmb and c.gmb.is_live for c in clients):
+        raise HTTPException(409, "No client here is linked to Google yet (and sample data is turned off with REVIEW_SAMPLE_DATA=0)")
+    out = review_queue.sync(db, clients)
+    parts = [f"{out['new_reviews']} new from Google"] if out["profiles"] else []
+    if out["sample_reviews"]:
+        parts.append(f"{out['sample_reviews']} sample")
+    audit(db, user, f"review sync: {', '.join(parts) or 'nothing new'}; {out['drafted']} AI drafts", entity_type="review")
     db.commit()
-    return {"mode": "demo", **review_out(r, c.company_name)}
+    return out

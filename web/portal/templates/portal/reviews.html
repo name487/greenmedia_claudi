@@ -1,48 +1,133 @@
 {% extends "portal/base.html" %}{% load gm %}
 {% block content %}
 <div class="page-header">
-  <div><h1>AI Review Queue</h1><p class="muted">Detect → sentiment → AI draft → approve → publish</p></div>
+  <div><h1>AI Review Queue</h1><p class="muted">Google reviews → sentiment → AI draft → approve → publish</p></div>
   <div class="page-actions">
     {% include "portal/_client_select.html" with allow_all=True %}
-    {% if 'gmb' in me.sections %}<form method="post" class="inline">{% csrf_token %}<button class="btn soft" name="action" value="sync">Sync new reviews</button></form>{% endif %}
+    {% if can_sync %}<form method="post" class="inline">{% csrf_token %}<button class="btn soft" name="action" value="sync">{% icon 'sparkle' 16 %} Sync reviews</button></form>{% endif %}
   </div>
 </div>
-<div class="pill-tabs">
-  {% for key, label in tabs %}<a href="{% qs filter=key %}" class="{% if flt == key %}on{% endif %}" style="text-decoration:none">{{ label }} ({{ counts|get:key }})</a>{% endfor %}
+
+{# Where the reviews come from #}
+{% if sources.approval_pending %}
+  <div class="notice queue-source" role="status">
+    <strong>Waiting for Google API approval.</strong>
+    Google hasn't approved Business Profile API access for your Cloud project yet (quota 0), so real reviews can't be fetched.
+    {% if sources.sample_data_enabled %}The queue shows <span class="badge badge-purple">Sample</span> reviews so your team can work the flow — replies to them are never posted to Google, and real reviews replace them automatically on the first sync after approval.{% endif %}
+    {% if 'gmb' in me.sections and 'client.edit' in perms %}<a href="{% url 'google' %}?live=1#setup">Check Google setup</a>{% endif %}
+  </div>
+{% elif single %}
+  <div class="notice {% if single.state == 'live' %}ok{% elif single.state == 'error' %}error{% else %}info{% endif %} queue-source" role="status">
+    {% if single.state == 'live' %}<strong>Live from Google</strong> · {{ single.title|default:single.client_name }} · last sync {{ single.last_sync|when|default:"never" }}
+    {% elif single.state == 'error' %}<strong>Google sync problem:</strong> {{ single.last_error }}{% if 'client.edit' in perms %} — <a href="{% url 'client_detail' single.client_id %}#google">reconnect on the client page</a>{% endif %}
+    {% elif single.state == 'sample' %}<strong>Sample reviews.</strong> {{ single.client_name }} isn't linked to Google yet; these are marked Sample and are never posted to Google.{% if 'client.edit' in perms %} <a href="{% url 'client_detail' single.client_id %}#google">Connect Google</a>{% endif %}
+    {% else %}{{ single.client_name }} isn't linked to Google yet.{% if can_sync and sources.sample_data_enabled %} Click <strong>Sync reviews</strong> to load sample reviews and try the workflow.{% endif %}{% endif %}
+  </div>
+{% elif sources.summary.live == 0 and sources.clients %}
+  <div class="notice info queue-source" role="status">No client is linked to Google yet{% if sources.summary.sample %}, so the queue shows <span class="badge badge-purple">Sample</span> reviews — never posted to Google{% endif %}. Connect Google from a client's workspace to pull real reviews.</div>
+{% elif sources.summary.error %}
+  <div class="notice error queue-source" role="status">{{ sources.summary.error }} client{{ sources.summary.error|pluralize }} can't sync from Google:
+    {% for s in sources.clients %}{% if s.state == 'error' %}<a href="{% url 'client_detail' s.client_id %}#google">{{ s.client_name }}</a>{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}</div>
+{% endif %}
+
+<div class="grid stats queue-stats">
+  <div class="stat"><span class="stat-label">Needs reply</span><strong class="stat-value">{{ stats.needs_reply }}</strong><span class="stat-hint">{{ stats.ai_drafts_ready }} AI draft{{ stats.ai_drafts_ready|pluralize }} ready</span></div>
+  <div class="stat"><span class="stat-label">Negative waiting</span><strong class="stat-value"{% if stats.negative_waiting %} style="color:var(--red)"{% endif %}>{{ stats.negative_waiting }}</strong><span class="stat-hint">{{ stats.awaiting_approval }} 2★ or lower need approval</span></div>
+  <div class="stat"><span class="stat-label">Oldest waiting</span><strong class="stat-value">{{ stats.oldest_waiting_hours|hours }}</strong><span class="stat-hint">{{ stats.overdue }} over 48h</span></div>
+  <div class="stat"><span class="stat-label">Response rate (90d)</span><strong class="stat-value">{% if stats.response_rate is not None %}{{ stats.response_rate }}%{% else %}—{% endif %}</strong><span class="stat-hint">{% if stats.avg_response_hours is not None %}avg reply in {{ stats.avg_response_hours|hours }}{% else %}no replies yet{% endif %}{% if stats.avg_rating %} · {{ stats.avg_rating }}★ avg{% endif %}</span></div>
 </div>
-{% if not items %}<section class="card"><div class="empty">No reviews here.</div></section>{% endif %}
+
+<form method="get" class="toolbar">
+  {% keep_params 'q' 'rating' 'sentiment' 'source' 'sort' 'limit' %}
+  <input class="input" type="search" name="q" value="{{ f.q }}" placeholder="Search reviewer, review text, reply or client…">
+  <select class="input" name="rating" onchange="this.form.submit()" aria-label="Rating"><option value="">Any rating</option>{% for n in "54321" %}<option value="{{ n }}"{% if f.rating == n %} selected{% endif %}>{{ n }}★</option>{% endfor %}</select>
+  <select class="input" name="sentiment" onchange="this.form.submit()" aria-label="Sentiment"><option value="">Any sentiment</option>{% for s in "positive neutral negative"|split %}<option value="{{ s }}"{% if f.sentiment == s %} selected{% endif %}>{{ s|capfirst }}</option>{% endfor %}</select>
+  <select class="input" name="source" onchange="this.form.submit()" aria-label="Source"><option value="">Google + sample</option><option value="google"{% if f.source == 'google' %} selected{% endif %}>From Google</option><option value="sample"{% if f.source == 'sample' %} selected{% endif %}>Sample only</option></select>
+  <select class="input" name="sort" onchange="this.form.submit()" aria-label="Sort"><option value="priority">Sort: Priority</option><option value="newest"{% if f.sort == 'newest' %} selected{% endif %}>Sort: Newest</option><option value="oldest"{% if f.sort == 'oldest' %} selected{% endif %}>Sort: Oldest</option><option value="rating"{% if f.sort == 'rating' %} selected{% endif %}>Sort: Lowest rating</option></select>
+  <button class="btn soft">Search</button>
+  {% if filtered %}<a class="small" href="{% qs q=None rating=None sentiment=None source=None limit=None %}">Clear filters</a>{% endif %}
+</form>
+
+<div class="pill-tabs">
+  {% for key, label in tabs %}<a href="{% qs filter=key limit=None %}" class="{% if flt == key %}on{% endif %}" style="text-decoration:none">{{ label }} ({{ counts|get:key }})</a>{% endfor %}
+</div>
+
+{% if items %}
+<form method="post" id="bulk" class="bulkbar">{% csrf_token %}
+  <label class="check"><input type="checkbox" id="select-all" aria-label="Select all on this page"> Select all</label>
+  <span class="muted small" id="selected-count">0 selected</span>
+  <span class="btn-row">
+    <button class="btn ghost sm" name="action" value="bulk_draft">{% icon 'sparkle' 14 %} Draft AI replies</button>
+    {% if can_approve %}<button class="btn soft sm" name="action" value="bulk_approve">Approve</button>{% endif %}
+    {% if can_publish %}<button class="btn sm" name="action" value="bulk_publish">Publish</button>{% endif %}
+    <button class="btn ghost sm" name="action" value="bulk_reject">Reject</button>
+  </span>
+</form>
+{% else %}
+<section class="card"><div class="empty">
+  {% if filtered %}No reviews match these filters. <a href="{% qs q=None rating=None sentiment=None source=None %}">Clear filters</a>
+  {% elif flt == 'pending' and counts.all %}All caught up — every review has a reply. 🎉
+  {% elif can_sync %}No reviews yet. Click <strong>Sync reviews</strong> to fetch them{% if sources.sample_data_enabled %} (sample reviews are used until Google is connected and approved){% endif %}.
+  {% else %}No reviews here.{% endif %}
+</div></section>
+{% endif %}
+
 <div class="grid cols-2">
 {% for r in items %}
-  <section class="card review" id="r{{ r.id }}">
-    <div class="row between">
-      <div><strong>{{ r.author }}</strong> {{ r.rating|stars }}<div class="muted small">{{ r.client_name }} · {{ r.created_at|when }}</div></div>
-      <div class="row">{{ r.sentiment|badge }}{% if r.language != 'en' %}<span class="badge badge-blue">{{ r.language }}</span>{% endif %}{{ r.reply_status|badge }}</div>
+  <section class="card review{% if r.is_sample %} is-sample{% endif %}" id="r{{ r.id }}">
+    <div class="row between" style="align-items:flex-start">
+      <div class="row" style="align-items:flex-start;gap:10px">
+        <input type="checkbox" name="ids" value="{{ r.id }}" form="bulk" class="pick" aria-label="Select review by {{ r.author }}">
+        {% if r.reviewer_photo %}<img class="avatar" src="{{ r.reviewer_photo }}" alt="" referrerpolicy="no-referrer" width="34" height="34">{% else %}<span class="avatar" aria-hidden="true">{{ r.author|initials }}</span>{% endif %}
+        <div><strong>{{ r.author }}</strong> {{ r.rating|stars }}
+          <div class="muted small">{% if not request.me.client_id %}<a href="{% url 'client_detail' r.client_id %}" style="color:inherit">{{ r.client_name }}</a> · {% endif %}{{ r.created_at|when }}{% if r.edited %} · edited{% endif %}</div></div>
+      </div>
+      <div class="row badges">
+        {% if r.is_sample %}<span class="badge badge-purple" title="Sample review — not from Google; replies are not posted">Sample</span>{% else %}<span class="badge badge-blue" title="Fetched from Google">Google</span>{% endif %}
+        {{ r.sentiment|badge }}{% if r.language != 'en' %}<span class="badge badge-blue">{{ r.language }}</span>{% endif %}{{ r.reply_status|badge }}
+        {% if r.waiting_hours is not None %}<span class="badge badge-{% if r.waiting_hours > 48 %}red{% elif r.waiting_hours > 24 %}amber{% else %}gray{% endif %}" title="Waiting for a reply">⏱ {{ r.waiting_hours|hours }}</span>{% endif %}
+      </div>
     </div>
-    <blockquote>{{ r.text }}</blockquote>
-    {% if r.needs_escalation and r.reply_status != 'published' %}<div class="notice">Escalation: replies to 2★ or lower need approval before publishing.</div>{% endif %}
+    {% if r.text %}<blockquote>{{ r.text }}</blockquote>{% else %}<blockquote class="muted">Rating only — no written review.</blockquote>{% endif %}
+    {% if r.needs_escalation and r.reply_status != 'published' %}<div class="notice small">Escalation: replies to 2★ or lower need approval before publishing.</div>{% endif %}
 
     {% if r.reply_status == 'new' %}
       <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}">
         <button class="btn" name="action" value="draft">{% icon 'sparkle' 16 %} Generate AI reply</button></form>
     {% elif r.reply_status == 'published' %}
-      <div class="reply-box"><p style="margin:0">{{ r.reply }}</p><span class="muted small">Published {{ r.published_at|when }}</span></div>
+      <div class="reply-box"><p style="margin:0">{{ r.reply }}</p><span class="muted small">{% if r.is_sample %}Marked published {{ r.published_at|when }} · sample, not on Google{% else %}Published on Google {{ r.published_at|when }}{% endif %}</span></div>
     {% elif r.reply_status == 'rejected' %}
       <div class="reply-box"><p class="muted" style="margin:0">{{ r.reply|default:"—" }}</p>
         <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}"><button class="btn ghost sm" name="action" value="reopen">Reopen</button></form></div>
     {% else %}
       <form method="post" class="reply-box form">{% csrf_token %}
         <input type="hidden" name="review_id" value="{{ r.id }}"><input type="hidden" name="original" value="{{ r.reply }}">
-        <textarea class="input" name="reply" aria-label="Reply">{{ r.reply }}</textarea>
+        <label class="muted small" for="reply{{ r.id }}">{% if r.reply_status == 'failed' %}Publishing failed — edit or retry{% else %}AI draft — edit before approving{% endif %}</label>
+        <textarea class="input" name="reply" id="reply{{ r.id }}">{{ r.reply }}</textarea>
         <div class="btn-row">
           <button class="btn ghost sm" name="action" value="save">Save edit</button>
           <button class="btn ghost sm" name="action" value="draft">Regenerate</button>
           <button class="btn ghost sm" name="action" value="reject">Reject</button>
           {% if can_approve and r.reply_status != 'approved' %}<button class="btn soft sm" name="action" value="approve">Approve</button>{% endif %}
-          {% if can_publish %}<button class="btn sm" name="action" value="publish"{% if r.needs_escalation and r.reply_status != 'approved' %} disabled title="Approve first"{% endif %}>Publish to Google</button>{% endif %}
+          {% if can_publish %}<button class="btn sm" name="action" value="publish"{% if r.needs_escalation and r.reply_status != 'approved' %} disabled title="Approve first"{% endif %}>{% if r.is_sample %}Publish (sample){% else %}Publish to Google{% endif %}</button>{% endif %}
         </div>
       </form>
     {% endif %}
   </section>
 {% endfor %}
 </div>
+{% if items %}
+<p class="muted small" style="text-align:center;margin-top:16px">Showing {{ items|length }} of {{ total }}{% if more %} · <a href="{% qs limit=more %}">Show more</a>{% endif %}</p>
+{% endif %}
+
+<script>
+(() => {
+  const all = document.getElementById('select-all');
+  if (!all) return;
+  const picks = () => [...document.querySelectorAll('input.pick')];
+  const count = () => { const n = picks().filter(p => p.checked).length; document.getElementById('selected-count').textContent = `${n} selected`; all.checked = n && n === picks().length; };
+  all.addEventListener('change', () => { picks().forEach(p => { p.checked = all.checked; }); count(); });
+  picks().forEach(p => p.addEventListener('change', count));
+})();
+</script>
 {% endblock %}

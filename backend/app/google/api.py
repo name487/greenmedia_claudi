@@ -7,7 +7,7 @@ APIs used (enable all of them in Google Cloud Console):
 - Business Profile Performance API        daily insights
 """
 
-from datetime import date
+from datetime import date, datetime
 from urllib.parse import urlencode
 
 import httpx
@@ -35,9 +35,19 @@ class GoogleApiError(Exception):
         self.status = status
 
     @property
+    def approval_pending(self) -> bool:
+        """Quota 0: Google hasn't approved Business Profile API access for this Cloud project yet."""
+        return is_approval_pending(self.status, str(self))
+
+    @property
     def auth_failed(self) -> bool:
         """Token revoked/expired beyond refresh: the user must reconnect Google."""
         return self.status == 401 or "invalid_grant" in str(self)
+
+
+def is_approval_pending(status: int | None, message: str) -> bool:
+    low = (message or "").lower()
+    return status == 429 or "quota" in low or "resource_exhausted" in low
 
 
 def _raise(r: httpx.Response) -> None:
@@ -55,6 +65,12 @@ def _raise(r: httpx.Response) -> None:
     elif r.status_code == 403:
         hint = " — check that the API is enabled in Google Cloud and the Google account manages this profile."
     raise GoogleApiError(r.status_code, f"Google API {r.status_code}: {msg}{hint}")
+
+
+def parse_time(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
 # ---------- OAuth ----------
@@ -143,18 +159,20 @@ class Gbp:
         return self._paged(f"{INFO_BASE}/{account}/locations", "locations", pageSize=100,
                            readMask="name,title,storefrontAddress,websiteUri,phoneNumbers,metadata")
 
-    def reviews(self, account: str, location: str, max_pages: int = 10) -> dict:
-        """Returns {"reviews": [...], "averageRating": x, "totalReviewCount": n} (newest first)."""
+    def reviews(self, account: str, location: str, max_pages: int = 10, since: datetime | None = None) -> dict:
+        """Returns {"reviews": [...], "averageRating": x, "totalReviewCount": n}, most recently updated first.
+        With `since`, paging stops once a page reaches reviews not updated after it (incremental sync)."""
         url = f"{V4_BASE}/{account}/{location}/reviews"
         out: dict = {"reviews": []}
         token = None
         for _ in range(max_pages):
             body = self._get(url, pageSize=50, pageToken=token, orderBy="updateTime desc")
-            out["reviews"] += body.get("reviews", [])
+            page = body.get("reviews", [])
+            out["reviews"] += page
             out["averageRating"] = body.get("averageRating", out.get("averageRating"))
             out["totalReviewCount"] = body.get("totalReviewCount", out.get("totalReviewCount"))
             token = body.get("nextPageToken")
-            if not token:
+            if not token or (since and page and (parse_time(page[-1].get("updateTime")) or since) <= since):
                 break
         return out
 

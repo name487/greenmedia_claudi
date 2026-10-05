@@ -189,7 +189,7 @@ Open a client and use the **Google Business Profile** panel:
 
 ### After linking
 
-- **AI Reviews:** "Sync new reviews" pulls reviews from Google. Approved replies are posted to Google. 2★ replies still need approval first.
+- **AI Reviews:** **Sync reviews** (and the scheduler) pulls new reviews from Google into `gmb_reviews` and AI-drafts replies. Approved replies are posted to Google. 2★ replies still need approval first. See [AI Review Queue](#ai-review-queue).
 - **Content Studio:** GMB variants of approved content are posted to the profile as Google posts, either on "Publish now" or at their scheduled time.
 - **Scheduler:** every `SCHEDULER_INTERVAL_MINUTES`, the API re-syncs every live profile and publishes posts that are due. You can also run it from cron: `python -m app.jobs`.
 - **Errors:** if access is revoked, the profile shows **Expired** with Google's error message. **Reconnect** fixes it.
@@ -232,11 +232,55 @@ How refresh works:
 
 **Still simulated:** Facebook, Instagram, LinkedIn and YouTube publishing, plus the GA4/Search Console/social columns in analytics. After you link a client, those columns show 0 until their integrations are added.
 
+## AI Review Queue
+
+**AI Reviews** in the web app (also `GET /api/reviews`) is the team's inbox for every client's Google reviews.
+
+**Fetching from Google into `gmb_reviews`**
+
+**Sync reviews**, the GMB page's sync and the scheduler all call Google's `accounts/*/locations/*/reviews`. Each new review is stored with:
+- reviewer, photo, stars, text (Google's machine translation is stripped), language and sentiment
+- Google's `createTime` and `updateTime`
+
+How the sync behaves:
+- **Incremental.** After the first import, it only pages through reviews updated since the last one it has.
+- **Edits.** If a reviewer edits their review, the text, rating and sentiment are refreshed. A reply that was approved but not yet published goes back to *Drafted* for another look.
+- **Replies made on Google.** A reply written directly on Google is mirrored as *Published*, so nobody drafts a second one.
+- **AI drafts.** New unanswered reviews get an AI draft straight away, up to `REVIEW_AUTODRAFT_LIMIT` per client per sync. Without an AI key, the brand-voice template is used.
+- **Auto-publish.** Positive 4–5★ replies are auto-published only when the client opted in (*Client Workspace → Publishing safety*) and the review is under 14 days old.
+
+**The screen**
+
+- A source banner shows where the reviews come from: *Live from Google*, *Waiting for Google API approval*, *Sample reviews*, or a sync error with a link to reconnect.
+- Stat tiles: needs reply (and AI drafts ready), negative waiting, oldest waiting (and how many are over 48h), and 90-day response rate with average reply time and rating.
+- Search and filters by rating, sentiment and source (Google or sample), plus sort by priority, newest, oldest or lowest rating.
+- **Priority** puts negative and 2★ reviews first, then the longest-waiting ones.
+- Tabs: Needs reply / Approved / Negative / Published / All.
+- Each card shows a ⏱ waiting badge (amber over 24h, red over 48h), the AI draft editor, and Approve / Publish / Reject / Regenerate.
+- Bulk actions: tick reviews (or **Select all**), then *Draft AI replies*, *Approve*, *Publish* or *Reject*. Each review follows the single-review rules: 2★ approval and role permissions. Any that can't be done are listed.
+
+**Sample data while API approval is pending**
+
+Until Google approves Business Profile API access, every review call fails with quota 0. So the team can still use the queue, **Sync reviews** falls back to realistic sample reviews (English, Hindi and Hinglish, every rating, some rating-only):
+
+- **For a linked client** that gets a quota-0 answer: 6 sample reviews the first time, then one more per sync, like a review arriving.
+- **For clients not linked to Google yet:** a first batch for clients with no reviews (10 clients per sync), then one new review per sync.
+- **Labelling.** Samples are labelled *Sample* everywhere: card, filter, mobile app and audit log. Their replies are **never sent to Google**; publishing one only marks it published.
+- **Clean-up.** They are deleted automatically on the first successful Google fetch for that client, and when a location is linked.
+- **Turning it off.** `REVIEW_SAMPLE_DATA=0` stops sample reviews from ever being created.
+
+| Method & path | What it does |
+|---|---|
+| `GET /api/reviews?filter=&client_id=&rating=&sentiment=&source=&q=&sort=&limit=&offset=` | Queue items, tab counts, `stats` and per-client `sources` (`live` / `approval_pending` / `error` / `sample` / `none`) |
+| `POST /api/reviews/sync` `{client_id?}` | Fetch from Google, or sample data, then AI drafts. The response lists the clients where approval is pending. |
+| `POST /api/reviews/bulk` `{ids, action}` | `draft` / `approve` / `publish` / `reject` for up to 100 reviews |
+| `POST /api/reviews/{id}/draft` · `PATCH /api/reviews/{id}` · `POST /api/reviews/{id}/approve|reject|publish|reopen` | Single-review actions |
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 66 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
-                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics)
+cd backend && pytest -q          # 74 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions)
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```

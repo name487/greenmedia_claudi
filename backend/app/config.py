@@ -11,6 +11,10 @@ class Settings:
     jwt_secret: str = os.getenv("JWT_SECRET", "dev-only-change-me")
     jwt_ttl_minutes: int = int(os.getenv("JWT_TTL_MINUTES", "720"))
     seed_demo: bool = os.getenv("SEED_DEMO", "1") == "1"
+    # AI Review Queue: show clearly-labelled sample reviews while Google hasn't approved Business Profile API
+    # access (quota 0) or a client isn't linked yet. Set to 0 to never create sample reviews.
+    review_sample_data: bool = os.getenv("REVIEW_SAMPLE_DATA", "1") == "1"
+    review_autodraft_limit: int = int(os.getenv("REVIEW_AUTODRAFT_LIMIT", "20"))  # AI drafts per client per sync
     ai_provider: str = os.getenv("AI_PROVIDER", "anthropic").lower()
     ai_model: str = os.getenv("AI_MODEL", "")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")

@@ -285,3 +285,10 @@ details.card[open] > summary { margin-bottom: 12px; }
 .review.is-sample { border-style: dashed; }
 .review .pick { margin-top: 9px; width: 16px; height: 16px; flex: none; }
 img.avatar { object-fit: cover; background: var(--surface-2); }
+
+/* brand voice */
+.prompt { white-space: pre-wrap; font-size: 12px; background: var(--surface-2); padding: 10px 12px; border-radius: 10px; max-height: 320px; overflow: auto; margin: 8px 0 0; }
+.ai-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.history { margin: 0; padding-left: 16px; font-size: 12px; }
+.history li { margin: 2px 0; }
+.sm-input { font-size: 13px; padding: 6px 10px; }

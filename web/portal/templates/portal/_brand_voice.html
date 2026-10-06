@@ -1,0 +1,58 @@
+{% load gm %}
+<section class="card" id="voice"><header class="card-head"><h3>AI brand voice</h3>
+  <span class="muted small">{% if voice.ai.enabled %}Replies by {% if voice.ai.provider == 'openai' %}OpenAI{% else %}Anthropic{% endif %} · {{ voice.ai.model }}{% else %}AI off — template replies{% endif %}</span></header>
+  {% with bv=c.brand_voice %}
+  <dl class="kv">
+    <dt>Tone</dt><dd>{{ bv.tone|default:"—" }}</dd>
+    <dt>Length</dt><dd>{{ bv.reply_length|default:"medium"|capfirst }}</dd>
+    <dt>Sign-off</dt><dd>{% if bv.sign_off %}{{ bv.sign_off }}{% else %}<span class="muted">— Team {{ c.company_name }} (default)</span>{% endif %}</dd>
+    <dt>Phrases</dt><dd>{{ bv.preferred_phrases|join:" · "|default:"—" }}</dd>
+    <dt>Never say</dt><dd>{{ bv.prohibited_claims|join:" · "|default:"—" }}</dd>
+    <dt>CTA</dt><dd>{{ bv.cta_style|default:"—" }}</dd>
+    <dt>Languages</dt><dd>{{ bv.languages|join:", "|default:"—" }}</dd>
+    {% if bv.review_prompt %}<dt>Instructions</dt><dd class="small" style="white-space:pre-line">{{ bv.review_prompt }}</dd>{% endif %}
+    <dt>Escalation</dt><dd>{{ bv.escalation_rule|default:"—" }}</dd>
+  </dl>
+
+  {% if editable %}
+  <details style="margin-top:12px"{% if voice_open %} open{% endif %}><summary><strong>Edit brand voice</strong></summary>
+    <form method="post" class="form" style="margin-top:10px">{% csrf_token %}<input type="hidden" name="action" value="brand_voice">
+      <div class="grid cols-2">
+        <label class="field">Tone <input class="input" name="tone" value="{{ bv.tone }}" maxlength="200" placeholder="Warm, caring and professional"></label>
+        <label class="field">Reply length <select class="input" name="reply_length">{% for k, label in lengths %}<option value="{{ k }}"{% if bv.reply_length|default:'medium' == k %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label class="field">Sign-off <input class="input" name="sign_off" value="{{ bv.sign_off }}" maxlength="150" placeholder="— Dr. Anjali & Team"></label>
+        <label class="field">Call to action <input class="input" name="cta_style" value="{{ bv.cta_style }}" maxlength="150" placeholder="Book online or call us"></label>
+        <label class="field">Preferred phrases <span class="muted small">one per line</span><textarea class="input" name="preferred_phrases" rows="3">{{ bv.preferred_phrases|lines }}</textarea></label>
+        <label class="field">Never say / claim <span class="muted small">one per line</span><textarea class="input" name="prohibited_claims" rows="3">{{ bv.prohibited_claims|lines }}</textarea></label>
+        <label class="field">Languages <span class="muted small">codes, comma separated</span><input class="input" name="languages" value="{{ bv.languages|join:', ' }}" placeholder="en, hi"></label>
+        <label class="field">Escalation rule <input class="input" name="escalation_rule" value="{{ bv.escalation_rule }}" maxlength="300"></label>
+      </div>
+      <label class="field">Instructions for review replies <span class="muted small">added to the AI prompt for this client only</span>
+        <textarea class="input" name="review_prompt" rows="4" maxlength="2000" placeholder="e.g. Mention our 24x7 emergency line for dental pain. Never mention prices. Thank first-time patients for choosing us.">{{ bv.review_prompt }}</textarea></label>
+      <div><button class="btn sm">Save brand voice</button></div>
+    </form>
+  </details>
+  {% endif %}
+
+  <details style="margin-top:8px"><summary class="small">See the exact prompt the AI receives</summary>
+    <pre class="prompt">{{ voice.system_prompt }}</pre>
+  </details>
+
+  {% if editable %}
+  <details style="margin-top:8px" id="voice-try"{% if voice_try %} open{% endif %}><summary><strong>Try it on a review</strong></summary>
+    <form method="post" class="form" style="margin-top:10px">{% csrf_token %}<input type="hidden" name="action" value="brand_voice_try">
+      <div class="grid cols-2">
+        <label class="field">Rating <select class="input" name="rating">{% for n in "54321" %}<option value="{{ n }}"{% if voice_try.rating|stringformat:"d" == n %} selected{% endif %}>{{ n }}★</option>{% endfor %}</select></label>
+        <label class="field">Reviewer <input class="input" name="author" value="{{ voice_try.author|default:'Priya Sharma' }}" maxlength="120"></label>
+      </div>
+      <label class="field">Review text <textarea class="input" name="text" rows="2" maxlength="4000" placeholder="Waited 40 minutes past my appointment…">{{ voice_try.text }}</textarea></label>
+      <div><button class="btn soft sm">{% icon 'sparkle' 14 %} Draft a sample reply</button></div>
+    </form>
+    {% if voice_try.reply %}
+    <div class="reply-box" style="margin-top:10px"><p style="margin:0">{{ voice_try.reply }}</p>
+      <span class="muted small">{% if voice_try.ai.source == 'ai' %}AI · {{ voice_try.ai.model }} · {{ voice_try.ai.ms }} ms{% else %}Template{% if voice_try.ai.error %} — AI not used: {{ voice_try.ai.error }}{% endif %}{% endif %}</span></div>
+    {% endif %}
+  </details>
+  {% endif %}
+  {% endwith %}
+</section>

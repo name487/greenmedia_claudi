@@ -53,7 +53,7 @@ The frontends hold no business logic, so a rule like "2★ replies need approval
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # optional: add ANTHROPIC_API_KEY or OPENAI_API_KEY
+cp .env.example .env            # optional: add OPENAI_API_KEY (or ANTHROPIC_API_KEY)
 uvicorn app.main:app --reload --port 8001
 
 # 2. Web  → http://127.0.0.1:8000
@@ -131,7 +131,7 @@ The interactive docs are at `http://127.0.0.1:8001/docs`. The Django **Clients**
 | `DELETE /api/clients/{id}/contacts/{cid}` | Remove a contact. If it was primary, the next contact is promoted | `client.edit` |
 | `POST /api/clients/import` | Bulk-create clients from CSV (see above) | `client.edit` |
 
-**AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `ANTHROPIC_API_KEY` (or `AI_PROVIDER=openai` plus `OPENAI_API_KEY`) on the API server to switch to real model output. Keys never ship inside the apps.
+**AI:** without a key, review replies, content and reports come from built-in templates, so everything still works. Set `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`) on the API server to switch to real model output, then press **Settings → Test AI connection**. Keys never ship inside the apps. See [AI replies with OpenAI](#ai-replies-with-openai).
 
 ## Going live with Google Business Profile
 
@@ -276,11 +276,77 @@ Until Google approves Business Profile API access, every review call fails with 
 | `POST /api/reviews/bulk` `{ids, action}` | `draft` / `approve` / `publish` / `reject` for up to 100 reviews |
 | `POST /api/reviews/{id}/draft` · `PATCH /api/reviews/{id}` · `POST /api/reviews/{id}/approve|reject|publish|reopen` | Single-review actions |
 
+## AI replies with OpenAI
+
+**Connect.** Put `OPENAI_API_KEY=sk-…` in `backend/.env` and restart the API. With no `AI_PROVIDER` set, OpenAI is used whenever that key exists.
+
+- **Model:** `AI_MODEL`, default `gpt-4.1-mini`.
+- **Optional settings:** `OPENAI_BASE_URL`, `OPENAI_ORG_ID` and `OPENAI_PROJECT_ID`.
+- **Checking the connection:** **Settings → AI connection** shows the provider, model and a masked key (`sk-…1234`). **Test AI connection** sends one tiny request and reports the latency, or the reason it failed with a fix:
+  - invalid key
+  - no credit (`insufficient_quota`)
+  - model not available
+  - rate limit
+- **Where the key lives:** only in the server's environment. It is never stored in the database or shown in full.
+
+**How requests are made.**
+- The official Chat Completions API (`POST /v1/chat/completions`, `max_completion_tokens`).
+- One automatic retry on a rate limit or server error.
+- Every draft records the model, token usage, latency and OpenAI request id.
+- If OpenAI fails, the reply falls back to the client's brand-voice template. The card shows **Template — AI not used: <reason>**, so nothing is silently wrong.
+
+**Per-client brand voice** (*Client Workspace → AI brand voice*):
+- **Fields:** tone, reply length (short/medium/long), sign-off, call to action, preferred phrases, things never to say, languages, the escalation rule, and free-text **Instructions for review replies**.
+- **See the exact prompt the AI receives** shows the full system prompt.
+- **Try it on a review** drafts a sample reply without saving anything.
+- **Fixed safety rules** are appended after the client's instructions:
+  - reply in the review's language
+  - no private details
+  - no admitting liability
+  - no public refunds or discounts
+  - apologise and take negatives offline
+- The review text is wrapped in `<review>` tags and treated as data. A review saying "ignore your instructions" can't steer the reply.
+
+**Workflow in the AI Review Queue.**
+- **Draft:** automatic for new reviews, or **Generate AI reply**.
+- **Edit:** type in the box, then **Save edit**. The reply is marked *Edited by your team* and needs approval again.
+- **Regenerate:** with an optional note such as "shorter" or "mention online booking".
+- **Approve, Reject, Reopen.**
+- **Publish to Google:** through the official Business Profile API, `PUT accounts/{a}/locations/{l}/reviews/{id}/reply`. Google's `updateTime` becomes the published time.
+- **Approval rules:** replies to reviews of 2★ or lower must be approved before publishing. Only roles with `review.approve` or `review.publish` can approve or publish.
+
+**Audit trail.** Every step is a row in `audit_logs` with a `details` JSON column:
+
+| Action | `details` |
+|---|---|
+| AI drafted / regenerated reply | source (`ai`/`template`), provider, model, token usage, ms, request id, instruction, reply, previous text, AI error |
+| edited reply | before, after |
+| approved / rejected / reopened | from → to status, reply |
+| published reply to Google | target (`google`, `sample`, `simulated`), location, Google's `updateTime`, reply |
+| publish failed | Google's error |
+| `[auto]` … (user "System") | drafts and auto-publishes made by sync or the scheduler |
+| brand voice changes | before/after per field |
+| AI connection test | ok or error code |
+
+- Each review card has a **History** list. The same data is at `GET /api/reviews/{id}/history`.
+- The Team & Tasks page shows the full audit trail.
+
+| Method & path | What it does |
+|---|---|
+| `GET /api/ai/status` · `POST /api/ai/test` | AI connection state and test (Settings) |
+| `GET /api/clients/{id}/brand-voice` | Brand voice plus the exact system prompt |
+| `POST /api/clients/{id}/brand-voice/try` | `{rating, text, author?, brand_voice?}`: a sample reply, nothing saved |
+| `PATCH /api/clients/{id}` `{brand_voice: {...}}` | Save the voice (merged, validated, audited) |
+| `POST /api/reviews/{id}/draft` `{instruction?}` | Draft or regenerate |
+| `PATCH /api/reviews/{id}` `{reply}` | Edit |
+| `POST /api/reviews/{id}/approve\|reject\|reopen\|publish` | State changes; publish posts to Google |
+| `GET /api/reviews/{id}/history` | That review's audit entries |
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 74 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
-                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions)
+cd backend && pytest -q          # 85 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details)
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```

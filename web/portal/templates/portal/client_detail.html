@@ -88,13 +88,7 @@
       {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.handle }}</span></span>{{ s.status|badge }}</li>{% endfor %}
     </ul>
   </section>
-  <section class="card"><header class="card-head"><h3>AI brand voice</h3></header>
-    <dl class="kv">
-      <dt>Tone</dt><dd>{{ c.brand_voice.tone }}</dd><dt>CTA</dt><dd>{{ c.brand_voice.cta_style }}</dd>
-      <dt>Languages</dt><dd>{{ c.brand_voice.languages|join:", " }}</dd><dt>Never say</dt><dd>{{ c.brand_voice.prohibited_claims|join:", " }}</dd>
-      <dt>Escalation</dt><dd>{{ c.brand_voice.escalation_rule }}</dd>
-    </dl>
-  </section>
+  {% include "portal/_brand_voice.html" %}
 </div>
 
 <div class="grid cols-2">

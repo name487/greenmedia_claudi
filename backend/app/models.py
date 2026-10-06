@@ -175,6 +175,11 @@ class Review(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # Google's updateTime (edits)
     reviewer_photo: Mapped[str] = mapped_column(String(500), default="")
+    # Who wrote the current reply text: ai | template | human (edited) | google (replied on Google directly)
+    reply_source: Mapped[str] = mapped_column(String(20), default="")
+    reply_model: Mapped[str] = mapped_column(String(80), default="")  # e.g. "openai/gpt-4.1-mini"
+    reply_error: Mapped[str] = mapped_column(Text, default="")  # why the AI wasn't used for the last draft
+    drafted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @property
     def is_sample(self) -> bool:
@@ -283,4 +288,6 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(300))
     entity_type: Mapped[str] = mapped_column(String(50), default="")
     entity_id: Mapped[str] = mapped_column(String(50), default="")
+    # Structured context, e.g. for review replies: before/after text, AI provider/model/tokens, Google response, errors
+    details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)

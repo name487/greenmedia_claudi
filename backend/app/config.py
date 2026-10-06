@@ -15,10 +15,15 @@ class Settings:
     # access (quota 0) or a client isn't linked yet. Set to 0 to never create sample reviews.
     review_sample_data: bool = os.getenv("REVIEW_SAMPLE_DATA", "1") == "1"
     review_autodraft_limit: int = int(os.getenv("REVIEW_AUTODRAFT_LIMIT", "20"))  # AI drafts per client per sync
-    ai_provider: str = os.getenv("AI_PROVIDER", "anthropic").lower()
+    # "openai" or "anthropic". Unset: OpenAI when OPENAI_API_KEY is set, else Anthropic.
+    ai_provider: str = (os.getenv("AI_PROVIDER") or ("openai" if os.getenv("OPENAI_API_KEY") else "anthropic")).lower()
     ai_model: str = os.getenv("AI_MODEL", "")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    # Official OpenAI API by default; point at a compatible gateway (e.g. Azure OpenAI proxy) if needed
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    openai_org: str = os.getenv("OPENAI_ORG_ID", "")
+    openai_project: str = os.getenv("OPENAI_PROJECT_ID", "")
     # Google Business Profile (OAuth web client from Google Cloud Console)
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")

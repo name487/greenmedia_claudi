@@ -144,5 +144,8 @@ def scoped_ids(db: Session, user: User, client_id: int | None) -> list[int]:
     return [get_client(db, user, client_id).id]
 
 
-def audit(db: Session, user: User, action: str, *, client_id: int | None = None, entity_type: str = "", entity_id: object = "") -> None:
-    db.add(AuditLog(tenant_id=user.tenant_id, user_id=user.id, client_id=client_id, action=action, entity_type=entity_type, entity_id=str(entity_id)))
+def audit(db: Session, user: User | None, action: str, *, client_id: int | None = None, entity_type: str = "", entity_id: object = "",
+          details: dict | None = None, tenant_id: int | None = None) -> None:
+    """Append to audit_logs. user=None records a system action (scheduler, sync) and needs tenant_id."""
+    db.add(AuditLog(tenant_id=user.tenant_id if user else tenant_id, user_id=user.id if user else None, client_id=client_id, action=action[:300],
+                    entity_type=entity_type, entity_id=str(entity_id), details=details or None))

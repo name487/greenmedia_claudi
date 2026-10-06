@@ -19,6 +19,7 @@ from .google import api as google_api
 from .google import service as google_service
 from .models import SAMPLE_REVIEW_PREFIX, Client, GoogleConnection, Review
 from .publishers import PublishError, publish_review_reply
+from .security import audit
 from .sentiment import detect_language, detect_sentiment
 
 # (rating, text). Industry-neutral so they read naturally for any local business; English, Hindi and Hinglish.
@@ -68,41 +69,68 @@ def add_samples(db: Session, client: Client, n: int, rnd: random.Random | None =
     return out
 
 
-def draft(r: Review, c: Client) -> str:
-    """AI-draft a reply (or a brand-voice template when no AI key is configured). Returns "ai" or "template"."""
-    reply, source = ai.review_reply(
+def draft(r: Review, c: Client, instruction: str = "") -> dict:
+    """AI-draft a reply with the client's brand-voice prompt (or the brand-voice template when the AI isn't
+    available). Returns the AI meta: source ai|template, provider, model, usage, ms, error."""
+    reply, meta = ai.review_reply(
         company=c.company_name, industry=c.industry, city=c.city, phone=c.contacts[0].phone if c.contacts else "",
-        brand_voice=c.brand_voice, author=r.author, rating=r.rating, text=r.text or "(rating only, no text)", language=r.language, sentiment=r.sentiment,
+        brand_voice=c.brand_voice, author=r.author, rating=r.rating, text=r.text, language=r.language, sentiment=r.sentiment, instruction=instruction,
     )
-    r.reply, r.reply_status = reply, "drafted"
-    return source
+    r.reply, r.reply_status, r.drafted_at = reply, "drafted", datetime.now(timezone.utc)
+    r.reply_source = meta["source"]
+    r.reply_model = f"{meta['provider']}/{meta['model']}" if meta["source"] == "ai" else ""
+    r.reply_error = meta.get("error", "") if meta["source"] == "template" else ""
+    return meta
 
 
-def publish(r: Review, c: Client) -> None:
-    """Post the reply to Google (live reviews) and mark it published. Raises PublishError."""
-    publish_review_reply(c, r.external_review_id, r.reply or "")
-    r.reply_status, r.published_at = "published", datetime.now(timezone.utc)
+def draft_details(meta: dict, reply: str, instruction: str = "") -> dict:
+    """What goes into audit_logs.details for a draft."""
+    d = {k: meta[k] for k in ("source", "provider", "model", "usage", "ms", "request_id", "error", "error_code") if meta.get(k) not in (None, "")}
+    if instruction:
+        d["instruction"] = instruction
+    d["reply"] = reply
+    return d
+
+
+def publish(r: Review, c: Client) -> dict:
+    """Post the reply through the official Google Business Profile API (reviews.updateReply) and mark it
+    published. Sample reviews are only marked. Returns audit details. Raises PublishError."""
+    if r.is_sample:
+        r.reply_status, r.published_at = "published", datetime.now(timezone.utc)
+        return {"target": "sample", "reply": r.reply}
+    res = publish_review_reply(c, r.external_review_id, r.reply or "") or {}
+    r.reply_status = "published"
+    r.published_at = google_api.parse_time(res.get("updateTime")) or datetime.now(timezone.utc)
+    return {"target": "google" if c.gmb and c.gmb.is_live else "simulated", "reply": r.reply,
+            "google": {k: res[k] for k in ("updateTime",) if k in res} or None,
+            "location": f"{c.gmb.google_account}/{c.gmb.location_id}" if c.gmb and c.gmb.is_live else None}
 
 
 def process_new(db: Session, c: Client, reviews: list[Review], limit: int | None = None) -> dict:
     """Draft AI replies for newly arrived reviews (newest first, up to `limit`) and auto-publish positive ones
-    when the client opted in (Client Workspace → Publishing safety). Negative/neutral always wait for a human."""
+    when the client opted in (Client Workspace → Publishing safety). Negative/neutral always wait for a human.
+    Each step is written to audit_logs as a system action."""
     limit = settings.review_autodraft_limit if limit is None else limit
     drafted = auto = 0
     errors: list[str] = []
     for r in sorted(reviews, key=lambda x: _aware(x.created_at), reverse=True)[:limit]:
         if r.reply_status != "new":
             continue
-        draft(r, c)
+        meta = draft(r, c)
         drafted += 1
+        audit(db, None, f"[auto] AI drafted reply ({meta['source']})", tenant_id=c.tenant_id, client_id=c.id, entity_type="review", entity_id=r.id,
+              details=draft_details(meta, r.reply))
         recent = datetime.now(timezone.utc) - _aware(r.created_at) < timedelta(days=14)  # never auto-reply to old reviews
         if c.auto_publish.get("reviews") and r.sentiment == "positive" and r.rating >= 4 and recent:
             try:
-                publish(r, c)
+                details = publish(r, c)
                 auto += 1
+                audit(db, None, "[auto] published reply" + (" (sample — not sent to Google)" if r.is_sample else " to Google"), tenant_id=c.tenant_id,
+                      client_id=c.id, entity_type="review", entity_id=r.id, details={**details, "rule": "auto-publish positive 4-5★"})
             except PublishError as e:
                 r.reply_status = "failed"
                 errors.append(f"{c.company_name}: {e}")
+                audit(db, None, f"[auto] publish failed: {e}", tenant_id=c.tenant_id, client_id=c.id, entity_type="review", entity_id=r.id, details={"error": str(e)})
     return {"drafted": drafted, "auto_published": auto, "errors": errors}
 
 

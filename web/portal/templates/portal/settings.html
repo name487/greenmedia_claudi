@@ -2,11 +2,16 @@
 {% block content %}
 <div class="page-header"><div><h1>Settings</h1><p class="muted">{{ s.tenant_name }}</p></div></div>
 <div class="grid cols-2">
-  <section class="card"><header class="card-head"><h3>Backend &amp; AI</h3></header>
+  <section class="card" id="ai"><header class="card-head"><h3>AI connection</h3>{% if s.ai.enabled %}<span class="badge badge-green">On</span>{% else %}<span class="badge badge-amber">Templates only</span>{% endif %}</header>
     <dl class="kv">
-      <dt>API</dt><dd>{% if health.ok %}<span class="badge badge-green">Connected</span>{% else %}<span class="badge badge-red">Down</span>{% endif %}</dd>
-      <dt>AI</dt><dd>{% if s.ai.enabled %}<span class="badge badge-green">On</span> {{ s.ai.provider }} · {{ s.ai.model }}{% else %}<span class="badge badge-amber">Offline templates</span> set ANTHROPIC_API_KEY or OPENAI_API_KEY on the API server{% endif %}</dd>
+      <dt>API server</dt><dd>{% if health.ok %}<span class="badge badge-green">Connected</span>{% else %}<span class="badge badge-red">Down</span>{% endif %}</dd>
+      <dt>Provider</dt><dd>{% if s.ai.provider == 'openai' %}OpenAI{% else %}Anthropic{% endif %} <span class="muted small">· {{ s.ai.base_url }}</span></dd>
+      <dt>Model</dt><dd><code>{{ s.ai.model }}</code> <span class="muted small">(AI_MODEL)</span></dd>
+      <dt>API key</dt><dd>{% if s.ai.key_hint %}<code>{{ s.ai.key_hint }}</code>{% else %}<span class="muted">Not set — add <code>{{ s.ai.env_var }}</code> to backend/.env and restart the API</span>{% endif %}</dd>
+      {% if s.ai.last_test %}<dt>Last test</dt><dd>{% if s.ai.last_test.ok %}<span class="badge badge-green">OK</span> {{ s.ai.last_test.model }} · {{ s.ai.last_test.ms }} ms{% else %}<span class="badge badge-red">{{ s.ai.last_test.code }}</span> <span class="small">{{ s.ai.last_test.error }}</span>{% endif %} <span class="muted small">· {{ s.ai.last_test.at|when }}</span></dd>{% endif %}
     </dl>
+    <p class="muted small">Without a working key, replies are drafted from each client's brand-voice template and marked “Template” in the review queue. The key stays on the API server; it is never shown here or stored in the database.</p>
+    {% if can_edit %}<form method="post">{% csrf_token %}<button class="btn soft sm" name="action" value="ai_test">Test AI connection</button></form>{% endif %}
   </section>
   <section class="card"><header class="card-head"><h3>Workflow &amp; notifications</h3></header>
     <form method="post" class="form">{% csrf_token %}<input type="hidden" name="action" value="workflow">

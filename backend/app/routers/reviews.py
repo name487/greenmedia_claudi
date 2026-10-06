@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from .. import review_queue
 from ..config import settings
 from ..db import get_db
-from ..models import Client, Review, User
+from ..models import AuditLog, Client, Review, User
 from ..publishers import PublishError
 from ..security import audit, can, get_client, require_section, scoped_ids
 from ..serializers import iso, review_out
@@ -102,9 +102,11 @@ def list_reviews(filter: Literal["pending", "approved", "negative", "published",
         items.sort(key=lambda r: (r.rating, -_aware(r.created_at).timestamp()))
     else:
         items.sort(key=lambda r: _aware(r.created_at), reverse=sort == "newest")
+    page = items[offset:offset + limit]
+    hist = _history(db, user.tenant_id, [r.id for r in page], per_review=10)
     return {
         "counts": counts, "total": len(items), "limit": limit, "offset": offset,
-        "items": [review_out(r, names[r.client_id]) for r in items[offset:offset + limit]],
+        "items": [{**review_out(r, names[r.client_id]), "history": hist.get(r.id, [])} for r in page],
         "stats": _stats(rows, now), "sources": _sources(db, user, clients, rows),
     }
 
@@ -116,30 +118,39 @@ def _load(db: Session, user: User, review_id: int) -> tuple[Review, Client]:
     return r, get_client(db, user, r.client_id)
 
 
-def _publish(db: Session, user: User | None, r: Review, c: Client) -> None:
+def _publish(db: Session, user: User | None, r: Review, c: Client) -> dict:
     try:
-        review_queue.publish(r, c)
+        return review_queue.publish(r, c)
     except PublishError as e:
         r.reply_status = "failed"
         if user:
-            audit(db, user, f"publish failed: {e}", client_id=c.id, entity_type="review", entity_id=r.id)
+            audit(db, user, f"publish failed: {e}", client_id=c.id, entity_type="review", entity_id=r.id, details={"error": str(e), "reply": r.reply})
         db.commit()
         raise HTTPException(502, str(e))
 
 
+class DraftIn(BaseModel):
+    instruction: str = Field(default="", max_length=500)  # e.g. "shorter", "mention our Sunday hours"
+
+
 @router.post("/{review_id}/draft")
-def draft(review_id: int, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+def draft(review_id: int, body: DraftIn | None = None, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """Draft (or regenerate) the reply with the client's brand-voice prompt. Optional instruction steers a regenerate."""
     r, c = _load(db, user, review_id)
     if r.reply_status == "published":
         raise HTTPException(409, "Already published")
-    source = review_queue.draft(r, c)
-    audit(db, user, f"AI drafted reply ({source})", client_id=c.id, entity_type="review", entity_id=r.id)
+    instruction = (body.instruction if body else "").strip()
+    before = r.reply
+    meta = review_queue.draft(r, c, instruction)
+    verb = "regenerated reply" if before else "drafted reply"
+    audit(db, user, f"AI {verb} ({meta['source']}{', ' + meta['model'] if meta['source'] == 'ai' else ''})", client_id=c.id, entity_type="review",
+          entity_id=r.id, details={**review_queue.draft_details(meta, r.reply, instruction), **({"before": before} if before else {})})
     db.commit()
-    return {**review_out(r, c.company_name), "source": source}
+    return {**review_out(r, c.company_name), "source": meta["source"], "ai": meta}
 
 
 class ReplyIn(BaseModel):
-    reply: str
+    reply: str = Field(min_length=1, max_length=4000)  # Google's limit is 4096 bytes
 
 
 @router.patch("/{review_id}")
@@ -147,8 +158,14 @@ def edit(review_id: int, body: ReplyIn, user: User = Depends(require_section("re
     r, c = _load(db, user, review_id)
     if r.reply_status == "published":
         raise HTTPException(409, "Already published")
-    r.reply, r.reply_status = body.reply.strip(), "drafted"  # an edit always needs re-approval
-    audit(db, user, "edited reply", client_id=c.id, entity_type="review", entity_id=r.id)
+    new = body.reply.strip()
+    if not new:
+        raise HTTPException(422, "Reply can't be empty")
+    before = r.reply
+    r.reply, r.reply_status = new, "drafted"  # an edit always needs re-approval
+    if new != before:
+        r.reply_source, r.reply_model = "human", ""
+    audit(db, user, "edited reply", client_id=c.id, entity_type="review", entity_id=r.id, details={"before": before, "after": new})
     db.commit()
     return review_out(r, c.company_name)
 
@@ -158,17 +175,20 @@ VERB = {"approve": "approved reply", "reject": "rejected reply", "publish": "pub
 
 
 def _act(db: Session, user: User, r: Review, c: Client, action: str) -> None:
-    """One state transition with its permission and escalation rules. Raises HTTPException."""
+    """One state transition with its permission and escalation rules, written to audit_logs. Raises HTTPException."""
+    details: dict = {"from": r.reply_status}
     if action == "draft":
         if r.reply_status == "published":
             raise HTTPException(409, "Already published")
-        review_queue.draft(r, c)
+        meta = review_queue.draft(r, c)
+        details.update(review_queue.draft_details(meta, r.reply))
     elif action == "approve":
         if not can(user, "review.approve"):
             raise HTTPException(403, "Your role cannot approve replies")
         if not r.reply or r.reply_status not in ("drafted", "failed"):
             raise HTTPException(409, "Only drafted replies can be approved")
         r.reply_status = "approved"
+        details["reply"] = r.reply
     elif action == "publish":
         if not can(user, "review.publish"):
             raise HTTPException(403, "Your role cannot publish replies")
@@ -178,17 +198,42 @@ def _act(db: Session, user: User, r: Review, c: Client, action: str) -> None:
             raise HTTPException(409, "Replies to reviews of 2★ or less must be approved first")
         if r.reply_status not in ("drafted", "approved", "failed"):
             raise HTTPException(409, f"Cannot publish a {r.reply_status} reply")
-        _publish(db, user, r, c)
+        details.update(_publish(db, user, r, c))
     elif action == "reject":
         if r.reply_status == "published":
             raise HTTPException(409, "Already published")
         r.reply_status = "rejected"
+        details["reply"] = r.reply
     else:  # reopen
         if r.reply_status != "rejected":
             raise HTTPException(409, "Only rejected reviews can be reopened")
         r.reply_status = "drafted" if r.reply else "new"
-    verb = "published reply (sample — not sent to Google)" if action == "publish" and r.is_sample else VERB[action]
-    audit(db, user, verb, client_id=c.id, entity_type="review", entity_id=r.id)
+    verb = VERB[action]
+    if action == "publish" and details.get("target") != "google":
+        verb = "published reply (sample — not sent to Google)" if r.is_sample else "published reply (demo client — simulated)"
+    details["to"] = r.reply_status
+    audit(db, user, verb, client_id=c.id, entity_type="review", entity_id=r.id, details=details)
+
+
+@router.get("/{review_id}/history")
+def history(review_id: int, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """Everything that happened to this review, newest first, from audit_logs."""
+    r, _ = _load(db, user, review_id)
+    return _history(db, user.tenant_id, [r.id]).get(r.id, [])
+
+
+def _history(db: Session, tenant_id: int, ids: list[int], per_review: int = 20) -> dict[int, list[dict]]:
+    if not ids:
+        return {}
+    rows = db.scalars(select(AuditLog).where(AuditLog.tenant_id == tenant_id, AuditLog.entity_type == "review",
+                                             AuditLog.entity_id.in_([str(i) for i in ids])).order_by(AuditLog.id.desc()))
+    names = dict(db.execute(select(User.id, User.name).where(User.tenant_id == tenant_id)).all())
+    out: dict[int, list[dict]] = {}
+    for a in rows:
+        lst = out.setdefault(int(a.entity_id), [])
+        if len(lst) < per_review:
+            lst.append({"action": a.action, "user_name": names.get(a.user_id) if a.user_id else "System", "created_at": iso(a.created_at), "details": a.details or {}})
+    return out
 
 
 @router.post("/{review_id}/{action}")

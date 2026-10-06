@@ -107,6 +107,12 @@ def hours(value):
 
 
 @register.filter
+def lines(values):
+    """List → one item per line (for textareas); escaping still applies to the items."""
+    return "\n".join(str(v) for v in values or [])
+
+
+@register.filter
 def split(value, sep=None):
     return str(value).split(sep)
 

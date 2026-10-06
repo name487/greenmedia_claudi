@@ -3,11 +3,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..ai import ai_enabled
-from ..config import settings as cfg
 from ..db import get_db
 from ..models import Role, Tenant, User
 from ..security import ALL_SECTIONS, audit, require, require_section
+from .ai import status_out as ai_status
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -24,7 +23,7 @@ def _out(t: Tenant, roles: list[Role]) -> dict:
         "tenant_name": t.name,
         "notify_on_negative_review": t.notify_on_negative_review,
         "require_client_approval": t.require_client_approval,
-        "ai": {"enabled": ai_enabled(), "provider": cfg.ai_provider, "model": cfg.model},
+        "ai": ai_status(),
         "integrations": [{"name": n, "description": d, "status": "not_configured"} for n, d in INTEGRATIONS],
         "roles": [{"role": r.name, "label": r.label, "sections": r.sections, "permissions": r.permissions} for r in roles],
         "sections": ALL_SECTIONS,

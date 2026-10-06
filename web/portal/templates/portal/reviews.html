@@ -95,23 +95,33 @@
       <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}">
         <button class="btn" name="action" value="draft">{% icon 'sparkle' 16 %} Generate AI reply</button></form>
     {% elif r.reply_status == 'published' %}
-      <div class="reply-box"><p style="margin:0">{{ r.reply }}</p><span class="muted small">{% if r.is_sample %}Marked published {{ r.published_at|when }} · sample, not on Google{% else %}Published on Google {{ r.published_at|when }}{% endif %}</span></div>
+      <div class="reply-box"><p style="margin:0">{{ r.reply }}</p><span class="muted small">{% if r.is_sample %}Marked published {{ r.published_at|when }} · sample, not on Google{% elif r.reply_source == 'google' %}Replied on Google directly · {{ r.published_at|when }}{% else %}Published on Google {{ r.published_at|when }}{% endif %}</span>
+        {% include "portal/_reply_source.html" %}</div>
     {% elif r.reply_status == 'rejected' %}
       <div class="reply-box"><p class="muted" style="margin:0">{{ r.reply|default:"—" }}</p>
         <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}"><button class="btn ghost sm" name="action" value="reopen">Reopen</button></form></div>
     {% else %}
       <form method="post" class="reply-box form">{% csrf_token %}
         <input type="hidden" name="review_id" value="{{ r.id }}"><input type="hidden" name="original" value="{{ r.reply }}">
-        <label class="muted small" for="reply{{ r.id }}">{% if r.reply_status == 'failed' %}Publishing failed — edit or retry{% else %}AI draft — edit before approving{% endif %}</label>
-        <textarea class="input" name="reply" id="reply{{ r.id }}">{{ r.reply }}</textarea>
+        <label class="muted small" for="reply{{ r.id }}">{% if r.reply_status == 'failed' %}Publishing failed — edit or retry{% elif r.reply_status == 'approved' %}Approved — ready to publish{% else %}Draft — edit before approving{% endif %}</label>
+        <textarea class="input" name="reply" id="reply{{ r.id }}" maxlength="4000">{{ r.reply }}</textarea>
+        {% include "portal/_reply_source.html" %}
+        <input class="input sm-input" name="instruction" maxlength="500" placeholder="Note for Regenerate (optional): shorter, more formal, mention online booking…" aria-label="Instruction for regenerating">
         <div class="btn-row">
-          <button class="btn ghost sm" name="action" value="save">Save edit</button>
-          <button class="btn ghost sm" name="action" value="draft">Regenerate</button>
-          <button class="btn ghost sm" name="action" value="reject">Reject</button>
           {% if can_approve and r.reply_status != 'approved' %}<button class="btn soft sm" name="action" value="approve">Approve</button>{% endif %}
+          <button class="btn ghost sm" name="action" value="save">Save edit</button>
+          <button class="btn ghost sm" name="action" value="draft">{% icon 'sparkle' 14 %} Regenerate</button>
+          <button class="btn ghost sm" name="action" value="reject">Reject</button>
           {% if can_publish %}<button class="btn sm" name="action" value="publish"{% if r.needs_escalation and r.reply_status != 'approved' %} disabled title="Approve first"{% endif %}>{% if r.is_sample %}Publish (sample){% else %}Publish to Google{% endif %}</button>{% endif %}
         </div>
       </form>
+    {% endif %}
+    {% if r.history %}
+    <details class="small"><summary class="muted">History ({{ r.history|length }})</summary>
+      <ul class="history">{% for h in r.history %}
+        <li><span class="muted">{{ h.created_at|when }}</span> · <strong>{{ h.user_name }}</strong> — {{ h.action }}{% if h.details.instruction %} <em>“{{ h.details.instruction }}”</em>{% endif %}{% if h.details.usage.input %} <span class="muted">· {{ h.details.usage.input }}+{{ h.details.usage.output }} tokens{% if h.details.ms %}, {{ h.details.ms }} ms{% endif %}</span>{% endif %}{% if h.details.error %} · <span style="color:var(--red)">{{ h.details.error }}</span>{% endif %}</li>
+      {% endfor %}</ul>
+    </details>
     {% endif %}
   </section>
 {% endfor %}

@@ -71,6 +71,7 @@ def review_out(r: Review, client_name: str) -> dict:
         "needs_escalation": r.rating <= 2, "created_at": iso(r.created_at), "published_at": iso(r.published_at),
         "updated_at": iso(r.updated_at), "edited": bool(r.updated_at and r.created_at and abs((_utc(r.updated_at) - _utc(r.created_at)).total_seconds()) > 60),
         "reviewer_photo": r.reviewer_photo, "is_sample": r.is_sample,
+        "reply_source": r.reply_source, "reply_model": r.reply_model, "reply_error": r.reply_error, "drafted_at": iso(r.drafted_at),
         "waiting_hours": round((datetime.now(timezone.utc) - _utc(r.created_at)).total_seconds() / 3600)
         if r.reply_status in ("new", "drafted", "approved", "failed") and r.created_at else None,
     }
@@ -107,4 +108,5 @@ def report_out(r: Report, client_name: str) -> dict:
 
 
 def audit_out(a: AuditLog, user_name: str | None, client_name: str | None) -> dict:
-    return {"id": a.id, "user_name": user_name, "client_id": a.client_id, "client_name": client_name, "action": a.action, "created_at": iso(a.created_at)}
+    return {"id": a.id, "user_name": user_name, "client_id": a.client_id, "client_name": client_name, "action": a.action, "created_at": iso(a.created_at),
+            "entity_type": a.entity_type, "entity_id": a.entity_id, "details": a.details or {}}

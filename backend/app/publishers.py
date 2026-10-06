@@ -15,16 +15,19 @@ class PublishError(Exception):
     pass
 
 
-def publish_review_reply(client: Client, external_review_id: str, reply: str) -> None:
+def publish_review_reply(client: Client, external_review_id: str, reply: str) -> dict | None:
+    """Live clients: Google Business Profile API `PUT …/reviews/{id}/reply`; returns Google's response
+    ({"comment", "updateTime"}). Demo clients: simulated (None)."""
     if external_review_id.startswith(SAMPLE_REVIEW_PREFIX):
-        return  # sample review shown while Google API approval is pending: there is nothing on Google to reply to
+        return None  # sample review shown while Google API approval is pending: there is nothing on Google to reply to
     if not client.gmb or client.gmb.status != "connected":
         raise PublishError("Google Business Profile is not connected")
     if client.gmb.is_live:
         try:
-            google.publish_reply(client, external_review_id, reply)
+            return google.publish_reply(client, external_review_id, reply)
         except google_api.GoogleApiError as e:
             raise PublishError(str(e)) from e
+    return None
 
 
 def publish_post(client: Client, platform: str, copy: str) -> str:

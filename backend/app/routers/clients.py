@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -179,6 +179,30 @@ def client_detail(client_id: int, user: User = Depends(require_section("dashboar
     }
 
 
+class BrandVoiceIn(BaseModel):
+    """Per-client brand voice. It becomes the AI prompt for review replies (and shapes content). Fields not sent are kept."""
+    tone: str | None = Field(default=None, max_length=200)
+    preferred_phrases: list[Annotated[str, Field(max_length=150)]] | None = Field(default=None, max_length=15)
+    prohibited_claims: list[Annotated[str, Field(max_length=150)]] | None = Field(default=None, max_length=15)
+    cta_style: str | None = Field(default=None, max_length=150)
+    sign_off: str | None = Field(default=None, max_length=150)
+    reply_length: Literal["short", "medium", "long"] | None = None
+    languages: list[Annotated[str, Field(min_length=2, max_length=10)]] | None = Field(default=None, max_length=8)
+    review_prompt: str | None = Field(default=None, max_length=2000)  # free-text instructions for review replies
+    escalation_rule: str | None = Field(default=None, max_length=300)
+
+
+def merge_brand_voice(current: dict, body: BrandVoiceIn) -> dict:
+    out = dict(current or {})
+    for k, v in body.model_dump(exclude_unset=True).items():
+        if isinstance(v, list):
+            v = [x.strip() for x in v if x and x.strip()]
+        elif isinstance(v, str):
+            v = v.strip()
+        out[k] = v
+    return out
+
+
 class ClientPatch(BaseModel):
     company_name: str | None = Field(default=None, min_length=2, max_length=200)
     website: str | None = Field(default=None, max_length=300)
@@ -190,7 +214,7 @@ class ClientPatch(BaseModel):
     account_manager_id: int | None = None
     notes: str | None = None
     auto_publish: dict[str, bool] | None = None
-    brand_voice: dict | None = None
+    brand_voice: BrandVoiceIn | None = None
 
 
 @router.patch("/{client_id}")
@@ -209,13 +233,18 @@ def update_client(client_id: int, body: ClientPatch, user: User = Depends(requir
     for k in ("industry", "city"):
         if k in changes:
             changes[k] = changes[k].strip()
+    voice_before = dict(c.brand_voice or {})
+    if "brand_voice" in changes:
+        changes["brand_voice"] = merge_brand_voice(c.brand_voice, body.brand_voice)
     for k, v in changes.items():
         setattr(c, k, v)
     if "auto_publish" in changes:
         on = [k for k, v in changes["auto_publish"].items() if v]
         audit(db, user, f"auto-publish now {'on for ' + ', '.join(on) if on else 'off everywhere'}", client_id=c.id, entity_type="client", entity_id=c.id)
     elif changes:
-        audit(db, user, f"updated {', '.join(changes)}", client_id=c.id, entity_type="client", entity_id=c.id)
+        changed_voice = {k: {"before": voice_before.get(k), "after": v} for k, v in (changes.get("brand_voice") or {}).items() if voice_before.get(k) != v}
+        audit(db, user, f"updated {', '.join(changes)}", client_id=c.id, entity_type="client", entity_id=c.id,
+              details={"brand_voice": changed_voice} if changed_voice else None)
     db.commit()
     return client_out(c)
 

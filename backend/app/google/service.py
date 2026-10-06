@@ -150,7 +150,7 @@ def sync_reviews(db: Session, client: Client, full: bool = False) -> dict:
         r.reviewer_photo = (reviewer.get("profilePhotoUrl") or "")[:500]
         if g_reply.get("comment") and r.reply_status != "published":
             # Replied on Google directly (or by us earlier): mirror it so nobody drafts a second reply.
-            r.reply, r.reply_status = g_reply["comment"], "published"
+            r.reply, r.reply_status, r.reply_source, r.reply_model = g_reply["comment"], "published", "google", ""
             r.published_at = api.parse_time(g_reply.get("updateTime"))
     if data.get("averageRating") is not None:
         gmb.rating = round(float(data["averageRating"]), 1)
@@ -203,9 +203,9 @@ def sync_client(db: Session, client: Client) -> dict:
         raise
 
 
-def publish_reply(client: Client, review_id: str, comment: str) -> None:
+def publish_reply(client: Client, review_id: str, comment: str) -> dict:
     gmb = client.gmb
-    client_for(source(gmb)).reply(gmb.google_account, gmb.location_id, review_id, comment)
+    return client_for(source(gmb)).reply(gmb.google_account, gmb.location_id, review_id, comment)
 
 
 def publish_post(client: Client, summary: str) -> str:

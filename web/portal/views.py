@@ -204,6 +204,21 @@ def client_detail(request, client_id):
         contacts = f"/api/clients/{client_id}/contacts"
         if action.startswith("google_"):
             return _google_action(request, client_id, action)
+        if action == "brand_voice":
+            lines = lambda k: [x.strip() for x in request.POST.get(k, "").splitlines() if x.strip()]  # noqa: E731
+            request.api.patch(f"/api/clients/{client_id}", {"brand_voice": {
+                **{k: request.POST.get(k, "").strip() for k in ("tone", "sign_off", "cta_style", "review_prompt", "escalation_rule")},
+                "reply_length": request.POST.get("reply_length") or "medium",
+                "preferred_phrases": lines("preferred_phrases"), "prohibited_claims": lines("prohibited_claims"),
+                "languages": [x.strip() for x in request.POST.get("languages", "").split(",") if x.strip()],
+            }})
+            messages.success(request, "Brand voice saved. New AI drafts for this client use it.")
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#voice")
+        if action == "brand_voice_try":
+            body = {"rating": _int(request.POST.get("rating")) or 5, "text": request.POST.get("text", ""), "author": request.POST.get("author", "").strip() or "Priya Sharma"}
+            out = request.api.post(f"/api/clients/{client_id}/brand-voice/try", body)
+            request.session["voice_try"] = {**body, "reply": out["reply"], "ai": out["ai"], "client_id": client_id}
+            return HttpResponseRedirect(reverse("client_detail", args=[client_id]) + "#voice-try")
         if action == "profile":
             request.api.patch(f"/api/clients/{client_id}", _client_body(request.POST))
             messages.success(request, "Client details saved.")
@@ -244,6 +259,9 @@ def client_detail(request, client_id):
     channels = ["reviews", "gmb"] + [s["platform"] for s in c["social_accounts"]]
     editable = can(request, "client.edit")
     google = request.api.get(f"/api/clients/{client_id}/google")
+    voice_try = request.session.pop("voice_try", None)
+    if voice_try and voice_try.get("client_id") != client_id:
+        voice_try = None
     locations = None
     p = google["profile"] or {}
     # Listing locations calls Google, so only when choosing (or when signed in but nothing is linked yet)
@@ -253,6 +271,8 @@ def client_detail(request, client_id):
         "c": c, "k": c["kpis"], "channels": channels, "editable": editable,
         "facets": request.api.get("/api/clients/facets") if editable else None,
         "google": google, "g": p, "locations": locations,
+        "voice": request.api.get(f"/api/clients/{client_id}/brand-voice"), "voice_try": voice_try,
+        "lengths": [("short", "Short (1-2 sentences)"), ("medium", "Medium (2-4 sentences)"), ("long", "Long (4-6 sentences)")],
     })
 
 
@@ -385,8 +405,11 @@ def reviews(request):
             request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST.get("reply", "")})
             messages.success(request, "Reply saved.")
         elif action == "draft":
-            out = request.api.post(f"/api/reviews/{rid}/draft")
-            messages.success(request, "AI reply drafted." if out.get("source") == "ai" else "Reply drafted from your brand-voice template (no AI key set).")
+            out = request.api.post(f"/api/reviews/{rid}/draft", {"instruction": request.POST.get("instruction", "").strip()})
+            if out["source"] == "ai":
+                messages.success(request, f"AI reply drafted with {out['ai']['model']}.")
+            else:
+                messages.warning(request, f"Drafted from the brand-voice template — AI not used: {out['ai'].get('error', '')} {out['ai'].get('hint', '')}".strip())
         elif action in ("approve", "reject", "publish", "reopen"):
             if action in ("approve", "publish") and request.POST.get("reply") is not None and request.POST.get("reply") != request.POST.get("original"):
                 request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST["reply"]})
@@ -398,7 +421,9 @@ def reviews(request):
     cid = _client_filter(request)
     f = {k: request.GET.get(k, "") for k in QUEUE_FILTERS}
     limit = min(max(_int(request.GET.get("limit")) or PAGE, PAGE), 200)
-    data = request.api.get("/api/reviews", filter=flt, client_id=cid, limit=limit, **{k: v for k, v in f.items() if v})
+    # Not api.get(): it drops "all" values (meant for client pickers), which would turn the All tab into Needs reply
+    params = {"filter": flt, "limit": limit, **({"client_id": cid} if cid else {}), **{k: v for k, v in f.items() if v}}
+    data = request.api._request("GET", "/api/reviews", params=params)
     tabs = [("pending", "Needs reply"), ("approved", "Approved"), ("negative", "Negative"), ("published", "Published"), ("all", "All")]
     src = data["sources"]
     single = src["clients"][0] if len(src["clients"]) == 1 else None
@@ -631,6 +656,13 @@ def settings_view(request):
         if action == "workflow":
             request.api.patch("/api/settings", {"notify_on_negative_review": "notify" in request.POST, "require_client_approval": "client_approval" in request.POST})
             messages.success(request, "Settings saved.")
+        elif action == "ai_test":
+            r = request.api.post("/api/ai/test")["result"]
+            if r["ok"]:
+                messages.success(request, f"AI connection works: {r['model']} answered in {r['ms']} ms.")
+            else:
+                messages.error(request, f"AI connection failed ({r['code']}): {r['error']} {r.get('hint', '')}")
+            return HttpResponseRedirect(reverse("settings") + "#ai")
         elif action == "create_user":
             body = {k: request.POST.get(k, "").strip() for k in ("name", "email", "password", "role")}
             body["client_id"] = _int(request.POST.get("client_id")) if body["role"] == "client" else None

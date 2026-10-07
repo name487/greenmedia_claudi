@@ -191,7 +191,7 @@ Open a client and use the **Google Business Profile** panel:
 
 - **AI Reviews:** **Sync reviews** (and the scheduler) pulls new reviews from Google into `gmb_reviews` and AI-drafts replies. Approved replies are posted to Google. 2★ replies still need approval first. See [AI Review Queue](#ai-review-queue).
 - **Content Studio:** GMB variants of approved content are posted to the profile as Google posts, either on "Publish now" or at their scheduled time.
-- **Scheduler:** every `SCHEDULER_INTERVAL_MINUTES`, the API re-syncs every live profile and publishes posts that are due. You can also run it from cron: `python -m app.jobs`.
+- **Scheduler:** with Redis, Celery beat publishes due posts every minute and syncs live profiles every `GOOGLE_SYNC_MINUTES`. See [Content scheduling](#content-scheduling-redis--celery). Without Redis, the API does both every `SCHEDULER_INTERVAL_MINUTES`, or you can run `python -m app.jobs` from cron.
 - **Errors:** if access is revoked, the profile shows **Expired** with Google's error message. **Reconnect** fixes it.
 
 ### How tokens are stored and refreshed
@@ -342,11 +342,72 @@ Until Google approves Business Profile API access, every review call fails with 
 | `POST /api/reviews/{id}/approve\|reject\|reopen\|publish` | State changes; publish posts to Google |
 | `GET /api/reviews/{id}/history` | That review's audit entries |
 
+## Content scheduling (Redis + Celery)
+
+**`content_items` statuses**
+
+| Status | Meaning | Shown under |
+|---|---|---|
+| `draft` | Written by AI, a template or a person; editable | **Draft** |
+| `in_review` | Draft waiting for approval (or the client's approval, when that setting is on) | **Draft** ("awaiting approval") |
+| `scheduled` | Approved with a publish time; the copy is locked. Also used while waiting to retry after a temporary error ("retrying"). | **Scheduled** |
+| `publishing` | A worker is posting it right now | **Scheduled** ("Publishing…") |
+| `published` | Every platform went out | **Published** |
+| `failed` | A permanent error, or out of attempts. The reason is shown, with **Retry now**. | **Failed** |
+
+Each platform version (`content_variants`) also tracks its own `status`, `published_at`, `error` and `external_post_id`. A retry only posts the platforms that haven't gone out yet. The item records `attempts`, `next_attempt_at`, `last_error`, `published_at`, and `ai_source` / `ai_model` for AI drafts.
+
+**AI post drafts.** In Content Studio, choose a topic and platforms, plus optional *Notes for the AI*, then:
+- **Generate with AI** shows a draft you can edit, or
+- **Save AI draft** writes it straight to Drafts (`POST /api/content/draft`).
+
+Drafts use the client's brand voice and the OpenAI connection, falling back to templates. The model, token usage and any AI error are recorded in `audit_logs`.
+
+**From draft to published.** Send for approval → *Approve & schedule*. A publish time is required and must be in the future; times are entered in the web app's time zone (`TIME_ZONE`, IST by default).
+
+While scheduled:
+- **Reschedule** moves the time.
+- **Unschedule** returns it to Draft so the copy can be edited.
+- **Publish now** sends it immediately.
+
+**Running the scheduler**
+```bash
+docker compose up -d redis          # or any Redis 6+
+# backend/.env
+REDIS_URL=redis://127.0.0.1:6379/0
+# from backend/, next to the API:
+celery -A app.celery_app worker -l info   # publishes
+celery -A app.celery_app beat -l info     # every minute: queue due posts; every GOOGLE_SYNC_MINUTES: Google sync
+# (development: one process)  celery -A app.celery_app worker -B -l info
+```
+
+**How it works**
+- **Queueing.** Beat runs `dispatch_due` every minute. It queues one `publish_content` task per post whose time (or retry time) has arrived. **Publish now** queues the task immediately, and the page says "Queued".
+- **The schedule lives in PostgreSQL, not in Redis.** Rescheduling is a database update with nothing to revoke. A Redis restart loses nothing: the next sweep re-queues whatever is due.
+- **Never published twice.** A worker first claims the post with one conditional `UPDATE … SET status='publishing' WHERE status='scheduled' AND due`, and only the winner posts. Duplicate deliveries, two workers and double clicks are all no-ops. Tasks use `acks_late`, so a task lost with its worker is redelivered.
+- **Retries.** Temporary errors (rate limits, 5xx, timeouts, network) retry after `CONTENT_RETRY_MINUTES`, doubling each time, up to `CONTENT_PUBLISH_MAX_ATTEMPTS` (default 3). Permanent errors fail straight away: account not connected, expired token, Google rejected the post, or API approval pending.
+- **Stuck posts.** A post left in `publishing` by a crashed worker for 15 minutes goes back to `scheduled` and is retried.
+- **Without Redis** (`REDIS_URL` empty), the same code runs in the API: **Publish now** posts inline, and due posts go out every `SCHEDULER_INTERVAL_MINUTES` (or via `python -m app.jobs` from cron). The Content Studio status panel says which mode is active.
+- **Audit trail.** Every step is in `audit_logs` with details: who, from/to status, per-platform result and post id, errors, attempt number and retry time. Scheduler actions appear as `[scheduler] …`.
+
+| Method & path | What it does |
+|---|---|
+| `POST /api/content/draft` | AI draft saved as Draft `{client_id, topic, platforms, content_type?, notes?, scheduled_at?}` |
+| `POST /api/content/generate` | AI draft preview (not saved) |
+| `POST /api/content` | Save a draft, send it for review, or schedule it directly (needs approval rights) |
+| `PATCH /api/content/{id}` | Edit copy (draft/in review/failed) or `scheduled_at` (reschedule) |
+| `POST /api/content/{id}/submit\|request_changes\|approve\|schedule\|unschedule\|publish\|retry` | Status changes. `publish`/`retry` dispatch now. |
+| `DELETE /api/content/{id}` | Drafts and failed posts only |
+| `GET /api/content/board?group=draft\|scheduled\|published\|failed\|all` | Status counts, items and scheduler mode |
+| `GET /api/content?status=&client_id=&month=` | Plain list (calendar). `status` takes a status or a group. |
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 85 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
-                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details)
+cd backend && pytest -q          # 98 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+                                 #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
+                                 #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch)
+REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
 ```

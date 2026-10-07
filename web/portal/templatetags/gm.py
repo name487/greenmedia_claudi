@@ -107,6 +107,20 @@ def hours(value):
 
 
 @register.filter
+def local_input(value):
+    """ISO time from the API → value for <input type="datetime-local"> in the site's time zone."""
+    if not value:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if timezone.is_aware(dt):
+        dt = timezone.localtime(dt)
+    return dt.strftime("%Y-%m-%dT%H:%M")
+
+
+@register.filter
 def lines(values):
     """List → one item per line (for textareas); escaping still applies to the items."""
     return "\n".join(str(v) for v in values or [])

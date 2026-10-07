@@ -237,7 +237,9 @@ def _parse_json(text: str) -> dict:
     return json.loads(m.group(0) if m else text)
 
 
-def generate_content(*, company: str, industry: str, city: str, website: str, brand_voice: dict, topic: str, content_type: str, platforms: list[str]) -> tuple[dict, str]:
+def generate_content(*, company: str, industry: str, city: str, website: str, brand_voice: dict, topic: str, content_type: str, platforms: list[str],
+                     notes: str = "") -> tuple[dict, dict]:
+    """Returns (data, meta); meta["source"] is "ai" (provider/model/usage/ms) or "template" (with the AI error, if any)."""
     system = (
         f"You are the social media copywriter for {company} ({industry}, {city}, {website}).\n{_voice(brand_voice)}\n"
         'Respond with JSON only, matching: {"master_copy": string, "hashtags": string[], "variants": [{"platform": string, "copy": string}], "creative_brief": string}.'
@@ -246,8 +248,9 @@ def generate_content(*, company: str, industry: str, city: str, website: str, br
         f"Create a {content_type} about: {topic}\nWrite one master copy, then one variant per platform following these rules:\n"
         + "\n".join(f"- {p}: {PLATFORM_GUIDE.get(p, '')}" for p in platforms)
         + "\nThe creative_brief describes one master visual (mood, subject, headline under 6 words, CTA) for a designer."
+        + (f"\nExtra notes from the team: {notes.strip()[:500]}" if notes.strip() else "")
     )
-    out = _try(system, user, 2000)
+    out, meta = attempt(system, user, 2000)
     if out:
         try:
             data = _parse_json(out)
@@ -257,9 +260,11 @@ def generate_content(*, company: str, industry: str, city: str, website: str, br
                 if v.get("platform") in platforms
             ]
             if data.get("master_copy") and data["variants"]:
-                return data, "ai"
+                return data, meta
+            meta = {**meta, "source": "template", "error": "AI answer had no usable variants"}
         except (ValueError, KeyError, TypeError) as exc:
             log.warning("AI content was not valid JSON, using template: %s", exc)
+            meta = {**meta, "source": "template", "error": f"AI answer was not valid JSON ({exc.__class__.__name__})"}
 
     cta = brand_voice.get("cta_style") or "Contact us"
     phrases = brand_voice.get("preferred_phrases") or []
@@ -289,7 +294,7 @@ def generate_content(*, company: str, industry: str, city: str, website: str, br
             f'Visual for "{topic}" — {(brand_voice.get("tone") or "friendly").lower()} mood, {industry.lower()} setting in {city}. '
             f'Logo bottom-right, headline max 6 words, CTA button "{cta}". Export sizes: {", ".join(f"{p} {PLATFORM_FORMAT[p]}" for p in platforms)}.'
         ),
-    }, "template"
+    }, meta
 
 
 # ---------- reports ----------

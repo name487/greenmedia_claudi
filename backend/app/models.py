@@ -200,10 +200,18 @@ class ContentItem(Base):
     master_copy: Mapped[str] = mapped_column(Text, default="")
     hashtags: Mapped[list] = mapped_column(JSON, default=list)
     creative_brief: Mapped[str] = mapped_column(Text, default="")
-    status: Mapped[str] = mapped_column(String(20), default="draft")  # draft | in_review | scheduled | published | failed
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # draft → (in_review →) scheduled → publishing → published | failed. "publishing" is held only while a worker posts.
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)  # UTC
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)  # publish attempts for the current schedule
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # retry after a temporary error
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    ai_source: Mapped[str] = mapped_column(String(20), default="")  # ai | template | "" (written by hand)
+    ai_model: Mapped[str] = mapped_column(String(80), default="")
 
     variants: Mapped[list["ContentVariant"]] = relationship(cascade="all, delete-orphan", order_by="ContentVariant.id")
 
@@ -216,6 +224,9 @@ class ContentVariant(Base):
     copy: Mapped[str] = mapped_column(Text)
     format: Mapped[str] = mapped_column(String(10))
     external_post_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | published | failed (per platform)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[str] = mapped_column(Text, default="")
 
 
 class Keyword(Base):

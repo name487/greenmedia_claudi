@@ -28,7 +28,11 @@ async def _scheduler(minutes: int) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db(seed_if_empty=settings.seed_demo)
-    task = asyncio.create_task(_scheduler(settings.scheduler_minutes)) if settings.scheduler_minutes > 0 else None
+    # With Redis, Celery beat owns scheduling; the in-process loop is only the no-Redis fallback.
+    run_loop = settings.scheduler_minutes > 0 and not settings.celery_enabled
+    if settings.scheduler_minutes > 0 and settings.celery_enabled:
+        logging.getLogger("greenmedia.jobs").info("REDIS_URL set: scheduling runs in Celery beat, in-process scheduler disabled")
+    task = asyncio.create_task(_scheduler(settings.scheduler_minutes)) if run_loop else None
     yield
     if task:
         task.cancel()

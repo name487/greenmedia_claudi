@@ -49,6 +49,9 @@ def add_missing_columns(engine: Engine) -> list[str]:
             # reviews now use the "demo_" prefix so linking a real location can remove them safely.
             conn.execute(text("UPDATE gmb_reviews SET external_review_id = 'demo_' || substr(external_review_id, 3) "
                               "WHERE external_review_id LIKE 'g\\_%' ESCAPE '\\'"))
+        if "content_variants.status" in added:
+            # Variants that already went out (they have a post id) are published, not pending.
+            conn.execute(text("UPDATE content_variants SET status = 'published' WHERE external_post_id IS NOT NULL AND external_post_id <> ''"))
     if added:
         log.warning("Upgraded database schema, added columns: %s", ", ".join(added))
     return added

@@ -5,7 +5,6 @@ import json
 import httpx
 import pytest
 
-from app import ai
 from app.config import settings
 
 from .conftest import login
@@ -46,17 +45,6 @@ class FakeOpenAI:
 
 def err(status, code, message, typ="invalid_request_error"):
     return httpx.Response(status, json={"error": {"message": message, "type": typ, "code": code}})
-
-
-@pytest.fixture()
-def openai(monkeypatch):
-    fake = FakeOpenAI()
-    monkeypatch.setattr(ai, "http", httpx.Client(transport=httpx.MockTransport(fake)))
-    monkeypatch.setattr(ai, "RETRY_DELAY", 0)
-    monkeypatch.setattr(settings, "ai_provider", "openai")
-    monkeypatch.setattr(settings, "openai_api_key", KEY)
-    monkeypatch.setattr(settings, "ai_model", "")
-    return fake
 
 
 def _review(client, admin, pred):

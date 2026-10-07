@@ -292,3 +292,10 @@ img.avatar { object-fit: cover; background: var(--surface-2); }
 .history { margin: 0; padding-left: 16px; font-size: 12px; }
 .history li { margin: 2px 0; }
 .sm-input { font-size: 13px; padding: 6px 10px; }
+
+/* content status board */
+.content-row { display: flex; flex-direction: column; gap: 2px; }
+.variant-status { margin-top: 6px; gap: 6px; }
+.variant-status .chip { font-size: 12px; padding: 2px 8px; cursor: default; }
+.chip.v-published { color: var(--green); background: var(--green-bg); border-color: transparent; }
+.chip.v-failed { color: var(--red); background: var(--red-bg); border-color: transparent; }

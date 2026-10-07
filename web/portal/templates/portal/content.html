@@ -15,15 +15,19 @@
         <div class="chips">{% for t in types %}<label class="chip"><input type="radio" name="content_type" value="{{ t }}"{% if t == ctype %} checked{% endif %} hidden> {{ t }}</label>{% endfor %}</div></div>
       <div class="field">Platforms
         <div class="chips">{% for p in platforms %}<label class="chip"><input type="checkbox" name="platforms" value="{{ p }}"{% if p in selected %} checked{% endif %} hidden> {{ p|platform }}</label>{% endfor %}</div></div>
-      <p class="muted small" style="margin:0">Voice: {{ brand_voice.tone }} · CTA “{{ brand_voice.cta_style }}” · avoids {{ brand_voice.prohibited_claims|join:", " }}</p>
-      <button class="btn" name="action" value="generate">{% icon 'sparkle' 16 %} {% if draft %}Regenerate{% else %}Generate with AI{% endif %}</button>
+      <label class="field">Notes for the AI <span class="muted small">optional</span><input class="input" name="notes" value="{{ notes }}" maxlength="500" placeholder="e.g. mention free parking, offer ends 31 Oct"></label>
+      <p class="muted small" style="margin:0">Voice: {{ brand_voice.tone }} · CTA “{{ brand_voice.cta_style }}”{% if brand_voice.prohibited_claims %} · avoids {{ brand_voice.prohibited_claims|join:", " }}{% endif %}</p>
+      <div class="btn-row">
+        <button class="btn" name="action" value="generate">{% icon 'sparkle' 16 %} {% if draft %}Regenerate{% else %}Generate with AI{% endif %}</button>
+        <button class="btn ghost" name="action" value="ai_draft" title="Generate and save straight to Drafts">Save AI draft</button>
+      </div>
     </div>
   </section>
 
-  <section class="card"><header class="card-head"><h3>2. Review &amp; schedule</h3>{% if draft %}<span class="badge badge-{% if draft.source == 'ai' %}purple{% else %}gray{% endif %}">{% if draft.source == 'ai' %}AI{% elif draft.source == 'edited' %}Edited{% else %}Offline template{% endif %}</span>{% endif %}</header>
+  <section class="card"><header class="card-head"><h3>2. Review &amp; schedule</h3>{% if draft %}<span class="badge badge-{% if draft.source == 'ai' %}purple{% else %}gray{% endif %}" title="{% if draft.ai.error %}AI not used: {{ draft.ai.error }}{% endif %}">{% if draft.source == 'ai' %}AI · {{ draft.ai.model }}{% elif draft.source == 'edited' %}Edited{% else %}Template{% endif %}</span>{% endif %}</header>
     {% if not draft %}<div class="empty">Your AI draft and platform variants appear here.</div>{% else %}
     <div class="form">
-      <input type="hidden" name="hashtags" value="{{ draft_hashtags_json }}">
+      <input type="hidden" name="hashtags" value="{{ draft_hashtags_json }}"><input type="hidden" name="ai_source" value="{{ draft.source }}">
       <label class="field">Master copy <textarea class="input" name="master_copy">{{ draft.master_copy }}</textarea></label>
       {% for v in draft.variants %}
         <input type="hidden" name="variant_platforms" value="{{ v.platform }}"><input type="hidden" name="format_{{ v.platform }}" value="{{ v.format }}">
@@ -31,7 +35,7 @@
       {% endfor %}
       <input type="hidden" name="creative_brief" value="{{ draft.creative_brief }}">
       <div class="notice info"><strong>Creative brief:</strong> {{ draft.creative_brief }} <a href="{% url 'creative' %}?client={{ brief_cid }}&headline={{ topic|urlencode }}">Open Creative Studio →</a></div>
-      <label class="field">Schedule for <input class="input" type="datetime-local" name="scheduled_at" value="{{ when }}"></label>
+      <label class="field">Publish at <span class="muted small">({% now "T" %})</span><input class="input" type="datetime-local" name="scheduled_at" value="{{ when }}"></label>
       <div class="btn-row">
         <button class="btn ghost" name="action" value="save_draft">Save draft</button>
         <button class="btn soft" name="action" value="save_review">Send for approval</button>
@@ -42,19 +46,17 @@
 </form>
 {% endif %}
 
-<section class="card">
-  <header class="card-head"><h3>Content pipeline</h3>{% include "portal/_client_select.html" with clients=clients cid=pipeline_cid allow_all=True %}</header>
+<section class="card" id="board">
+  <header class="card-head"><h3>Status</h3>{% include "portal/_client_select.html" with clients=clients cid=pipeline_cid allow_all=True %}</header>
+  <div class="notice {% if board.scheduler.mode == 'off' %}{% else %}info{% endif %} small" style="margin-bottom:12px">
+    {% if board.scheduler.mode == 'celery' %}<strong>Scheduler: Redis + Celery.</strong>{% elif board.scheduler.mode == 'in_process' %}<strong>Scheduler: built in.</strong>{% else %}<strong>Scheduler not running.</strong>{% endif %} {{ board.scheduler.detail }}
+  </div>
+  <div class="pill-tabs">
+    {% for key, label in groups %}<a href="{% qs board=key %}#board" class="{% if group == key %}on{% endif %}" style="text-decoration:none">{{ label }} ({{ board.counts|get:key }})</a>{% endfor %}
+  </div>
   <ul class="list">
-  {% for c in items %}
-    <li>
-      <div class="row between">
-        <div><strong>{{ c.topic }}</strong> {{ c.status|badge }}
-          <div class="muted small">{{ c.client_name }} · {% for v in c.variants %}{{ v.platform|platform }}{% if not forloop.last %}, {% endif %}{% endfor %} · {{ c.scheduled_at|when|default:"unscheduled" }}</div></div>
-        {% include "portal/_content_actions.html" %}
-      </div>
-      <p class="small" style="margin:6px 0 0">{{ c.master_copy }}</p>
-    </li>
-  {% empty %}<li class="empty">No content yet.</li>{% endfor %}
+  {% for c in items %}{% include "portal/_content_card.html" %}
+  {% empty %}<li class="empty">{% if group == 'failed' %}Nothing failed. 🎉{% elif group == 'scheduled' %}Nothing scheduled. Approve a draft with a publish time to schedule it.{% elif group == 'draft' %}No drafts — generate one above.{% else %}Nothing here yet.{% endif %}</li>{% endfor %}
   </ul>
 </section>
 {% endblock %}

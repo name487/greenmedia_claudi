@@ -33,6 +33,13 @@ class Settings:
     web_app_url: str = os.getenv("WEB_APP_URL", "http://127.0.0.1:8000").rstrip("/")
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
+    # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
+    #   celery -A app.celery_app worker -B -l info
+    # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.
+    redis_url: str = os.getenv("REDIS_URL", "")
+    content_max_attempts: int = int(os.getenv("CONTENT_PUBLISH_MAX_ATTEMPTS", "3"))
+    content_retry_minutes: int = int(os.getenv("CONTENT_RETRY_MINUTES", "2"))  # first retry delay; doubles each time
+    google_sync_minutes: int = int(os.getenv("GOOGLE_SYNC_MINUTES", "30"))  # Celery beat: review/insight sync interval
     # Background sync/publish loop inside the API process (0 = off; use `python -m app.jobs` from cron instead)
     scheduler_minutes: int = int(os.getenv("SCHEDULER_INTERVAL_MINUTES", "0"))
     cors_origins: list[str] = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000").split(",") if o.strip()]
@@ -44,6 +51,10 @@ class Settings:
     @property
     def model(self) -> str:
         return self.ai_model or ("gpt-4.1-mini" if self.ai_provider == "openai" else "claude-sonnet-5")
+
+    @property
+    def celery_enabled(self) -> bool:
+        return bool(self.redis_url)
 
     @property
     def google_configured(self) -> bool:

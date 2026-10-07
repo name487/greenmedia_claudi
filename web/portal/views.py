@@ -449,6 +449,47 @@ def _aware(value: str):
     return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
 
 
+CONTENT_ACTIONS = ("submit", "request_changes", "approve", "schedule", "unschedule", "publish", "retry", "reschedule", "edit_content", "delete_content")
+
+
+def _content_action(request, action: str) -> None:
+    """Content Studio + Social calendar buttons → Content API."""
+    cid = _int(request.POST.get("content_id"))
+    base = f"/api/content/{cid}"
+    if action == "reschedule":
+        when = request.POST.get("scheduled_at")
+        if not when:
+            messages.error(request, "Pick a date and time.")
+            return
+        out = request.api.patch(base, {"scheduled_at": _aware(when).isoformat()})
+        messages.success(request, f"Moved to {gm.when(out['scheduled_at'])}." if out["status"] == "scheduled" else f"Publish time set to {gm.when(out['scheduled_at'])}.")
+    elif action == "edit_content":
+        variants = [{"platform": p, "copy": request.POST.get(f"copy_{p}", "")} for p in request.POST.getlist("variant_platforms")]
+        request.api.patch(base, {"topic": request.POST.get("topic", "").strip(), "master_copy": request.POST.get("master_copy", ""), "variants": variants})
+        messages.success(request, "Changes saved.")
+    elif action == "delete_content":
+        request.api.delete(base)
+        messages.success(request, "Deleted.")
+    else:
+        try:
+            out = request.api.post(f"{base}/{action}")
+        except ApiError as e:
+            if e.status == 502:  # publish failed: the item is now tracked as Failed with the reason
+                messages.error(request, f"Publishing failed: {e.detail}")
+                return
+            raise
+        if action in ("publish", "retry"):
+            if out.get("dispatch") == "queued":
+                messages.success(request, "Queued — a Celery worker is publishing it now. Refresh in a moment.")
+            elif out["status"] == "published":
+                messages.success(request, "Published to " + ", ".join(gm.platform(v["platform"]) for v in out["variants"]) + ".")
+            else:
+                messages.warning(request, f"Not published yet: {out['last_error']} — retrying {gm.when(out['next_attempt_at'])}.")
+        else:
+            messages.success(request, {"submit": "Sent for approval.", "request_changes": "Sent back to draft.", "approve": "Approved and scheduled.",
+                                       "schedule": "Scheduled.", "unschedule": "Unscheduled — back to Draft."}[action])
+
+
 @login_required("content")
 def content(request):
     cl = _clients(request)
@@ -461,27 +502,40 @@ def content(request):
 
     if request.method == "POST":
         action = request.POST.get("action")
-        if action in ("submit", "request_changes", "approve", "publish"):
-            request.api.post(f"/api/content/{request.POST['content_id']}/{action}")
-            messages.success(request, {"submit": "Sent for approval.", "request_changes": "Sent back to draft.", "approve": "Approved and scheduled.", "publish": "Published."}[action])
+        if action in CONTENT_ACTIONS:
+            _content_action(request, action)
             return _back(request)
+        if action == "ai_draft":
+            body = {"client_id": brief_cid, "topic": request.POST.get("topic", "").strip(), "content_type": request.POST.get("content_type", "post"),
+                    "platforms": request.POST.getlist("platforms"), "notes": request.POST.get("notes", "").strip()}
+            if request.POST.get("scheduled_at"):
+                body["scheduled_at"] = _aware(request.POST["scheduled_at"]).isoformat()
+            try:
+                d = request.api.post("/api/content/draft", body)
+                how = f"AI ({d['ai']['model']})" if d["ai_source"] == "ai" else "the brand-voice template" + (f" — AI not used: {d['ai'].get('error')}" if d["ai"].get("error") else "")
+                messages.success(request, f"Draft saved: “{d['topic']}”, written by {how}. Review it under Draft, then send for approval.")
+                return redirect(f"{reverse('content')}?client={brief_cid}&board=draft#board")
+            except ApiError as e:
+                messages.error(request, e.detail)
         topic, ctype, selected = request.POST.get("topic", "").strip(), request.POST.get("content_type", "post"), request.POST.getlist("platforms")
         ctx.update(topic=topic, ctype=ctype, selected=selected, when=request.POST.get("scheduled_at") or ctx["when"])
         if action == "generate":
             try:
-                ctx["draft"] = request.api.post("/api/content/generate", {"client_id": brief_cid, "topic": topic, "content_type": ctype, "platforms": selected})
+                ctx["draft"] = request.api.post("/api/content/generate", {"client_id": brief_cid, "topic": topic, "content_type": ctype, "platforms": selected,
+                                                                    "notes": request.POST.get("notes", "").strip()})
             except ApiError as e:
                 messages.error(request, e.detail)
         elif action in ("save_draft", "save_review", "save_schedule"):
             variants = [{"platform": p, "copy": request.POST.get(f"copy_{p}", ""), "format": request.POST.get(f"format_{p}", "1:1")} for p in request.POST.getlist("variant_platforms")]
             status = {"save_draft": "draft", "save_review": "in_review", "save_schedule": "scheduled"}[action]
             body = {"client_id": brief_cid, "topic": topic, "content_type": ctype, "master_copy": request.POST.get("master_copy", ""),
+                    "ai_source": request.POST.get("ai_source", "") if request.POST.get("ai_source") in ("ai", "template") else "",
                     "hashtags": json.loads(request.POST.get("hashtags") or "[]"), "creative_brief": request.POST.get("creative_brief", ""),
                     "variants": variants, "status": status, "scheduled_at": _aware(request.POST["scheduled_at"]).isoformat() if request.POST.get("scheduled_at") else None}
             try:
                 request.api.post("/api/content", body)
                 messages.success(request, {"draft": "Draft saved.", "in_review": "Sent for approval.", "scheduled": "Approved and scheduled."}[status])
-                return redirect(f"{reverse('content')}?client={brief_cid}")
+                return redirect(f"{reverse('content')}?client={brief_cid}&board={'scheduled' if status == 'scheduled' else 'draft'}#board")
             except ApiError as e:
                 messages.error(request, e.detail)
                 ctx["draft"] = {"master_copy": body["master_copy"], "hashtags": body["hashtags"], "creative_brief": body["creative_brief"], "variants": variants, "source": "edited"}
@@ -491,8 +545,13 @@ def content(request):
     ctx.update(
         platforms=meta["platforms"], brand_voice=meta["brand_voice"], can_schedule=meta["can_schedule"],
         can_create=can(request, "content.create"), can_publish=can(request, "content.publish"),
-        items=request.api.get("/api/content", client_id=pipeline_cid), pipeline_cid=pipeline_cid,
+        pipeline_cid=pipeline_cid, notes=request.POST.get("notes", ""),
     )
+    group = request.GET.get("board", "scheduled")
+    group = group if group in ("draft", "scheduled", "published", "failed", "all") else "scheduled"
+    board = request.api._request("GET", "/api/content/board", params={"group": group, **({"client_id": pipeline_cid} if pipeline_cid else {})})
+    ctx.update(board=board, items=board["items"], group=group,
+               groups=[("draft", "Draft"), ("scheduled", "Scheduled"), ("published", "Published"), ("failed", "Failed"), ("all", "All")])
     if ctx.get("draft"):
         ctx["draft_hashtags_json"] = json.dumps(ctx["draft"].get("hashtags", []))
     return render(request, "portal/content.html", ctx)
@@ -523,9 +582,8 @@ def social(request):
         if request.POST.get("action") == "reconnect":
             request.api.post(f"/api/clients/{request.POST['client_id']}/social/{request.POST['platform']}/reconnect")
             messages.success(request, "Account reconnected.")
-        else:
-            request.api.post(f"/api/content/{request.POST['content_id']}/{request.POST['action']}")
-            messages.success(request, "Updated.")
+        elif request.POST.get("action") in CONTENT_ACTIONS:
+            _content_action(request, request.POST["action"])
         return _back(request)
     today = timezone.localdate()
     try:

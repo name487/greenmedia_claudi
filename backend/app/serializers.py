@@ -81,8 +81,11 @@ def content_out(c: ContentItem, client_name: str) -> dict:
     return {
         "id": c.id, "client_id": c.client_id, "client_name": client_name, "topic": c.topic, "content_type": c.content_type,
         "master_copy": c.master_copy, "hashtags": c.hashtags, "creative_brief": c.creative_brief, "status": c.status,
-        "scheduled_at": iso(c.scheduled_at), "created_at": iso(c.created_at),
-        "variants": [{"platform": v.platform, "copy": v.copy, "format": v.format, "external_post_id": v.external_post_id} for v in c.variants],
+        "scheduled_at": iso(c.scheduled_at), "created_at": iso(c.created_at), "updated_at": iso(c.updated_at), "published_at": iso(c.published_at),
+        "attempts": c.attempts or 0, "next_attempt_at": iso(c.next_attempt_at), "last_error": c.last_error or "",
+        "ai_source": c.ai_source or "", "ai_model": c.ai_model or "",
+        "variants": [{"platform": v.platform, "copy": v.copy, "format": v.format, "external_post_id": v.external_post_id,
+                      "status": v.status or "pending", "published_at": iso(v.published_at), "error": v.error or ""} for v in c.variants],
     }
 
 

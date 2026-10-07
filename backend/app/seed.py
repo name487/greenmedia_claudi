@@ -153,6 +153,11 @@ def seed(db: Session) -> None:
                                status=r.choice(["draft", "in_review", "scheduled", "scheduled", "published"]), scheduled_at=when, created_by=users["content"].id)
             for p in ["gmb"] + ["facebook", "instagram", "linkedin"][: 1 if plan == "Starter" else 3]:
                 item.variants.append(ContentVariant(platform=p, copy=f"Something special is coming to {name}! {cta}.", format=PLATFORM_FORMAT[p]))
+            if item.status == "published":  # went out in the past, on every platform
+                item.scheduled_at = item.published_at = when - timedelta(days=14)
+                item.attempts = 1
+                for v in item.variants:
+                    v.status, v.published_at, v.external_post_id = "published", item.published_at, f"{v.platform}_demo{c.id}"
             db.add(item)
 
     db.flush()

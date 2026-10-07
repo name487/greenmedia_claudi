@@ -1,7 +1,10 @@
-# Local PostgreSQL for the Green Media API.
-#   docker compose up -d db
+# Local PostgreSQL and Redis for the Green Media API.
+#   docker compose up -d db redis
 # then in backend/.env:
 #   DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia
+#   REDIS_URL=redis://127.0.0.1:6379/0
+# and run the Celery worker + beat next to the API (from backend/):
+#   celery -A app.celery_app worker -B -l info
 services:
   db:
     image: postgres:16
@@ -20,5 +23,20 @@ services:
       timeout: 3s
       retries: 10
 
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]   # survive restarts (the schedule itself lives in PostgreSQL)
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   pgdata:
+  redisdata:

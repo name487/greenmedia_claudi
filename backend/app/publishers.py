@@ -12,7 +12,16 @@ from .models import SAMPLE_REVIEW_PREFIX, Client
 
 
 class PublishError(Exception):
-    pass
+    """transient=True: worth retrying later (rate limit, Google 5xx, network). False: needs a person (not connected, revoked, rejected)."""
+
+    def __init__(self, message: str, transient: bool = False):
+        super().__init__(message)
+        self.transient = transient
+
+
+def _google_error(e: "google_api.GoogleApiError") -> PublishError:
+    transient = e.status in (408, 429, 500, 502, 503, 504) and not e.approval_pending
+    return PublishError(str(e), transient=transient)
 
 
 def publish_review_reply(client: Client, external_review_id: str, reply: str) -> dict | None:
@@ -26,7 +35,7 @@ def publish_review_reply(client: Client, external_review_id: str, reply: str) ->
         try:
             return google.publish_reply(client, external_review_id, reply)
         except google_api.GoogleApiError as e:
-            raise PublishError(str(e)) from e
+            raise _google_error(e) from e
     return None
 
 
@@ -38,7 +47,7 @@ def publish_post(client: Client, platform: str, copy: str) -> str:
             try:
                 return google.publish_post(client, copy)
             except google_api.GoogleApiError as e:
-                raise PublishError(str(e)) from e
+                raise _google_error(e) from e
     else:
         acct = next((a for a in client.social_accounts if a.platform == platform), None)
         if not acct:

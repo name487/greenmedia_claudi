@@ -168,9 +168,13 @@ def test_reply_publishes_to_google_after_approval(client, admin, google):
 def test_gmb_post_goes_live_and_scheduler_publishes_due_posts(client, admin, google):
     _link(client, admin, google)
     body = {"client_id": 1, "topic": "Free checkup week", "master_copy": "x", "variants": [{"platform": "gmb", "copy": "Free dental checkups all week!", "format": "4:3"}],
-            "status": "scheduled", "scheduled_at": "2020-01-01T10:00:00Z"}  # already due
+            "status": "scheduled", "scheduled_at": "2030-01-01T10:00:00Z"}
     item = client.post("/api/content", headers=admin, json=body).json()
     with SessionLocal() as db:
+        from datetime import datetime, timezone
+        from app.models import ContentItem
+        db.get(ContentItem, item["id"]).scheduled_at = datetime(2020, 1, 1, tzinfo=timezone.utc)  # now due
+        db.commit()
         assert publish_due(db)["published"] >= 1
     assert google.posts[0]["summary"] == "Free dental checkups all week!" and google.posts[0]["topicType"] == "STANDARD"
     got = next(i for i in client.get("/api/content?client_id=1", headers=admin).json() if i["id"] == item["id"])

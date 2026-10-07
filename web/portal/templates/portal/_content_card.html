@@ -1,0 +1,37 @@
+{% load gm %}
+<li class="content-row" id="c{{ c.id }}">
+  <div class="row between" style="align-items:flex-start">
+    <div style="min-width:0">
+      <strong>{{ c.topic }}</strong>
+      {% if c.status == 'in_review' %}<span class="badge badge-amber">Draft · awaiting approval</span>{% elif c.status == 'publishing' %}<span class="badge badge-blue">Publishing…</span>{% elif c.status == 'scheduled' and c.last_error %}<span class="badge badge-amber">Scheduled · retrying</span>{% else %}{{ c.status|badge }}{% endif %}
+      {% if c.ai_source == 'ai' %}<span class="badge badge-purple" title="{{ c.ai_model }}">AI draft</span>{% elif c.ai_source == 'template' %}<span class="badge badge-gray">Template draft</span>{% endif %}
+      <div class="muted small">{{ c.client_name }} ·
+        {% if c.status == 'published' %}published {{ c.published_at|when }}{% elif c.scheduled_at %}{% if c.status == 'scheduled' or c.status == 'publishing' %}goes out {% else %}planned {% endif %}{{ c.scheduled_at|when }}{% else %}no publish time{% endif %}
+        {% if c.attempts and c.status != 'draft' %} · attempt {{ c.attempts }}{% endif %}</div>
+    </div>
+    {% include "portal/_content_actions.html" %}
+  </div>
+  <div class="chips variant-status">
+    {% for v in c.variants %}<span class="chip v-{{ v.status }}" title="{% if v.error %}{{ v.error }}{% elif v.external_post_id %}{{ v.external_post_id }}{% endif %}">{% if v.status == 'published' %}✓{% elif v.status == 'failed' %}✗{% else %}•{% endif %} {{ v.platform|platform }}</span>{% endfor %}
+  </div>
+  {% if c.last_error %}<div class="notice {% if c.status == 'failed' %}error{% endif %} small" style="margin-top:6px">{% if c.status == 'failed' %}Failed: {% else %}Temporary problem, retrying {{ c.next_attempt_at|when }}: {% endif %}{{ c.last_error }}</div>{% endif %}
+  <p class="small" style="margin:6px 0 0">{{ c.master_copy|truncatechars:240 }}</p>
+  {% if 'content.create' in perms and c.status != 'published' and c.status != 'publishing' %}
+  <details class="small" style="margin-top:6px"><summary class="muted">{% if c.status == 'scheduled' %}Change time{% else %}Edit · set time{% endif %}</summary>
+    <form method="post" class="toolbar" style="margin:8px 0">{% csrf_token %}<input type="hidden" name="content_id" value="{{ c.id }}">
+      <input class="input" type="datetime-local" name="scheduled_at" value="{{ c.scheduled_at|local_input }}" aria-label="Publish time"> <span class="muted">{% now "T" %}</span>
+      <button class="btn soft sm" name="action" value="reschedule">{% if c.status == 'scheduled' %}Reschedule{% else %}Set time{% endif %}</button>
+    </form>
+    {% if c.status != 'scheduled' %}
+    <form method="post" class="form">{% csrf_token %}<input type="hidden" name="content_id" value="{{ c.id }}">
+      <label class="field">Topic <input class="input" name="topic" value="{{ c.topic }}" maxlength="300"></label>
+      <label class="field">Master copy <textarea class="input" name="master_copy" rows="2">{{ c.master_copy }}</textarea></label>
+      {% for v in c.variants %}{% if v.status != 'published' %}<input type="hidden" name="variant_platforms" value="{{ v.platform }}">
+      <label class="field">{{ v.platform|platform }} <span class="muted">{{ v.copy|length }} chars</span><textarea class="input" name="copy_{{ v.platform }}" rows="3">{{ v.copy }}</textarea></label>{% endif %}{% endfor %}
+      <div class="btn-row"><button class="btn soft sm" name="action" value="edit_content">Save changes</button>
+        <button class="btn ghost sm danger-text" name="action" value="delete_content" onclick="return confirm('Delete this post?')">Delete</button></div>
+    </form>
+    {% else %}<p class="muted" style="margin:0">Copy is locked while scheduled — Unschedule to edit it.</p>{% endif %}
+  </details>
+  {% endif %}
+</li>

@@ -1,11 +1,11 @@
 """Background jobs: sync live Google profiles and publish due scheduled content.
 
-Run inside the API (SCHEDULER_INTERVAL_MINUTES > 0) or from cron:
+With Redis: Celery beat runs these (app/celery_app.py). Without Redis: inside the API
+(SCHEDULER_INTERVAL_MINUTES > 0) or from cron:
     python -m app.jobs            # one pass of everything
 """
 
 import logging
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,8 +13,7 @@ from sqlalchemy.orm import Session
 from . import review_queue
 from .db import SessionLocal
 from .google import api as google_api
-from .models import AuditLog, Client, ContentItem, GmbAccount
-from .publishers import PublishError, publish_post
+from .models import AuditLog, Client, GmbAccount
 
 log = logging.getLogger("greenmedia.jobs")
 
@@ -42,26 +41,9 @@ def sync_google(db: Session) -> dict:
 
 
 def publish_due(db: Session) -> dict:
-    now = datetime.now(timezone.utc)
-    ok = failed = 0
-    due = db.scalars(select(ContentItem).where(ContentItem.status == "scheduled", ContentItem.scheduled_at.is_not(None)))
-    for item in due:
-        at = item.scheduled_at if item.scheduled_at.tzinfo else item.scheduled_at.replace(tzinfo=timezone.utc)
-        if at > now:
-            continue
-        client = db.get(Client, item.client_id)
-        try:
-            for v in item.variants:
-                v.external_post_id = v.external_post_id or publish_post(client, v.platform, v.copy)
-            item.status = "published"
-            _log(db, item.tenant_id, f"published: {item.topic}", client.id, "content", item.id)
-            ok += 1
-        except PublishError as e:
-            item.status = "failed"
-            _log(db, item.tenant_id, f"publish failed: {e}", client.id, "content", item.id)
-            failed += 1
-        db.commit()
-    return {"published": ok, "failed": failed}
+    """Publish scheduled content that is due (also retries temporary failures). See content_service."""
+    from . import content_service
+    return content_service.publish_due(db)
 
 
 def run_once() -> dict:

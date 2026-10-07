@@ -41,3 +41,13 @@ def test_previous_release_gets_token_columns_and_stays_live(tmp_path):
     with Session(engine) as db:
         g = db.get(GmbAccount, 1)
         assert g.refresh_token_enc == "" and g.token_expires_at is None and g.is_live  # agency link keeps working
+
+
+def test_previous_release_content_gets_status_columns(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'content.db'}")
+    with engine.begin() as c:
+        c.execute(text("CREATE TABLE content_variants (id INTEGER PRIMARY KEY, content_id INTEGER, platform VARCHAR(20), copy TEXT, format VARCHAR(10), external_post_id VARCHAR(100))"))
+        c.execute(text("INSERT INTO content_variants VALUES (1, 1, 'gmb', 'a', '4:3', 'gmb_123'), (2, 1, 'facebook', 'b', '1:1', NULL)"))
+    assert "content_variants.status" in add_missing_columns(engine)
+    with engine.connect() as c:
+        assert [r[0] for r in c.execute(text("SELECT status FROM content_variants ORDER BY id"))] == ["published", "pending"]

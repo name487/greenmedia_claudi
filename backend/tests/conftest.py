@@ -63,3 +63,22 @@ def google(monkeypatch):
     fake = FakeGoogle()
     monkeypatch.setattr(api, "http", httpx.Client(transport=httpx.MockTransport(fake)))
     return fake
+
+
+@pytest.fixture()
+def openai(monkeypatch):
+    """Route AI calls to an in-process fake of the OpenAI Chat Completions API (provider = openai, key set)."""
+    import httpx
+
+    from app import ai
+    from app.config import settings
+
+    from .test_ai_openai import KEY, FakeOpenAI
+
+    fake = FakeOpenAI()
+    monkeypatch.setattr(ai, "http", httpx.Client(transport=httpx.MockTransport(fake)))
+    monkeypatch.setattr(ai, "RETRY_DELAY", 0)
+    monkeypatch.setattr(settings, "ai_provider", "openai")
+    monkeypatch.setattr(settings, "openai_api_key", KEY)
+    monkeypatch.setattr(settings, "ai_model", "")
+    return fake

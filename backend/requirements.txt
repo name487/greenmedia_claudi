@@ -10,3 +10,4 @@ python-dotenv>=1.0
 # dev
 pytest>=8.0
 cryptography>=42
+celery[redis]>=5.4   # scheduled publishing (REDIS_URL); optional without Redis

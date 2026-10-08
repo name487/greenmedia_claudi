@@ -449,7 +449,7 @@ def _aware(value: str):
     return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
 
 
-CONTENT_ACTIONS = ("submit", "request_changes", "approve", "schedule", "unschedule", "publish", "retry", "reschedule", "edit_content", "delete_content")
+CONTENT_ACTIONS = ("submit", "request_changes", "approve", "schedule", "unschedule", "publish", "retry", "reschedule", "edit_content", "delete_content", "adapt_content")
 
 
 def _content_action(request, action: str) -> None:
@@ -465,8 +465,16 @@ def _content_action(request, action: str) -> None:
         messages.success(request, f"Moved to {gm.when(out['scheduled_at'])}." if out["status"] == "scheduled" else f"Publish time set to {gm.when(out['scheduled_at'])}.")
     elif action == "edit_content":
         variants = [{"platform": p, "copy": request.POST.get(f"copy_{p}", "")} for p in request.POST.getlist("variant_platforms")]
-        request.api.patch(base, {"topic": request.POST.get("topic", "").strip(), "master_copy": request.POST.get("master_copy", ""), "variants": variants})
+        request.api.patch(base, {"topic": request.POST.get("topic", "").strip(), "master_copy": request.POST.get("master_copy", ""), "variants": variants,
+                                 "image_url": request.POST.get("image_url", "").strip()})
         messages.success(request, "Changes saved.")
+    elif action == "adapt_content":
+        out = request.api.post(f"{base}/adapt")
+        how = f"AI ({out['ai']['model']})" if out["ai"]["source"] == "ai" else "platform rules" + (f" — AI not used: {out['ai']['error']}" if out["ai"].get("error") else "")
+        problems = [f"{gm.platform(v['platform'])}: {c['message']}" for v in out["variants"] for c in v["checks"] if c["level"] == "error"]
+        messages.success(request, f"Rewrote each platform version from the master copy using {how}.")
+        for p in problems:
+            messages.warning(request, f"Fix before scheduling — {p}")
     elif action == "delete_content":
         request.api.delete(base)
         messages.success(request, "Deleted.")
@@ -507,7 +515,8 @@ def content(request):
             return _back(request)
         if action == "ai_draft":
             body = {"client_id": brief_cid, "topic": request.POST.get("topic", "").strip(), "content_type": request.POST.get("content_type", "post"),
-                    "platforms": request.POST.getlist("platforms"), "notes": request.POST.get("notes", "").strip()}
+                    "platforms": request.POST.getlist("platforms"), "notes": request.POST.get("notes", "").strip(),
+                    "image_url": request.POST.get("image_url", "").strip()}
             if request.POST.get("scheduled_at"):
                 body["scheduled_at"] = _aware(request.POST["scheduled_at"]).isoformat()
             try:
@@ -530,6 +539,7 @@ def content(request):
             status = {"save_draft": "draft", "save_review": "in_review", "save_schedule": "scheduled"}[action]
             body = {"client_id": brief_cid, "topic": topic, "content_type": ctype, "master_copy": request.POST.get("master_copy", ""),
                     "ai_source": request.POST.get("ai_source", "") if request.POST.get("ai_source") in ("ai", "template") else "",
+                    "image_url": request.POST.get("image_url", "").strip(),
                     "hashtags": json.loads(request.POST.get("hashtags") or "[]"), "creative_brief": request.POST.get("creative_brief", ""),
                     "variants": variants, "status": status, "scheduled_at": _aware(request.POST["scheduled_at"]).isoformat() if request.POST.get("scheduled_at") else None}
             try:
@@ -545,7 +555,7 @@ def content(request):
     ctx.update(
         platforms=meta["platforms"], brand_voice=meta["brand_voice"], can_schedule=meta["can_schedule"],
         can_create=can(request, "content.create"), can_publish=can(request, "content.publish"),
-        pipeline_cid=pipeline_cid, notes=request.POST.get("notes", ""),
+        pipeline_cid=pipeline_cid, notes=request.POST.get("notes", ""), image_url=request.POST.get("image_url", ""),
     )
     group = request.GET.get("board", "scheduled")
     group = group if group in ("draft", "scheduled", "published", "failed", "all") else "scheduled"
@@ -576,41 +586,100 @@ def creative(request):
 
 # ---------- social ----------
 
+def _meta_action(request, action: str):
+    if action == "meta_connect":
+        return ShareRedirect(request.api.post("/api/meta/connect")["auth_url"])
+    if action == "meta_link":
+        cid = _int(request.POST.get("client_id"))
+        out = request.api.post(f"/api/clients/{cid}/meta/link", {"connection_id": _int(request.POST.get("connection_id")), "page_id": request.POST.get("page_id", ""),
+                                                                  "instagram": "instagram" in request.POST})
+        messages.success(request, "Linked " + " and ".join(gm.platform(p) for p in out["linked"]) + ". Posts for this client now publish for real."
+                         + ("" if out["instagram_available"] else " (This Page has no Instagram professional account linked.)"))
+    elif action == "meta_unlink":
+        out = request.api.delete(f"/api/clients/{_int(request.POST.get('client_id'))}/meta")
+        messages.success(request, f"Unlinked {', '.join(out['unlinked']) or 'nothing'}.")
+    elif action == "meta_disconnect":
+        out = request.api.delete(f"/api/meta/connections/{_int(request.POST.get('connection_id'))}")
+        messages.success(request, f"Meta login removed and access revoked ({out['unlinked_accounts']} account(s) unlinked).")
+    return HttpResponseRedirect(reverse("social") + "#meta")
+
+
+def _calendar(request, cid):
+    """Month (6 weeks) or week grid of posts by local day, from /api/content/calendar."""
+    today = timezone.localdate()
+    view = request.GET.get("view", "month")
+    if view == "week":
+        try:
+            anchor = date.fromisoformat(request.GET.get("week", ""))
+        except ValueError:
+            anchor = today
+        first = anchor - timedelta(days=anchor.weekday())
+        days = [first + timedelta(days=i) for i in range(7)]
+        title = f"{days[0]:%d %b} – {days[-1]:%d %b %Y}"
+        nav = {"prev": {"week": (first - timedelta(days=7)).isoformat()}, "next": {"week": (first + timedelta(days=7)).isoformat()}}
+    else:
+        view = "month"
+        try:
+            month = date.fromisoformat(request.GET.get("month", "") + "-01")
+        except ValueError:
+            month = today.replace(day=1)
+        days = [d for wk in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month) for d in wk]
+        title = f"{month:%B %Y}"
+        nav = {"prev": {"month": (month - timedelta(days=1)).strftime("%Y-%m")}, "next": {"month": (month + timedelta(days=32)).strftime("%Y-%m")}}
+        anchor = month
+    start = timezone.make_aware(datetime.combine(days[0], datetime.min.time()))
+    params = {"start": start.isoformat(), "days": len(days), **({"client_id": cid} if cid else {})}
+    data = request.api._request("GET", "/api/content/calendar", params=params)
+    by_day: dict[date, list] = {}
+    for it in data["items"]:
+        local = timezone.localtime(datetime.fromisoformat(it["at"]))
+        by_day.setdefault(local.date(), []).append({**it, "time": local.strftime("%I:%M %p").lstrip("0")})
+    cells = [{"date": d, "other": view == "month" and d.month != anchor.month, "today": d == today, "posts": by_day.get(d, [])} for d in days]
+    return {"view": view, "cal_title": title, "weeks": [cells[i:i + 7] for i in range(0, len(cells), 7)], "nav": nav,
+            "cal_count": len(data["items"]), "cal_groups": {g: sum(1 for x in data["items"] if x["group"] == g) for g in ("scheduled", "published", "failed", "draft")}}
+
+
 @login_required("social")
 def social(request):
+    result = request.GET.get("meta", "")
+    if result:
+        kind, _, detail = result.partition(":")
+        if kind == "connected":
+            messages.success(request, f"Connected Meta as {detail}. Now link each client to its Facebook Page below.")
+        else:
+            messages.error(request, f"Meta connection failed: {detail}")
+        return HttpResponseRedirect(reverse("social") + "#meta")
     if request.method == "POST":
-        if request.POST.get("action") == "reconnect":
+        action = request.POST.get("action", "")
+        if action == "reconnect":
             request.api.post(f"/api/clients/{request.POST['client_id']}/social/{request.POST['platform']}/reconnect")
             messages.success(request, "Account reconnected.")
-        elif request.POST.get("action") in CONTENT_ACTIONS:
-            _content_action(request, request.POST["action"])
+        elif action.startswith("meta_"):
+            return _meta_action(request, action)
+        elif action in CONTENT_ACTIONS:
+            _content_action(request, action)
         return _back(request)
-    today = timezone.localdate()
-    try:
-        month = date.fromisoformat(request.GET.get("month", "") + "-01")
-    except ValueError:
-        month = today.replace(day=1)
     cid = _client_filter(request)
     items = request.api.get("/api/content", client_id=cid)
-    by_day: dict[date, list] = {}
-    for it in items:
-        if it["scheduled_at"]:
-            d = timezone.localtime(datetime.fromisoformat(it["scheduled_at"])).date()
-            by_day.setdefault(d, []).append(it)
-    weeks = [[{"date": d, "other": d.month != month.month, "today": d == today, "posts": by_day.get(d, [])} for d in wk]
-             for wk in calendar.Calendar(firstweekday=0).monthdatescalendar(month.year, month.month)]
     cl = _clients(request)
     accounts = []
     for c in cl if not cid else [x for x in cl if x["id"] == cid]:
         for s in request.api.get(f"/api/clients/{c['id']}")["social_accounts"]:
             accounts.append({**s, "client_id": c["id"], "client_name": c["company_name"]})
-    prev_m = (month - timedelta(days=1)).replace(day=1)
-    next_m = (month + timedelta(days=32)).replace(day=1)
+    meta = pages = None
+    page_errors = []
+    if can(request, "client.edit"):
+        meta = request.api.get("/api/meta/status")
+        if meta["configured"] and any(x["status"] == "active" for x in meta["connections"]):
+            got = request.api.get("/api/meta/pages")
+            pages, page_errors = got["pages"], got["errors"]
     return render(request, "portal/social.html", {
-        "weeks": weeks, "month": month, "prev_m": prev_m.strftime("%Y-%m"), "next_m": next_m.strftime("%Y-%m"), "cid": cid,
-        "queue": [i for i in items if i["status"] != "published"], "accounts": accounts, "broken": [a for a in accounts if a["status"] != "connected"],
-        "clients": None if request.me.get("client_id") else cl, "can_publish": can(request, "content.publish"),
-        "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        **_calendar(request, cid), "cid": cid,
+        "queue": [i for i in items if i["status"] not in ("published", "draft")], "accounts": accounts,
+        "broken": [a for a in accounts if a["status"] != "connected"],
+        "clients": None if request.me.get("client_id") else cl, "all_clients": cl, "can_publish": can(request, "content.publish"),
+        "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "meta": meta, "pages": pages, "page_errors": page_errors,
+        "live_clients": sorted({(a["client_id"], a["client_name"]) for a in accounts if a.get("is_live")}),
     })
 
 

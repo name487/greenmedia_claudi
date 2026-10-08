@@ -4,14 +4,14 @@ Statuses: draft, in_review (draft waiting for approval), scheduled, publishing (
 """
 
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import ai, content_service
+from .. import adapt, ai, content_service
 from ..config import settings
 from ..db import get_db
 from ..models import Client, ContentItem, ContentVariant, Tenant, User
@@ -19,6 +19,8 @@ from ..security import audit, can, get_client, require, require_section, scoped_
 from ..serializers import content_out
 
 router = APIRouter(prefix="/api/content", tags=["content"])
+
+ImageUrl = Annotated[str, Field(max_length=1000, pattern=r"^(https://\S+)?$", description="Public https image URL (required by Instagram)")]
 
 Platform = Literal["gmb", "facebook", "instagram", "linkedin", "youtube", "x"]
 ContentType = Literal["post", "offer", "event", "update"]
@@ -70,6 +72,7 @@ def generate(body: GenerateIn, user: User = Depends(require("content.create")), 
 
 class DraftIn(GenerateIn):
     scheduled_at: datetime | None = None  # proposed time, kept on the draft
+    image_url: ImageUrl = ""
 
 
 @router.post("/draft", status_code=201)
@@ -80,7 +83,7 @@ def ai_draft(body: DraftIn, user: User = Depends(require("content.create")), db:
     item = ContentItem(tenant_id=user.tenant_id, client_id=c.id, topic=body.topic, content_type=body.content_type, master_copy=data["master_copy"],
                        hashtags=data.get("hashtags", []), creative_brief=data.get("creative_brief", ""), status="draft",
                        scheduled_at=content_service.to_utc(body.scheduled_at), created_by=user.id, updated_at=content_service.utcnow(),
-                       ai_source=meta["source"], ai_model=f"{meta['provider']}/{meta['model']}" if meta["source"] == "ai" else "",
+                       ai_source=meta["source"], ai_model=f"{meta['provider']}/{meta['model']}" if meta["source"] == "ai" else "", image_url=body.image_url,
                        variants=[ContentVariant(platform=v["platform"], copy=v["copy"], format=v["format"]) for v in data["variants"]])
     db.add(item)
     db.flush()
@@ -107,6 +110,14 @@ class ContentIn(BaseModel):
     scheduled_at: datetime | None = None
     status: Literal["draft", "in_review", "scheduled"] = "draft"
     ai_source: Literal["ai", "template", ""] = ""
+    image_url: ImageUrl = ""
+
+
+def _publishable(item: ContentItem) -> None:
+    """Refuse to schedule a post a platform would reject (e.g. Instagram without an image, X over 280 chars)."""
+    problems = adapt.blocking(item.variants, item.image_url or "")
+    if problems:
+        raise HTTPException(422, "Fix before scheduling: " + "; ".join(problems))
 
 
 def _check_schedule(when: datetime | None) -> datetime:
@@ -126,11 +137,12 @@ def create(body: ContentIn, user: User = Depends(require("content.create")), db:
     when = _check_schedule(body.scheduled_at) if body.status == "scheduled" else content_service.to_utc(body.scheduled_at)
     item = ContentItem(tenant_id=user.tenant_id, client_id=c.id, topic=body.topic, content_type=body.content_type, master_copy=body.master_copy,
                        hashtags=body.hashtags, creative_brief=body.creative_brief, status="draft", scheduled_at=when, created_by=user.id,
-                       updated_at=content_service.utcnow(), ai_source=body.ai_source,
+                       updated_at=content_service.utcnow(), ai_source=body.ai_source, image_url=body.image_url,
                        variants=[ContentVariant(**v.model_dump()) for v in body.variants])
     db.add(item)
     db.flush()
     if body.status == "scheduled":
+        _publishable(item)
         content_service.schedule(item, when)
     else:
         item.status = body.status
@@ -197,6 +209,7 @@ class ContentPatch(BaseModel):
     hashtags: list[str] | None = None
     creative_brief: str | None = None
     variants: list[VariantIn] | None = None  # copy per platform (platforms must already exist on the item)
+    image_url: ImageUrl | None = None
     scheduled_at: datetime | None = None  # reschedule (scheduled items keep their status)
 
 
@@ -204,7 +217,7 @@ class ContentPatch(BaseModel):
 def edit(content_id: int, body: ContentPatch, user: User = Depends(require("content.create")), db: Session = Depends(get_db)):
     item, c = _load(db, user, content_id)
     changes = body.model_dump(exclude_unset=True)
-    copy_fields = {"topic", "master_copy", "hashtags", "creative_brief", "variants"} & set(changes)
+    copy_fields = {"topic", "master_copy", "hashtags", "creative_brief", "variants", "image_url"} & set(changes)
     if item.status in ("published", "publishing"):
         raise HTTPException(409, f"Content that is {item.status} can't be edited")
     if copy_fields and item.status == "scheduled":
@@ -235,6 +248,64 @@ def edit(content_id: int, body: ContentPatch, user: User = Depends(require("cont
     return content_out(item, c.company_name)
 
 
+class AdaptIn(BaseModel):
+    platforms: list[Platform] | None = None  # default: the post's current platforms; new connected ones are added
+
+
+@router.post("/{content_id}/adapt")
+def adapt_content(content_id: int, body: AdaptIn | None = None, user: User = Depends(require("content.create")), db: Session = Depends(get_db)):
+    """Rewrite every platform version from the master copy (AI with the brand voice, or the rule-based adapter)."""
+    item, c = _load(db, user, content_id)
+    if item.status not in ("draft", "in_review", "failed"):
+        raise HTTPException(409, "Unschedule it before adapting the copy")
+    if not (item.master_copy or "").strip():
+        raise HTTPException(422, "Write a master copy first")
+    current = {v.platform: v for v in item.variants}
+    if body and body.platforms:
+        missing = [p for p in body.platforms if p not in available_platforms(c)]
+        if missing:
+            raise HTTPException(422, f"Not connected for {c.company_name}: {', '.join(missing)}")
+    platforms = list(dict.fromkeys(body.platforms)) if body and body.platforms else [v.platform for v in item.variants]
+    platforms = [p for p in platforms if not (p in current and current[p].status == "published")]  # never rewrite what's live
+    variants, meta = ai.adapt_variants(company=c.company_name, industry=c.industry, city=c.city, website=c.website, brand_voice=c.brand_voice,
+                                       topic=item.topic, master=item.master_copy, hashtags=item.hashtags or [], platforms=platforms)
+    before = {p: current[p].copy for p in platforms if p in current}
+    for v in variants:
+        if v["platform"] in current:
+            current[v["platform"]].copy, current[v["platform"]].format = v["copy"], v["format"]
+        else:
+            item.variants.append(ContentVariant(platform=v["platform"], copy=v["copy"], format=v["format"]))
+    item.updated_at = content_service.utcnow()
+    audit(db, user, f"adapted copy per platform ({meta['source']}): {item.topic}", client_id=c.id, entity_type="content", entity_id=item.id,
+          details={**_ai_details(meta), "platforms": platforms, "before": before})
+    db.commit()
+    db.refresh(item)
+    return {**content_out(item, c.company_name), "ai": meta}
+
+
+@router.get("/calendar")
+def calendar_view(start: str, days: int = 42, client_id: int | None = None, user: User = Depends(require_section("content")), db: Session = Depends(get_db)):
+    """Posts with a time in [start, start+days): scheduled/publishing by their publish time, published by when they went
+    out, drafts/failed by their planned time. start = YYYY-MM-DD (UTC)."""
+    try:
+        begin = content_service.to_utc(datetime.fromisoformat(start))
+    except ValueError as e:
+        raise HTTPException(422, "start must be YYYY-MM-DD") from e
+    end = begin + timedelta(days=max(1, min(days, 62)))
+    ids = scoped_ids(db, user, client_id)
+    names = dict(db.execute(select(Client.id, Client.company_name).where(Client.id.in_(ids))).all())
+    out = []
+    for i in db.scalars(select(ContentItem).where(ContentItem.client_id.in_(ids))):
+        at = content_service._aware(i.published_at if i.status == "published" and i.published_at else i.scheduled_at)
+        if at and begin <= at < end:
+            out.append({"id": i.id, "client_id": i.client_id, "client_name": names[i.client_id], "topic": i.topic, "status": i.status,
+                        "at": at.isoformat(), "platforms": [{"platform": v.platform, "status": v.status} for v in i.variants],
+                        "image_url": i.image_url or "", "last_error": i.last_error or "",
+                        "group": next((g for g, st in GROUPS.items() if i.status in st), i.status)})
+    out.sort(key=lambda x: x["at"])
+    return {"start": begin.isoformat(), "end": end.isoformat(), "items": out}
+
+
 Action = Literal["submit", "request_changes", "approve", "schedule", "unschedule", "publish", "retry"]
 
 
@@ -263,6 +334,7 @@ def transition(content_id: int, action: Action, user: User = Depends(require_sec
         need({"in_review"} if action == "approve" else {"draft", "in_review", "failed"})
         if not can_approve(db, user):
             raise HTTPException(403, "This content needs approval before it can be scheduled" if action == "schedule" else "Your role cannot approve this content")
+        _publishable(item)
         content_service.schedule(item, _check_schedule(item.scheduled_at))
     elif action == "unschedule":
         need({"scheduled"})
@@ -273,6 +345,7 @@ def transition(content_id: int, action: Action, user: User = Depends(require_sec
         need({"scheduled", "failed"} if action == "publish" else {"failed"})
         if not can(user, "content.publish"):
             raise HTTPException(403, "Your role cannot publish")
+        _publishable(item)
         content_service.schedule(item, content_service.utcnow())
         audit(db, user, f"{'retry' if before == 'failed' else 'publish now'} requested: {item.topic}", client_id=c.id, entity_type="content",
               entity_id=item.id, details={"from": before})

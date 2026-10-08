@@ -299,3 +299,29 @@ img.avatar { object-fit: cover; background: var(--surface-2); }
 .variant-status .chip { font-size: 12px; padding: 2px 8px; cursor: default; }
 .chip.v-published { color: var(--green); background: var(--green-bg); border-color: transparent; }
 .chip.v-failed { color: var(--red); background: var(--red-bg); border-color: transparent; }
+
+/* calendar: status colours, week view */
+a.cal-post { display: block; color: var(--text); text-decoration: none; }
+a.cal-post:hover { background: var(--surface-2); outline: 1px solid var(--border); }
+.cal-post.g-scheduled { border-left-color: var(--blue); }
+.cal-post.g-published { border-left-color: var(--green); }
+.cal-post.g-failed { border-left-color: var(--red); background: var(--red-bg); }
+.cal-post.g-draft { border-left-color: var(--gray); opacity: .8; border-left-style: dashed; }
+.cal-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.calendar.week .cal-day { min-height: 220px; }
+.calendar.week .cal-post { white-space: normal; font-size: 12px; padding: 6px 8px; }
+.cal-meta { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.dot.g-scheduled { background: var(--blue); } .dot.g-published { background: var(--green); } .dot.g-failed { background: var(--red); } .dot.g-draft { background: var(--gray); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.pill-tabs.mini { margin: 0; padding: 2px; display: inline-flex; }
+.pill-tabs.mini a { padding: 4px 10px; font-size: 13px; text-decoration: none; }
+@media (max-width: 860px) {
+  .calendar.week { grid-template-columns: 1fr; }
+  .calendar.week .cal-head { display: none; }
+  .calendar.week .cal-day { min-height: 0; }
+  .calendar.week .cal-post { font-size: 13px; height: auto; padding: 6px 8px; border-left-width: 3px; background: var(--surface); }
+}
+.check-line { margin-top: 2px; }
+.check-line.error { color: var(--red); }
+.check-line.warning { color: var(--amber); }

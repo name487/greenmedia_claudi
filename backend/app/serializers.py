@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 
+from . import adapt
 from .google.tokens import expires_at_iso
 from .models import AuditLog, Client, ContentItem, Keyword, Report, Review, Task, User
 from .security import ROLE_LABELS
@@ -56,7 +57,8 @@ def client_out(c: Client) -> dict:
         "brand_voice": c.brand_voice, "auto_publish": c.auto_publish, "notes": c.notes,
         "contacts": [contact_out(x) for x in c.contacts],
         "gmb": c.gmb and gmb_out(c.gmb),
-        "social_accounts": [{"platform": s.platform, "handle": s.handle, "status": s.status} for s in c.social_accounts],
+        "social_accounts": [{"platform": s.platform, "handle": s.handle, "status": s.status, "is_live": s.is_live, "name": s.name,
+                             "last_error": s.last_error} for s in c.social_accounts],
     }
 
 
@@ -83,9 +85,10 @@ def content_out(c: ContentItem, client_name: str) -> dict:
         "master_copy": c.master_copy, "hashtags": c.hashtags, "creative_brief": c.creative_brief, "status": c.status,
         "scheduled_at": iso(c.scheduled_at), "created_at": iso(c.created_at), "updated_at": iso(c.updated_at), "published_at": iso(c.published_at),
         "attempts": c.attempts or 0, "next_attempt_at": iso(c.next_attempt_at), "last_error": c.last_error or "",
-        "ai_source": c.ai_source or "", "ai_model": c.ai_model or "",
+        "ai_source": c.ai_source or "", "ai_model": c.ai_model or "", "image_url": c.image_url or "",
         "variants": [{"platform": v.platform, "copy": v.copy, "format": v.format, "external_post_id": v.external_post_id,
-                      "status": v.status or "pending", "published_at": iso(v.published_at), "error": v.error or ""} for v in c.variants],
+                      "status": v.status or "pending", "published_at": iso(v.published_at), "error": v.error or "",
+                      "checks": adapt.check(v.platform, v.copy, c.image_url or "") if v.status != "published" else []} for v in c.variants],
     }
 
 

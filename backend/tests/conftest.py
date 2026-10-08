@@ -82,3 +82,22 @@ def openai(monkeypatch):
     monkeypatch.setattr(settings, "openai_api_key", KEY)
     monkeypatch.setattr(settings, "ai_model", "")
     return fake
+
+
+@pytest.fixture()
+def meta(monkeypatch):
+    """Route Meta Graph API calls to an in-process fake, with the Meta app configured."""
+    import httpx
+
+    from app.config import settings
+    from app.meta import api
+
+    from .test_meta import FakeMeta
+
+    fake = FakeMeta()
+    monkeypatch.setattr(api, "http", httpx.Client(transport=httpx.MockTransport(fake)))
+    monkeypatch.setattr(settings, "meta_app_id", "meta-app")
+    monkeypatch.setattr(settings, "meta_app_secret", "meta-secret")
+    monkeypatch.setattr(settings, "meta_redirect_uri", "http://testserver/api/meta/callback")
+    monkeypatch.setattr(settings, "meta_graph_version", "v23.0")
+    return fake

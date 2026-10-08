@@ -92,7 +92,7 @@ def _publish(db: Session, item: ContentItem, user: User | None) -> dict:
         if v.status == "published" and v.external_post_id:
             continue
         try:
-            v.external_post_id = publish_post(client, v.platform, v.copy)
+            v.external_post_id = publish_post(client, v.platform, v.copy, image_url=item.image_url or "")
             v.status, v.published_at, v.error = "published", now, ""
         except PublishError as e:
             v.status, v.error = "failed", str(e)

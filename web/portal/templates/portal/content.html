@@ -15,6 +15,7 @@
         <div class="chips">{% for t in types %}<label class="chip"><input type="radio" name="content_type" value="{{ t }}"{% if t == ctype %} checked{% endif %} hidden> {{ t }}</label>{% endfor %}</div></div>
       <div class="field">Platforms
         <div class="chips">{% for p in platforms %}<label class="chip"><input type="checkbox" name="platforms" value="{{ p }}"{% if p in selected %} checked{% endif %} hidden> {{ p|platform }}</label>{% endfor %}</div></div>
+      <label class="field">Image URL <span class="muted small">public https link — required for Instagram</span><input class="input" name="image_url" type="url" value="{{ image_url }}" placeholder="https://…/offer.jpg" pattern="https://.*"></label>
       <label class="field">Notes for the AI <span class="muted small">optional</span><input class="input" name="notes" value="{{ notes }}" maxlength="500" placeholder="e.g. mention free parking, offer ends 31 Oct"></label>
       <p class="muted small" style="margin:0">Voice: {{ brand_voice.tone }} · CTA “{{ brand_voice.cta_style }}”{% if brand_voice.prohibited_claims %} · avoids {{ brand_voice.prohibited_claims|join:", " }}{% endif %}</p>
       <div class="btn-row">

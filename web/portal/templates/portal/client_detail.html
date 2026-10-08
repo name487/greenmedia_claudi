@@ -85,7 +85,9 @@
   <section class="card"><header class="card-head"><h3>Connected accounts</h3></header>
     <ul class="list">
       <li class="row between"><span>Google Business Profile {% if c.gmb.is_live %}<span class="badge badge-green">Live</span>{% elif c.gmb %}<span class="badge badge-gray">Demo</span>{% endif %}</span>{% if c.gmb.is_live %}{{ c.gmb.status|badge }}{% else %}<a class="small" href="#google">Connect Google</a>{% endif %}</li>
-      {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.handle }}</span></span>{{ s.status|badge }}</li>{% endfor %}
+      {% for s in c.social_accounts %}<li class="row between"><span>{{ s.platform|platform }} <span class="muted small">{{ s.name|default:s.handle }}</span>
+        {% if s.is_live %}<span class="badge badge-green">Live</span>{% else %}<span class="badge badge-gray">Demo</span>{% endif %}</span>
+        <span class="row">{{ s.status|badge }}{% if not s.is_live and s.platform in 'facebook instagram' and 'social' in me.sections %}<a class="small" href="{% url 'social' %}?client={{ c.id }}#meta">Link Page</a>{% endif %}</span></li>{% endfor %}
     </ul>
   </section>
   {% include "portal/_brand_voice.html" %}

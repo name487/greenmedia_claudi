@@ -401,12 +401,66 @@ celery -A app.celery_app beat -l info     # every minute: queue due posts; every
 | `GET /api/content/board?group=draft\|scheduled\|published\|failed\|all` | Status counts, items and scheduler mode |
 | `GET /api/content?status=&client_id=&month=` | Plain list (calendar). `status` takes a status or a group. |
 
+## Facebook & Instagram (Meta)
+
+Facebook and Instagram are the first social platforms with real publishing. Everything else stays simulated until connected.
+
+**One-time setup (Meta app)**
+1. At [developers.facebook.com](https://developers.facebook.com/apps/), create a **Business** app and add **Facebook Login for Business**.
+2. Under *Facebook Login → Settings*, add the **Valid OAuth Redirect URI** `http://127.0.0.1:8001/api/meta/callback` (your API host in production).
+3. Request these permissions: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `business_management`.
+   - In Development mode they work for people with a role on the app and their own Pages.
+   - Clients' Pages need *Advanced Access* through App Review.
+4. Put `META_APP_ID`, `META_APP_SECRET` and `META_REDIRECT_URI` (plus optionally `META_GRAPH_VERSION`, default `v23.0`) in `backend/.env` and restart the API.
+5. Each client's Instagram must be a **professional (Business or Creator) account linked to its Facebook Page**.
+
+**Connect and link** (*Social Hub → Facebook & Instagram*)
+- **Connect Facebook & Instagram:** sign in with the Facebook account that manages the Pages.
+  - The short-lived login is exchanged for a 60-day token, stored encrypted.
+  - Each Page's own token is stored encrypted on the linked account. Page tokens obtained this way don't expire.
+  - Reconnecting refreshes them.
+- Every Page the login manages is listed with its Instagram account. Choose the client and press **Link**; Instagram is included when the Page has one.
+- Linked accounts show **Live**. Other clients' accounts stay **Demo**, simulated.
+
+**Publishing**
+- **Facebook:** text and link posts go to `POST /{page-id}/feed`. Posts with an image go to `POST /{page-id}/photos`.
+- **Instagram:** `POST /{ig-user-id}/media` (a container from the image URL), then `POST /{ig-user-id}/media_publish`.
+- **Images:** Instagram needs an image, so posts have an **Image URL** field (a public `https://` link).
+- **Errors** follow the scheduling rules:
+  - Rate limits and Meta "transient" errors retry with backoff.
+  - An expired or revoked login (code 190) fails the post, marks the account **expired** in Social Hub, and asks you to reconnect.
+  - Missing permissions explain what to allow.
+
+**Adapting content per platform**
+- AI drafts already write one version per platform.
+- **Adapt for each platform** (on a draft) rewrites every version from the master copy, using AI with the client's brand voice. Without AI it uses platform rules:
+  - Instagram: no URLs ("link in bio"), up to 30 hashtags, 2,200 characters
+  - Facebook: link kept, up to 3 hashtags
+  - Google: no hashtags, 1,500 characters
+  - X: 280 characters
+- Every version is checked, and problems show under the post. Errors block scheduling until fixed: Instagram without an image, a non-https image, or too long for the platform. Warnings (link in an Instagram caption, too many hashtags, very long Facebook text) don't block.
+
+**Calendar** (*Social Hub*)
+- Month and week views of posts by publish time, coloured by status: scheduled (blue), published (green), failed (red), planned drafts (grey, dashed).
+- The week view shows the time, client and each platform's result. On a phone it becomes a simple list.
+- Clicking a post opens it in the Content Studio. Data comes from `GET /api/content/calendar?start=…&days=…`.
+
+| Method & path | What it does |
+|---|---|
+| `GET /api/meta/status` · `POST /api/meta/connect` · `GET /api/meta/callback` | Connection state, Facebook login URL, OAuth return |
+| `GET /api/meta/pages` | Pages with their Instagram accounts and linked clients (no tokens) |
+| `POST /api/clients/{id}/meta/link` `{connection_id, page_id, instagram}` | Link the client's Page (+ Instagram) |
+| `DELETE /api/clients/{id}/meta` · `DELETE /api/meta/connections/{id}` | Unlink a client · remove a login and revoke it |
+| `POST /api/content/{id}/adapt` `{platforms?}` | Rewrite each platform version from the master copy |
+| `GET /api/content/calendar?start=&days=&client_id=` | Posts in a date range for the calendar |
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 98 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 110 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
-                                 #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch)
+                                 #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
+                                 #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract

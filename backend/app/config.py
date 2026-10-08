@@ -31,6 +31,11 @@ class Settings:
     google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8001/api/google/callback")
     # Where the browser lands after connecting (the Django "Google Business Profile" page)
     web_app_url: str = os.getenv("WEB_APP_URL", "http://127.0.0.1:8000").rstrip("/")
+    # Meta (Facebook Pages + Instagram professional accounts) — app from developers.facebook.com, "Facebook Login for Business"
+    meta_app_id: str = os.getenv("META_APP_ID", "")
+    meta_app_secret: str = os.getenv("META_APP_SECRET", "")
+    meta_redirect_uri: str = os.getenv("META_REDIRECT_URI", "http://127.0.0.1:8001/api/meta/callback")
+    meta_graph_version: str = os.getenv("META_GRAPH_VERSION", "v23.0")
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
@@ -51,6 +56,10 @@ class Settings:
     @property
     def model(self) -> str:
         return self.ai_model or ("gpt-4.1-mini" if self.ai_provider == "openai" else "claude-sonnet-5")
+
+    @property
+    def meta_configured(self) -> bool:
+        return bool(self.meta_app_id and self.meta_app_secret)
 
     @property
     def celery_enabled(self) -> bool:

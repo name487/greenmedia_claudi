@@ -22,7 +22,7 @@ def _iso(dt: datetime) -> str:
 def _post(client, admin, cid=1, platforms=("gmb", "facebook"), status="draft", when=FUTURE):
     body = {"client_id": cid, "topic": "Monsoon dental check-up offer", "master_copy": "Book your check-up",
             "variants": [{"platform": p, "copy": f"{p} copy", "format": "1:1"} for p in platforms], "status": status,
-            "scheduled_at": _iso(when) if when else None}
+            "scheduled_at": _iso(when) if when else None, "image_url": "https://cdn.example.com/post.jpg" if "instagram" in platforms else ""}
     r = client.post("/api/content", headers=admin, json=body)
     assert r.status_code == 201, r.text
     return r.json()
@@ -125,11 +125,11 @@ def test_temporary_errors_retry_with_backoff_then_succeed(client, admin, monkeyp
     calls = []
     real = publishers.publish_post
 
-    def flaky(client_, platform, copy):
+    def flaky(client_, platform, copy, **kw):
         calls.append(platform)
         if platform == "facebook" and calls.count("facebook") == 1:
             raise publishers.PublishError("Meta 503: try later", transient=True)
-        return real(client_, platform, copy)
+        return real(client_, platform, copy, **kw)
 
     monkeypatch.setattr(content_service, "publish_post", flaky)
     item = _post(client, admin, status="scheduled")
@@ -149,7 +149,7 @@ def test_temporary_errors_retry_with_backoff_then_succeed(client, admin, monkeyp
 
 
 def test_out_of_attempts_or_permanent_errors_fail_and_retry_works(client, admin, monkeypatch):
-    monkeypatch.setattr(content_service, "publish_post", lambda c, p, copy: (_ for _ in ()).throw(publishers.PublishError("Meta 500", transient=True)))
+    monkeypatch.setattr(content_service, "publish_post", lambda c, p, copy, **kw: (_ for _ in ()).throw(publishers.PublishError("Meta 500", transient=True)))
     item = _post(client, admin, status="scheduled", platforms=("facebook",))
     for _ in range(settings.content_max_attempts):
         _make_due(item["id"])
@@ -158,7 +158,7 @@ def test_out_of_attempts_or_permanent_errors_fail_and_retry_works(client, admin,
     assert got["status"] == "failed" and got["attempts"] == settings.content_max_attempts and got["next_attempt_at"] is None
 
     # Permanent: fails on the first attempt
-    monkeypatch.setattr(content_service, "publish_post", lambda c, p, copy: (_ for _ in ()).throw(publishers.PublishError("facebook token expired — reconnect the account")))
+    monkeypatch.setattr(content_service, "publish_post", lambda c, p, copy, **kw: (_ for _ in ()).throw(publishers.PublishError("facebook token expired — reconnect the account")))
     item2 = _post(client, admin, status="scheduled", platforms=("facebook",))
     _make_due(item2["id"])
     _sweep()

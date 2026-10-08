@@ -1,28 +1,45 @@
 {% extends "portal/base.html" %}{% load gm %}
 {% block content %}
 <div class="page-header">
-  <div><h1>Social Hub</h1><p class="muted">Unified calendar, publishing status and connected accounts</p></div>
+  <div><h1>Social Hub</h1><p class="muted">Calendar of scheduled posts, publishing queue and connected Facebook &amp; Instagram accounts</p></div>
   <div class="page-actions">{% include "portal/_client_select.html" with allow_all=True %}</div>
 </div>
 {% if broken %}
-<div class="notice" style="margin-bottom:16px">{{ broken|length }} account{{ broken|length|pluralize:" needs,s need" }} reconnection (token expired):
-  {% for b in broken %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="reconnect"><input type="hidden" name="client_id" value="{{ b.client_id }}"><input type="hidden" name="platform" value="{{ b.platform }}"><button class="btn ghost sm" style="margin-left:6px">{{ b.client_name }} · {{ b.platform|platform }}</button></form>{% endfor %}
+<div class="notice" style="margin-bottom:16px">{{ broken|length }} account{{ broken|length|pluralize:" needs,s need" }} reconnection:
+  {% for b in broken %}{% if b.is_live or b.last_error %}<a class="btn ghost sm" style="margin-left:6px" href="#meta" title="{{ b.last_error }}">{{ b.client_name }} · {{ b.platform|platform }}</a>{% else %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="reconnect"><input type="hidden" name="client_id" value="{{ b.client_id }}"><input type="hidden" name="platform" value="{{ b.platform }}"><button class="btn ghost sm" style="margin-left:6px">{{ b.client_name }} · {{ b.platform|platform }}</button></form>{% endif %}{% endfor %}
 </div>
 {% endif %}
-<section class="card">
-  <header class="card-head"><h3>{{ month|date:"F Y" }}</h3>
-    <div class="btn-row"><a class="btn ghost sm" href="{% qs month=prev_m %}">‹</a><a class="btn ghost sm" href="{% qs month='' %}">Today</a><a class="btn ghost sm" href="{% qs month=next_m %}">›</a></div>
+
+<section class="card" id="calendar">
+  <header class="card-head"><h3>{{ cal_title }}</h3>
+    <div class="btn-row">
+      <span class="pill-tabs mini"><a href="{% qs view='month' week=None %}#calendar" class="{% if view == 'month' %}on{% endif %}">Month</a><a href="{% qs view='week' month=None %}#calendar" class="{% if view == 'week' %}on{% endif %}">Week</a></span>
+      {% if view == 'week' %}<a class="btn ghost sm" href="{% qs week=nav.prev.week %}#calendar" aria-label="Previous week">‹</a><a class="btn ghost sm" href="{% qs week=None %}#calendar">This week</a><a class="btn ghost sm" href="{% qs week=nav.next.week %}#calendar" aria-label="Next week">›</a>
+      {% else %}<a class="btn ghost sm" href="{% qs month=nav.prev.month %}#calendar" aria-label="Previous month">‹</a><a class="btn ghost sm" href="{% qs month=None %}#calendar">Today</a><a class="btn ghost sm" href="{% qs month=nav.next.month %}#calendar" aria-label="Next month">›</a>{% endif %}
+    </div>
   </header>
-  <div class="calendar">
+  <div class="legend small" style="margin-bottom:8px">
+    <span><i class="dot g-scheduled"></i>Scheduled {{ cal_groups.scheduled }}</span><span><i class="dot g-published"></i>Published {{ cal_groups.published }}</span>
+    <span><i class="dot g-failed"></i>Failed {{ cal_groups.failed }}</span><span><i class="dot g-draft"></i>Draft (planned) {{ cal_groups.draft }}</span>
+  </div>
+  <div class="calendar{% if view == 'week' %} week{% endif %}">
     {% for w in weekdays %}<div class="cal-head">{{ w }}</div>{% endfor %}
     {% for week in weeks %}{% for d in week %}
       <div class="cal-day{% if d.other %} other{% endif %}{% if d.today %} today{% endif %}">
-        <span class="cal-num">{{ d.date.day }}</span>
-        {% for p in d.posts %}<span class="cal-post" title="{{ p.topic }} — {{ p.client_name }} ({{ p.status }})">{{ p.topic }}</span>{% endfor %}
+        <span class="cal-num">{% if view == 'week' %}{{ d.date|date:"D j M" }}{% else %}{{ d.date.day }}{% endif %}</span>
+        {% for p in d.posts %}
+          <a class="cal-post g-{{ p.group }}" href="{% url 'content' %}?client={{ p.client_id }}&board={{ p.group }}#c{{ p.id }}"
+             title="{{ p.time }} · {{ p.topic }} — {{ p.client_name }} ({{ p.status }}){% if p.last_error %}: {{ p.last_error }}{% endif %}">
+            <span class="cal-time">{{ p.time }}</span> {{ p.topic }}
+            {% if view == 'week' %}<span class="cal-meta">{{ p.client_name }} · {% for v in p.platforms %}{{ v.platform|platform }}{% if v.status == 'published' %} ✓{% elif v.status == 'failed' %} ✗{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+          </a>
+        {% endfor %}
       </div>
     {% endfor %}{% endfor %}
   </div>
+  {% if not cal_count %}<p class="muted small" style="margin:10px 0 0">Nothing on the calendar {% if view == 'week' %}this week{% else %}this month{% endif %}. Schedule posts in the <a href="{% url 'content' %}">Content Studio</a>.</p>{% endif %}
 </section>
+
 <div class="grid cols-2">
   <section class="card"><header class="card-head"><h3>Publishing queue</h3></header>
     <ul class="list">{% for c in queue %}
@@ -30,13 +47,58 @@
         <span><strong>{{ c.topic }}</strong> {{ c.status|badge }}<div class="muted small">{{ c.client_name }} · {{ c.scheduled_at|when|default:"unscheduled" }}</div></span>
         {% include "portal/_content_actions.html" %}
       </div>
-      <div class="chips" style="margin-top:6px">{% for v in c.variants %}<span class="badge badge-blue">{{ v.platform|platform }}</span>{% endfor %}</div></li>
-    {% empty %}<li class="muted">Queue is empty.</li>{% endfor %}</ul>
+      <div class="chips variant-status" style="margin-top:6px">{% for v in c.variants %}<span class="chip v-{{ v.status }}">{{ v.platform|platform }}</span>{% endfor %}</div></li>
+    {% empty %}<li class="muted">Nothing waiting to publish.</li>{% endfor %}</ul>
   </section>
   <section class="card"><header class="card-head"><h3>Connected accounts ({{ accounts|length }})</h3></header>
     <ul class="list">{% for a in accounts %}
-      <li class="row between"><span>{{ a.platform|platform }} <span class="muted small">{{ a.client_name }}</span></span>{{ a.status|badge }}</li>
+      <li class="row between"><span>{{ a.platform|platform }} <span class="muted small">{{ a.client_name }}{% if a.name %} · {{ a.name }}{% endif %}</span></span>
+        <span class="row">{% if a.is_live %}<span class="badge badge-green">Live</span>{% else %}<span class="badge badge-gray">Demo</span>{% endif %}{{ a.status|badge }}</span></li>
     {% endfor %}</ul>
   </section>
 </div>
+
+{% if meta %}
+<section class="card" id="meta">
+  <header class="card-head"><h3>Facebook &amp; Instagram (Meta)</h3>
+    {% if meta.configured %}<form method="post">{% csrf_token %}<button class="btn sm" name="action" value="meta_connect">{% if meta.connections %}Connect another Facebook login{% else %}Connect Facebook &amp; Instagram{% endif %}</button></form>{% else %}<span class="badge badge-amber">Not configured</span>{% endif %}
+  </header>
+  {% if not meta.configured %}
+    <ol class="small" style="line-height:1.8;margin:0;padding-left:18px">
+      <li>At <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener">developers.facebook.com</a> create a <strong>Business</strong> app and add <strong>Facebook Login for Business</strong>.</li>
+      <li>Under Facebook Login → Settings, add the redirect URI <code style="user-select:all">{{ meta.redirect_uri }}</code>.</li>
+      <li>Request the permissions: <code>{{ meta.scopes|join:", " }}</code> (Advanced Access needs App Review for Pages you don't own; your own Pages work in Development mode).</li>
+      <li>Put <code>META_APP_ID</code>, <code>META_APP_SECRET</code> and <code>META_REDIRECT_URI</code> in <code>backend/.env</code> and restart the API.</li>
+    </ol>
+  {% else %}
+    <ul class="list">{% for c in meta.connections %}
+      <li class="row between"><span><strong>{{ c.name }}</strong> {{ c.status|badge }}<div class="muted small">{{ c.linked_accounts }} linked account{{ c.linked_accounts|pluralize }} · login valid until {{ c.token_expires_at|when:"long" }} (Page tokens keep working){% if c.last_error %} · <span style="color:var(--red)">{{ c.last_error }}</span>{% endif %}</div></span>
+        <span class="btn-row">{% if c.status != 'active' %}<form method="post" class="inline">{% csrf_token %}<button class="btn sm" name="action" value="meta_connect">Reconnect</button></form>{% endif %}
+          <form method="post" class="inline" onsubmit="return confirm('Disconnect {{ c.name }}? Linked Pages stop publishing.')">{% csrf_token %}<input type="hidden" name="connection_id" value="{{ c.id }}"><button class="btn ghost sm" name="action" value="meta_disconnect">Disconnect</button></form></span></li>
+    {% empty %}<li class="muted">Connect the Facebook login that manages your clients' Pages. You'll be asked to allow posting to Pages and to their Instagram accounts — Green Media never sees the password.</li>{% endfor %}</ul>
+    {% for e in page_errors %}<div class="notice error small" style="margin-top:8px">{{ e.connected_as }}: {{ e.error }}</div>{% endfor %}
+    {% if pages %}
+    <div class="table-wrap" style="margin-top:12px"><table class="table responsive">
+      <thead><tr><th>Facebook Page</th><th>Instagram</th><th>Client</th></tr></thead>
+      <tbody>{% for p in pages %}
+        <tr>
+          <td class="primary">{{ p.name }}<div class="muted small">via {{ p.connected_as }}{% if not p.can_post %} · <span style="color:var(--red)">no permission to post</span>{% endif %}</div></td>
+          <td data-label="Instagram">{% if p.instagram %}@{{ p.instagram.username }}{% else %}<span class="muted small">None linked to this Page</span>{% endif %}</td>
+          <td data-label="Client">
+            {% if p.linked_client_id %}<a href="{% url 'client_detail' p.linked_client_id %}">{{ p.linked_client_name }}</a>
+              <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="client_id" value="{{ p.linked_client_id }}"><button class="btn ghost sm" name="action" value="meta_unlink" style="margin-left:6px">Unlink</button></form>
+            {% else %}
+              <form method="post" class="btn-row">{% csrf_token %}<input type="hidden" name="connection_id" value="{{ p.connection_id }}"><input type="hidden" name="page_id" value="{{ p.page_id }}">
+                <select class="input" name="client_id" aria-label="Client">{% for c in all_clients %}<option value="{{ c.id }}"{% if cid and c.id == cid or not cid and c.company_name == p.name %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select>
+                {% if p.instagram %}<label class="check small"><input type="checkbox" name="instagram" checked> + Instagram</label>{% endif %}
+                <button class="btn sm" name="action" value="meta_link">Link</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

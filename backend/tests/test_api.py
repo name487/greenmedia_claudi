@@ -81,7 +81,8 @@ def test_content_publish_fails_on_expired_token_then_retries(client, admin):
     sunrise = next(c for c in client.get("/api/clients?q=Sunrise", headers=admin).json())
     body = {"client_id": sunrise["id"], "topic": "Eye camp", "master_copy": "x", "variants": [{"platform": "instagram", "copy": "x", "format": "4:5"}],
             "scheduled_at": "2030-01-01T10:00:00Z", "status": "scheduled"}
-    item = client.post("/api/content", headers=admin, json=body).json()
+    assert "Instagram needs an image" in client.post("/api/content", headers=admin, json=body).json()["detail"]  # refused before scheduling
+    item = client.post("/api/content", headers=admin, json={**body, "image_url": "https://cdn.example.com/eye-camp.jpg"}).json()
     res = client.post(f"/api/content/{item['id']}/publish", headers=admin)
     assert res.status_code == 502 and "expired" in res.json()["detail"]
     client.post(f"/api/clients/{sunrise['id']}/social/instagram/reconnect", headers=admin)

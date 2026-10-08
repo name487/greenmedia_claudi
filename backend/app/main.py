@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .ai import ai_enabled
 from .config import settings
 from .routers import ai as ai_router
+from .routers import meta as meta_router
 from .routers import analytics, auth, clients, content, dashboard, google, reports, reviews, seo, tasks, users
 from .routers import settings as settings_router
 from .seed import init_db
@@ -48,6 +49,8 @@ for r in (auth, dashboard, clients, reviews, content, seo, analytics, reports, t
 app.include_router(google.client_router)
 app.include_router(ai_router.router)
 app.include_router(ai_router.client_router)
+app.include_router(meta_router.router)
+app.include_router(meta_router.client_router)
 
 
 @app.get("/api/health", tags=["meta"])

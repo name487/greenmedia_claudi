@@ -297,6 +297,34 @@ def generate_content(*, company: str, industry: str, city: str, website: str, br
     }, meta
 
 
+def adapt_variants(*, company: str, industry: str, city: str, website: str, brand_voice: dict, topic: str, master: str, hashtags: list[str],
+                   platforms: list[str]) -> tuple[list[dict], dict]:
+    """Rewrite one master copy for each platform. Returns ([{"platform", "copy", "format"}], meta). Falls back to the
+    rule-based adapter (app.adapt) when the AI isn't available or answers badly."""
+    from . import adapt
+
+    system = (
+        f"You adapt social media posts for {company} ({industry}, {city}, {website}).\n{_voice(brand_voice)}\n"
+        "Keep the facts, offer and call to action of the master copy; change length, tone and format to suit each platform. "
+        'Respond with JSON only: {"variants": [{"platform": string, "copy": string}]}.'
+    )
+    rules = {"instagram": PLATFORM_GUIDE["instagram"] + " Links are not clickable: never include a URL, say “link in bio”.",
+             "facebook": PLATFORM_GUIDE["facebook"] + f" You may include {website} once."}
+    user = (f"Topic: {topic}\nMaster copy:\n\"\"\"\n{master}\n\"\"\"\nSuggested hashtags: {' '.join(hashtags)}\nWrite one version per platform:\n"
+            + "\n".join(f"- {p}: {rules.get(p, PLATFORM_GUIDE.get(p, ''))}" for p in platforms))
+    out, meta = attempt(system, user, 1500)
+    if out:
+        try:
+            got = {v["platform"]: v["copy"].strip() for v in _parse_json(out).get("variants", []) if v.get("platform") in platforms and v.get("copy")}
+            if set(got) == set(platforms):
+                return [{"platform": p, "copy": got[p][: PLATFORM_LIMIT[p]], "format": PLATFORM_FORMAT[p]} for p in platforms], meta
+            meta = {**meta, "source": "template", "error": "AI answer was missing some platforms"}
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            meta = {**meta, "source": "template", "error": f"AI answer was not valid JSON ({exc.__class__.__name__})"}
+    cta = (brand_voice or {}).get("cta_style", "")
+    return [{"platform": p, "copy": adapt.adapt(p, master, hashtags, website, cta), "format": PLATFORM_FORMAT[p]} for p in platforms], meta
+
+
 # ---------- reports ----------
 
 def pct(cur: float, prev: float) -> int:

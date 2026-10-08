@@ -156,6 +156,37 @@ class SocialAccount(Base):
     handle: Mapped[str] = mapped_column(String(100), default="")
     oauth_ref: Mapped[str] = mapped_column(String(200), default="")
     status: Mapped[str] = mapped_column(String(20), default="connected")  # connected | expired
+    # Live link (Meta): Facebook Page id / Instagram professional account id, and the Page access token (Fernet-encrypted).
+    # Without them the account is simulated (demo data).
+    external_id: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(200), default="")
+    access_token_enc: Mapped[str] = mapped_column(Text, default="")
+    meta_connection_id: Mapped[int | None] = mapped_column(ForeignKey("meta_connections.id"), nullable=True)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def is_live(self) -> bool:
+        return bool(self.external_id and self.access_token_enc)
+
+
+class MetaConnection(Base):
+    """A Facebook user who granted the agency access to their Pages (and linked Instagram accounts).
+    The long-lived user token (~60 days) is only used to list Pages; posting uses each Page's own token."""
+
+    __tablename__ = "meta_connections"
+    __table_args__ = (UniqueConstraint("tenant_id", "fb_user_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    fb_user_id: Mapped[str] = mapped_column(String(64))
+    name: Mapped[str] = mapped_column(String(200), default="")
+    user_token_enc: Mapped[str] = mapped_column(Text)
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scopes: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active | expired
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    connected_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Review(Base):
@@ -212,6 +243,7 @@ class ContentItem(Base):
     last_error: Mapped[str] = mapped_column(Text, default="")
     ai_source: Mapped[str] = mapped_column(String(20), default="")  # ai | template | "" (written by hand)
     ai_model: Mapped[str] = mapped_column(String(80), default="")
+    image_url: Mapped[str] = mapped_column(String(1000), default="")  # public https image (required by Instagram)
 
     variants: Mapped[list["ContentVariant"]] = relationship(cascade="all, delete-orphan", order_by="ContentVariant.id")
 

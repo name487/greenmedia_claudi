@@ -59,6 +59,8 @@ def test_sample_reviews_publish_without_google_even_when_disconnected(client, ad
     r = _first(client, admin, lambda r: r["client_id"] == offline["id"] and r["reply_status"] == "new" and r["rating"] >= 3)
     assert r["is_sample"]
     client.post(f"/api/reviews/{r['id']}/draft", headers=admin)
+    assert client.post(f"/api/reviews/{r['id']}/publish", headers=admin).status_code == 409  # not approved yet
+    client.post(f"/api/reviews/{r['id']}/approve", headers=admin)
     res = client.post(f"/api/reviews/{r['id']}/publish", headers=admin)
     assert res.status_code == 200 and res.json()["reply_status"] == "published"
     assert client.get("/api/audit", headers=admin).json()[0]["action"] == "published reply (sample — not sent to Google)"

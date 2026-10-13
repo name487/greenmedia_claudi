@@ -410,9 +410,12 @@ def reviews(request):
                 messages.success(request, f"AI reply drafted with {out['ai']['model']}.")
             else:
                 messages.warning(request, f"Drafted from the brand-voice template — AI not used: {out['ai'].get('error', '')} {out['ai'].get('hint', '')}".strip())
-        elif action in ("approve", "reject", "publish", "reopen"):
-            if action in ("approve", "publish") and request.POST.get("reply") is not None and request.POST.get("reply") != request.POST.get("original"):
-                request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST["reply"]})
+        elif action in ("approve", "reject", "publish", "reopen", "approve_publish"):
+            if action in ("approve", "approve_publish") and request.POST.get("reply") is not None and request.POST.get("reply") != request.POST.get("original"):
+                request.api.patch(f"/api/reviews/{rid}", {"reply": request.POST["reply"]})  # approve exactly what's on screen
+            if action == "approve_publish":
+                request.api.post(f"/api/reviews/{rid}/approve")
+                action = "publish"
             out = request.api.post(f"/api/reviews/{rid}/{action}")
             if action == "publish":
                 messages.success(request, "Marked as published — sample review, nothing was sent to Google." if out["is_sample"] else "Reply published to Google.")

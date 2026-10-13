@@ -211,6 +211,11 @@ class Review(Base):
     reply_model: Mapped[str] = mapped_column(String(80), default="")  # e.g. "openai/gpt-4.1-mini"
     reply_error: Mapped[str] = mapped_column(Text, default="")  # why the AI wasn't used for the last draft
     drafted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Approval of the current reply text. Nothing is published without it: set by Approve (approved_by = the user) or by
+    # the client's opt-in auto-publish rule (approval_rule = "auto_publish"); cleared whenever the text changes.
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_rule: Mapped[str] = mapped_column(String(40), default="")
 
     @property
     def is_sample(self) -> bool:
@@ -244,6 +249,10 @@ class ContentItem(Base):
     ai_source: Mapped[str] = mapped_column(String(20), default="")  # ai | template | "" (written by hand)
     ai_model: Mapped[str] = mapped_column(String(80), default="")
     image_url: Mapped[str] = mapped_column(String(1000), default="")  # public https image (required by Instagram)
+    # Approval of the current copy (Approve & schedule, or created/scheduled by someone allowed to approve). Cleared when
+    # the copy changes; the publisher refuses anything without it.
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     variants: Mapped[list["ContentVariant"]] = relationship(cascade="all, delete-orphan", order_by="ContentVariant.id")
 

@@ -5,14 +5,34 @@
   {% if not me.client_id and 'content.create' in perms %}<div class="page-actions"><a class="btn" href="{% url 'content' %}">+ New campaign</a></div>{% endif %}
 </div>
 
+{% with m=d.master %}
 <div class="grid stats">
-  {% if not me.client_id %}<div class="stat"><span class="stat-label">Active clients</span><strong class="stat-value">{{ k.active_clients }}</strong><span class="stat-hint">{{ k.onboarding_clients }} onboarding</span></div>{% endif %}
-  <div class="stat"><span class="stat-label">GMB profiles</span><strong class="stat-value">{{ k.gmb_connected }}</strong><span class="stat-hint">{{ k.gmb_disconnected }} need connection</span></div>
-  <div class="stat"><span class="stat-label">Pending reviews</span><strong class="stat-value">{{ k.pending_reviews }}</strong><span class="stat-hint">{{ k.negative_reviews }} negative</span></div>
-  <div class="stat"><span class="stat-label">Scheduled posts</span><strong class="stat-value">{{ k.scheduled_posts }}</strong><span class="stat-hint">{% if k.failed_posts %}{{ k.failed_posts }} failed{% else %}none failed{% endif %}</span></div>
-  <div class="stat"><span class="stat-label">Leads</span><strong class="stat-value">{{ k.leads|compact }}</strong>{{ k.leads_change_pct|delta }}</div>
-  <div class="stat"><span class="stat-label">SEO alerts</span><strong class="stat-value">{{ k.seo_alerts }}</strong><span class="stat-hint">keywords dropped 3+</span></div>
+  {% if not me.client_id %}<div class="stat"><span class="stat-label">Clients</span><strong class="stat-value">{{ m.clients.total }}</strong>
+    <span class="stat-hint">{{ m.clients.active }} active · {% if m.clients.at_risk %}<span class="txt-red">⚠ {{ m.clients.at_risk }} at risk</span>{% else %}none at risk{% endif %}</span></div>{% endif %}
+  <a class="stat link" href="{% url 'reviews' %}"><span class="stat-label">Reviews needing a reply</span><strong class="stat-value">{{ m.reviews.needs_reply }}</strong>
+    <span class="stat-hint">{{ m.reviews.negative_waiting }} negative · {{ m.reviews.overdue_48h }} over 48h</span></a>
+  <a class="stat link" href="{% url 'reviews' %}?filter=pending"><span class="stat-label">Waiting for approval</span><strong class="stat-value">{{ m.approvals.total }}</strong>
+    <span class="stat-hint">{{ m.approvals.replies_waiting }} repl{{ m.approvals.replies_waiting|pluralize:"y,ies" }} · {{ m.approvals.posts_waiting }} post{{ m.approvals.posts_waiting|pluralize }}</span></a>
+  <div class="stat"><span class="stat-label">Response rate (30d)</span><strong class="stat-value">{% if m.reviews.response_rate_30d is not None %}{{ m.reviews.response_rate_30d }}%{% else %}—{% endif %}</strong>
+    <span class="stat-hint">{% if m.reviews.avg_response_hours_30d is not None %}avg reply {{ m.reviews.avg_response_hours_30d|hours }}{% else %}no replies yet{% endif %}{% if m.reviews.avg_rating_30d %} · {{ m.reviews.avg_rating_30d }}★{% endif %}</span></div>
+  <a class="stat link" href="{% url 'content' %}?board=scheduled#board"><span class="stat-label">Posts next 7 days</span><strong class="stat-value">{{ m.content.scheduled_7d }}</strong>
+    <span class="stat-hint">{{ m.content.published_30d }} published (30d){% if m.content.failed %} · <span class="txt-red">✗ {{ m.content.failed }} failed</span>{% endif %}</span></a>
+  <div class="stat"><span class="stat-label">Leads (30d)</span><strong class="stat-value">{{ m.leads.total|compact }}</strong>{{ m.leads.change_pct|delta }}</div>
 </div>
+
+{% if not me.client_id %}
+<section class="card integrations-strip">
+  <div><span class="muted small">Google Business Profile</span><strong>{{ m.integrations.google_live }} live</strong>
+    <span class="small">{% if m.integrations.google_approval_pending %}<span class="txt-amber">◷ {{ m.integrations.google_approval_pending }} awaiting API approval</span>{% endif %}{% if m.integrations.google_errors %} <span class="txt-red">✗ {{ m.integrations.google_errors }} error{{ m.integrations.google_errors|pluralize }}</span>{% endif %}{% if not m.integrations.google_approval_pending and not m.integrations.google_errors %}<span class="muted">no problems</span>{% endif %}</span></div>
+  <div><span class="muted small">Facebook &amp; Instagram</span><strong>{{ m.integrations.meta_live_clients }} client{{ m.integrations.meta_live_clients|pluralize }} live</strong>
+    <span class="small">{% if m.integrations.expired_accounts %}<a class="txt-red" href="{% url 'social' %}#meta">✗ {{ m.integrations.expired_accounts }} need{{ m.integrations.expired_accounts|pluralize:"s," }} reconnecting</a>{% else %}<span class="muted">all connected</span>{% endif %}</span></div>
+  <div><span class="muted small">AI replies &amp; posts</span><strong>{% if m.ai.enabled %}{{ m.ai.model }}{% else %}Templates only{% endif %}</strong>
+    <span class="small muted">{{ m.ai.ai_drafts_30d }} AI · {{ m.ai.template_drafts_30d }} template drafts (30d){% if m.ai.tokens_30d %} · {{ m.ai.tokens_30d|compact }} tokens{% endif %}</span></div>
+  <div><span class="muted small">Scheduler</span><strong>{% if m.integrations.scheduler == 'celery' %}Redis + Celery{% elif m.integrations.scheduler == 'in_process' %}Built in{% else %}Off{% endif %}</strong>
+    <span class="small muted">{% if m.integrations.scheduler == 'off' %}Publish now still works{% else %}checks every minute{% endif %}</span></div>
+</section>
+{% endif %}
+{% endwith %}
 
 <div class="grid cols-3">
   <section class="card span-2">
@@ -20,14 +40,16 @@
     {% line_chart d.growth "gmb_views|GMB views|var(--c1)" "social_reach|Social reach ÷10|var(--c2)|0.1" %}
   </section>
   <section class="card">
-    <header class="card-head"><h3>Needs attention</h3>{% if 'reviews' in me.sections %}<a class="small" href="{% url 'reviews' %}?filter=negative">Open queue</a>{% endif %}</header>
-    {% if not d.negative_reviews and not d.seo_alerts %}<p class="muted">All clear. 🎉</p>{% else %}
-    <ul class="list">
-      {% for r in d.negative_reviews|slice:":3" %}
-        <li><div class="row between"><strong>{{ r.client_name }}</strong>{{ r.rating|stars }}</div><p class="muted small" style="margin:0">{{ r.text|truncatechars:90 }}</p></li>
+    <header class="card-head"><h3>Needs attention</h3></header>
+    {% if not d.attention and not d.seo_alerts %}<p class="muted">All clear. 🎉</p>{% else %}
+    <ul class="list attention">
+      {% for a in d.attention %}
+        <li><a href="{{ a.link }}" style="color:inherit;text-decoration:none">
+          <div class="row between"><strong>{{ a.title }}</strong><span class="badge badge-{% if a.severity == 'critical' %}red{% elif a.severity == 'serious' %}red{% else %}amber{% endif %}">{% if a.severity == 'critical' %}✗ Failed{% elif a.severity == 'serious' %}! Urgent{% else %}◷ Check{% endif %}</span></div>
+          <p class="muted small" style="margin:0">{{ a.client_name }} · {{ a.detail|truncatechars:90 }}</p></a></li>
       {% endfor %}
       {% for s in d.seo_alerts|slice:":2" %}
-        <li class="row between"><span>“{{ s.keyword }}”</span><span class="badge badge-red">#{{ s.previous_rank }} → #{{ s.current_rank }}</span></li>
+        <li class="row between"><span>“{{ s.keyword }}” <span class="muted small">{{ s.client_name }}</span></span><span class="badge badge-red">#{{ s.previous_rank }} → #{{ s.current_rank }}</span></li>
       {% endfor %}
     </ul>{% endif %}
   </section>
@@ -37,19 +59,20 @@
 <section class="card"><header class="card-head"><h3>Where your leads come from</h3></header>{% bar_list lead_sources %}</section>
 {% else %}
 <section class="card">
-  <header class="card-head"><h3>Client performance</h3></header>
+  <header class="card-head"><h3>Client health</h3><span class="muted small">lowest first · score out of 100</span></header>
   <div class="table-wrap"><table class="table responsive">
-    <thead><tr><th>Client</th><th>Plan</th><th>Rating</th><th class="num">GMB views</th><th class="num">Leads</th><th class="num">Pending</th><th>Status</th></tr></thead>
+    <thead><tr><th>Client</th><th>Health</th><th class="num">Reviews waiting</th><th class="num">Scheduled</th><th class="num">Leads (30d)</th><th>Connections</th></tr></thead>
     <tbody>
     {% for c in d.client_performance %}
       <tr class="clickable" onclick="location.href='{% url 'client_detail' c.id %}'">
-        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit;text-decoration:none">{{ c.company_name }}</a><div class="muted small">{{ c.industry }} · {{ c.city }}</div></td>
-        <td data-label="Plan">{{ c.plan }}</td>
-        <td data-label="Rating">{% if c.rating %}{{ c.rating|stars }} {{ c.rating }}{% else %}<span class="muted small">Not linked to Google</span>{% endif %}</td>
-        <td data-label="GMB views" class="num">{{ c.gmb_views|compact }}</td>
+        <td class="primary"><a href="{% url 'client_detail' c.id %}" style="color:inherit;text-decoration:none">{{ c.company_name }}</a><div class="muted small">{{ c.industry }} · {{ c.city }} · {{ c.plan }}</div></td>
+        <td data-label="Health"><span class="badge badge-{% if c.health >= 80 %}green{% elif c.health >= 50 %}amber{% else %}red{% endif %}">{% if c.health >= 80 %}✓{% elif c.health >= 50 %}◷{% else %}⚠{% endif %} {{ c.health_label }} · {{ c.health }}</span>
+          {% if c.health_reasons %}<div class="muted small">{{ c.health_reasons|join:" · " }}</div>{% endif %}</td>
+        <td data-label="Reviews waiting" class="num">{{ c.pending_reviews|default:"—" }}</td>
+        <td data-label="Scheduled" class="num">{{ c.scheduled_posts|default:"—" }}</td>
         <td data-label="Leads" class="num">{{ c.leads }} {{ c.leads_change_pct|delta }}</td>
-        <td data-label="Pending" class="num">{{ c.pending_reviews|default:"—" }}</td>
-        <td data-label="Status">{{ c.status|badge }}</td>
+        <td data-label="Connections" class="small">Google: {% if c.google_state == 'live' %}live{% elif c.google_state == 'approval_pending' %}awaiting approval{% elif c.google_state == 'error' %}<span class="txt-red">error</span>{% else %}demo{% endif %}
+          · Meta: {% if c.meta_live %}live{% else %}demo{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>

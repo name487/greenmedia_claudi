@@ -113,6 +113,14 @@ class ContentIn(BaseModel):
     image_url: ImageUrl = ""
 
 
+def _approve(item: ContentItem, user: User) -> None:
+    item.approved_by, item.approved_at = user.id, content_service.utcnow()
+
+
+def _unapprove(item: ContentItem) -> None:
+    item.approved_by, item.approved_at = None, None
+
+
 def _publishable(item: ContentItem) -> None:
     """Refuse to schedule a post a platform would reject (e.g. Instagram without an image, X over 280 chars)."""
     problems = adapt.blocking(item.variants, item.image_url or "")
@@ -144,6 +152,7 @@ def create(body: ContentIn, user: User = Depends(require("content.create")), db:
     if body.status == "scheduled":
         _publishable(item)
         content_service.schedule(item, when)
+        _approve(item, user)  # created by someone allowed to approve: this is the approval
     else:
         item.status = body.status
     audit(db, user, f"content {body.status.replace('_', ' ')}: {body.topic}", client_id=c.id, entity_type="content", entity_id=item.id,
@@ -241,6 +250,12 @@ def edit(content_id: int, body: ContentPatch, user: User = Depends(require("cont
             content_service.schedule(item, when)
         else:
             item.scheduled_at = when
+    if copy_fields and details and item.approved_at:
+        # The approved text changed (e.g. a failed post being fixed): it must be approved again before it can go out.
+        _unapprove(item)
+        if item.status == "failed":
+            item.status, item.next_attempt_at = "draft", None
+        details["approval"] = "cleared — the copy changed after approval"
     item.updated_at = content_service.utcnow()
     verb = "rescheduled" if set(changes) == {"scheduled_at"} and item.status == "scheduled" else "edited"
     audit(db, user, f"{verb}: {item.topic}", client_id=c.id, entity_type="content", entity_id=item.id, details=details or None)
@@ -275,6 +290,10 @@ def adapt_content(content_id: int, body: AdaptIn | None = None, user: User = Dep
             current[v["platform"]].copy, current[v["platform"]].format = v["copy"], v["format"]
         else:
             item.variants.append(ContentVariant(platform=v["platform"], copy=v["copy"], format=v["format"]))
+    if item.approved_at:
+        _unapprove(item)
+        if item.status == "failed":
+            item.status, item.next_attempt_at = "draft", None
     item.updated_at = content_service.utcnow()
     audit(db, user, f"adapted copy per platform ({meta['source']}): {item.topic}", client_id=c.id, entity_type="content", entity_id=item.id,
           details={**_ai_details(meta), "platforms": platforms, "before": before})
@@ -330,21 +349,26 @@ def transition(content_id: int, action: Action, user: User = Depends(require_sec
         if not can_approve(db, user):
             raise HTTPException(403, "Your role cannot approve this content")
         item.status = "draft"
+        _unapprove(item)
     elif action in ("approve", "schedule"):
         need({"in_review"} if action == "approve" else {"draft", "in_review", "failed"})
         if not can_approve(db, user):
             raise HTTPException(403, "This content needs approval before it can be scheduled" if action == "schedule" else "Your role cannot approve this content")
         _publishable(item)
         content_service.schedule(item, _check_schedule(item.scheduled_at))
+        _approve(item, user)
     elif action == "unschedule":
         need({"scheduled"})
         if not can_approve(db, user):
             raise HTTPException(403, "Your role cannot change the schedule")
         item.status, item.next_attempt_at, item.updated_at = "draft", None, content_service.utcnow()
+        _unapprove(item)
     else:  # publish / retry: now
         need({"scheduled", "failed"} if action == "publish" else {"failed"})
         if not can(user, "content.publish"):
             raise HTTPException(403, "Your role cannot publish")
+        if not item.approved_at:
+            raise HTTPException(409, "This post hasn't been approved — approve & schedule it first")
         _publishable(item)
         content_service.schedule(item, content_service.utcnow())
         audit(db, user, f"{'retry' if before == 'failed' else 'publish now'} requested: {item.topic}", client_id=c.id, entity_type="content",

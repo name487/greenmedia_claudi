@@ -143,8 +143,9 @@ def sync_reviews(db: Session, client: Client, full: bool = False) -> dict:
                 new_ids.append(r.id)
         elif r.text != text or r.rating != rating:
             r.text, r.rating, r.language, r.sentiment = text, rating, detect_language(text), detect_sentiment(text, rating)
-            if r.reply_status == "approved":
+            if r.reply_status in ("approved", "failed"):
                 r.reply_status = "drafted"  # approved for the old text: needs another look
+                r.approved_by, r.approved_at, r.approval_rule = None, None, ""
             updated += 1
         r.updated_at = api.parse_time(gr.get("updateTime")) or r.updated_at
         r.reviewer_photo = (reviewer.get("profilePhotoUrl") or "")[:500]

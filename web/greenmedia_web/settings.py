@@ -15,8 +15,21 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-insecure-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+# Hosting platforms: Render sets RENDER_EXTERNAL_HOSTNAME; any HTTPS-terminating proxy sets X-Forwarded-Proto.
+if os.getenv("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+    CSRF_TRUSTED_ORIGINS.append(f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}")
+if os.getenv("DJANGO_BEHIND_PROXY", "1" if os.getenv("RENDER") else "0") == "1":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8001").rstrip("/")
+
+def _url(value: str) -> str:
+    """Accept "api.example.com" (as platforms hand out) as well as full URLs."""
+    value = value.strip().rstrip("/")
+    return value if "://" in value else f"https://{value}"
+
+
+API_URL = _url(os.getenv("API_URL", "http://127.0.0.1:8001"))
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "90"))
 
 INSTALLED_APPS = [
@@ -58,8 +71,8 @@ DATABASES: dict = {}
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+# Secure cookies need HTTPS; DJANGO_SECURE_COOKIES=0 for a local production-mode demo on plain http://
+SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = os.getenv("DJANGO_SECURE_COOKIES", "0" if DEBUG else "1") == "1"
 SESSION_COOKIE_AGE = 12 * 3600
 MESSAGE_STORAGE = "django.contrib.messages.storage.cookie.CookieStorage"
 

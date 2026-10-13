@@ -127,7 +127,27 @@ void main() {
     final publish = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
     expect(publish.onPressed, isNull);
     expect(find.widgetWithText(FilledButton, 'Approve'), findsOneWidget);
-    expect(find.textContaining('Escalation'), findsOneWidget);
+    expect(find.textContaining('2★ or lower'), findsOneWidget);
+  });
+
+  testWidgets('ReviewCard: nothing publishes without approval, whatever the rating', (tester) async {
+    final session = Session(store: MemoryStore(), api: ApiClient(baseUrl: 'http://api.test', httpClient: fakeApi([])));
+    session.me = Me.fromJson((fixture('login_admin') as Map<String, dynamic>)['user'] as Map<String, dynamic>);
+    Review review(String status) => Review.fromJson({
+          'id': 2, 'client_id': 1, 'client_name': 'Smile Dental Studio', 'author': 'Priya S.', 'rating': 5, 'text': 'Lovely staff!',
+          'language': 'en', 'sentiment': 'positive', 'reply': 'Thank you!', 'reply_status': status, 'needs_escalation': false,
+          'created_at': '2026-09-20T10:00:00+00:00', 'published_at': null,
+        });
+    Future<FilledButton> publishFor(String status) async {
+      await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: session,
+        child: MaterialApp(home: Scaffold(body: ListView(children: [ReviewCard(key: UniqueKey(), review: review(status), onChanged: () {})]))),
+      ));
+      return tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Publish'));
+    }
+
+    expect((await publishFor('drafted')).onPressed, isNull); // 5★ but not approved
+    expect((await publishFor('approved')).onPressed, isNotNull);
   });
 
   test('fixtures parse into typed models', () {

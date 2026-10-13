@@ -74,6 +74,7 @@ def review_out(r: Review, client_name: str) -> dict:
         "updated_at": iso(r.updated_at), "edited": bool(r.updated_at and r.created_at and abs((_utc(r.updated_at) - _utc(r.created_at)).total_seconds()) > 60),
         "reviewer_photo": r.reviewer_photo, "is_sample": r.is_sample,
         "reply_source": r.reply_source, "reply_model": r.reply_model, "reply_error": r.reply_error, "drafted_at": iso(r.drafted_at),
+        "approved_by": r.approved_by, "approved_at": iso(r.approved_at), "approval_rule": r.approval_rule or "",
         "waiting_hours": round((datetime.now(timezone.utc) - _utc(r.created_at)).total_seconds() / 3600)
         if r.reply_status in ("new", "drafted", "approved", "failed") and r.created_at else None,
     }
@@ -86,6 +87,7 @@ def content_out(c: ContentItem, client_name: str) -> dict:
         "scheduled_at": iso(c.scheduled_at), "created_at": iso(c.created_at), "updated_at": iso(c.updated_at), "published_at": iso(c.published_at),
         "attempts": c.attempts or 0, "next_attempt_at": iso(c.next_attempt_at), "last_error": c.last_error or "",
         "ai_source": c.ai_source or "", "ai_model": c.ai_model or "", "image_url": c.image_url or "",
+        "approved_by": c.approved_by, "approved_at": iso(c.approved_at),
         "variants": [{"platform": v.platform, "copy": v.copy, "format": v.format, "external_post_id": v.external_post_id,
                       "status": v.status or "pending", "published_at": iso(v.published_at), "error": v.error or "",
                       "checks": adapt.check(v.platform, v.copy, c.image_url or "") if v.status != "published" else []} for v in c.variants],

@@ -6,8 +6,21 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
+def _db_url(url: str) -> str:
+    """Hosting platforms hand out postgres://… — SQLAlchemy needs the driver: postgresql+psycopg://…"""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
+def _url(value: str) -> str:
+    value = value.strip().rstrip("/")
+    return value if "://" in value else f"https://{value}"
+
+
 class Settings:
-    database_url: str = os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}")
+    database_url: str = _db_url(os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}"))
     jwt_secret: str = os.getenv("JWT_SECRET", "dev-only-change-me")
     jwt_ttl_minutes: int = int(os.getenv("JWT_TTL_MINUTES", "720"))
     seed_demo: bool = os.getenv("SEED_DEMO", "1") == "1"
@@ -30,7 +43,7 @@ class Settings:
     # Must exactly match an "Authorized redirect URI" on the OAuth client, e.g. https://api.example.com/api/google/callback
     google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8001/api/google/callback")
     # Where the browser lands after connecting (the Django "Google Business Profile" page)
-    web_app_url: str = os.getenv("WEB_APP_URL", "http://127.0.0.1:8000").rstrip("/")
+    web_app_url: str = _url(os.getenv("WEB_APP_URL", "http://127.0.0.1:8000"))
     # Meta (Facebook Pages + Instagram professional accounts) — app from developers.facebook.com, "Facebook Login for Business"
     meta_app_id: str = os.getenv("META_APP_ID", "")
     meta_app_secret: str = os.getenv("META_APP_SECRET", "")

@@ -68,6 +68,7 @@ def test_sample_reviews_while_api_approval_is_pending_then_real_ones_replace_the
     # Working the queue on a sample never touches Google
     sample = next(r for r in q["items"] if r["is_sample"] and r["rating"] >= 3)
     before = len(google.calls)
+    client.post(f"/api/reviews/{sample['id']}/approve", headers=admin)
     assert client.post(f"/api/reviews/{sample['id']}/publish", headers=admin).json()["reply_status"] == "published"
     assert len(google.calls) == before and google.replies == {}
 
@@ -131,11 +132,13 @@ def test_bulk_actions_follow_the_same_rules(client, admin):
     assert ids
     out = client.post("/api/reviews/bulk", headers=admin, json={"ids": ids, "action": "draft"}).json()
     assert out == {"done": len(ids), "failed": []}
+    # Nothing publishes without approval, in bulk too
     out = client.post("/api/reviews/bulk", headers=admin, json={"ids": ids + [999999], "action": "publish"}).json()
     failed = {f["id"]: f["error"] for f in out["failed"]}
-    low = {r["id"] for r in new if r["rating"] <= 2}  # 2★ escalation still applies in bulk
-    assert set(failed) == low | {999999} and failed[999999] == "Review not found"
-    assert all("approved first" in failed[i] for i in low) and out["done"] == len(ids) - len(low)
+    assert out["done"] == 0 and set(failed) == set(ids) | {999999} and failed[999999] == "Review not found"
+    assert all("approved first" in failed[i] for i in ids)
+    assert client.post("/api/reviews/bulk", headers=admin, json={"ids": ids, "action": "approve"}).json() == {"done": len(ids), "failed": []}
+    assert client.post("/api/reviews/bulk", headers=admin, json={"ids": ids, "action": "publish"}).json() == {"done": len(ids), "failed": []}
     # A role without approve permission gets per-review errors, nothing changes
     content = login(client, "sneha@greenmedia.in")
     drafted = [r["id"] for r in _queue(client, admin, filter="all", limit=200)["items"] if r["reply_status"] == "drafted"][:3]

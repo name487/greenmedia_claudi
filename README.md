@@ -35,7 +35,7 @@ The frontends hold no business logic, so a rule like "2★ replies need approval
 - **Dashboard.** KPI cards, a 30-day growth chart, a "needs attention" list (negative reviews and SEO drops) and client performance.
 - **Clients.** Search and filter clients. Each client workspace shows accounts, brand voice, **auto-publish switches per channel**, keywords, reviews, content, tasks, reports and notes.
 - **GMB Center.** Connection health, sync, insights and posts.
-- **AI Review Queue.** Each review goes through sentiment and language detection, then an AI draft. You can then edit, regenerate, approve, reject or publish. **Replies to reviews of 2★ or lower must be approved first.** Editing a reply resets its approval. A failed publish is marked `failed` and can be retried.
+- **AI Review Queue.** Each review goes through sentiment and language detection, then an AI draft. You can then edit, regenerate, approve, reject or publish. **Every reply must be approved before it is published** (2★ or lower are flagged for an account manager). Editing a reply resets its approval. A failed publish is marked `failed` and can be retried.
 - **AI Content Studio.** A topic becomes master copy, variants for each platform (GMB, Facebook, Instagram, LinkedIn, YouTube, X) and a creative brief. Content then moves draft → in review → scheduled → published, and can optionally require client approval.
 - **Creative Studio** (web). One master image previewed at 6 platform sizes, each exportable as a PNG.
 - **Social Hub.** Monthly calendar, publishing queue, and reconnect prompts for expired tokens.
@@ -44,7 +44,7 @@ The frontends hold no business logic, so a rule like "2★ replies need approval
 - **Reports.** AI monthly narrative, KPI comparison and ranking movement. Deliver as PDF (print), email or WhatsApp.
 - **Tasks and audit trail.** Every write action is logged with who, what and when.
 
-**Safety defaults:** everything requires human approval. Auto-publish is an explicit setting per client and per channel.
+**Safety defaults:** nothing is published without approval (see [Approval guarantee](#approval-guarantee)). Auto-publish is an explicit opt-in per client and per channel.
 
 ## Run it locally
 
@@ -189,7 +189,7 @@ Open a client and use the **Google Business Profile** panel:
 
 ### After linking
 
-- **AI Reviews:** **Sync reviews** (and the scheduler) pulls new reviews from Google into `gmb_reviews` and AI-drafts replies. Approved replies are posted to Google. 2★ replies still need approval first. See [AI Review Queue](#ai-review-queue).
+- **AI Reviews:** **Sync reviews** (and the scheduler) pulls new reviews from Google into `gmb_reviews` and AI-drafts replies. Only approved replies are posted to Google. See [AI Review Queue](#ai-review-queue).
 - **Content Studio:** GMB variants of approved content are posted to the profile as Google posts, either on "Publish now" or at their scheduled time.
 - **Scheduler:** with Redis, Celery beat publishes due posts every minute and syncs live profiles every `GOOGLE_SYNC_MINUTES`. See [Content scheduling](#content-scheduling-redis--celery). Without Redis, the API does both every `SCHEDULER_INTERVAL_MINUTES`, or you can run `python -m app.jobs` from cron.
 - **Errors:** if access is revoked, the profile shows **Expired** with Google's error message. **Reconnect** fixes it.
@@ -247,7 +247,7 @@ How the sync behaves:
 - **Edits.** If a reviewer edits their review, the text, rating and sentiment are refreshed. A reply that was approved but not yet published goes back to *Drafted* for another look.
 - **Replies made on Google.** A reply written directly on Google is mirrored as *Published*, so nobody drafts a second one.
 - **AI drafts.** New unanswered reviews get an AI draft straight away, up to `REVIEW_AUTODRAFT_LIMIT` per client per sync. Without an AI key, the brand-voice template is used.
-- **Auto-publish.** Positive 4–5★ replies are auto-published only when the client opted in (*Client Workspace → Publishing safety*) and the review is under 14 days old.
+- **Auto-publish.** The one exception to [approval](#approval-guarantee): positive 4–5★ replies are auto-published only when the client opted in (*Client Workspace → Publishing safety*) and the review is under 14 days old.
 
 **The screen**
 
@@ -257,7 +257,7 @@ How the sync behaves:
 - **Priority** puts negative and 2★ reviews first, then the longest-waiting ones.
 - Tabs: Needs reply / Approved / Negative / Published / All.
 - Each card shows a ⏱ waiting badge (amber over 24h, red over 48h), the AI draft editor, and Approve / Publish / Reject / Regenerate.
-- Bulk actions: tick reviews (or **Select all**), then *Draft AI replies*, *Approve*, *Publish* or *Reject*. Each review follows the single-review rules: 2★ approval and role permissions. Any that can't be done are listed.
+- Bulk actions: tick reviews (or **Select all**), then *Draft AI replies*, *Approve*, *Publish* or *Reject*. Each review follows the single-review rules: approval first, and role permissions. *Publish approved* only sends replies that are already approved. Any that can't be done are listed.
 
 **Sample data while API approval is pending**
 
@@ -313,7 +313,7 @@ Until Google approves Business Profile API access, every review call fails with 
 - **Regenerate:** with an optional note such as "shorter" or "mention online booking".
 - **Approve, Reject, Reopen.**
 - **Publish to Google:** through the official Business Profile API, `PUT accounts/{a}/locations/{l}/reviews/{id}/reply`. Google's `updateTime` becomes the published time.
-- **Approval rules:** replies to reviews of 2★ or lower must be approved before publishing. Only roles with `review.approve` or `review.publish` can approve or publish.
+- **Approval rules:** every reply must be approved before publishing ([Approval guarantee](#approval-guarantee)). Only roles with `review.approve` or `review.publish` can approve or publish.
 
 **Audit trail.** Every step is a row in `audit_logs` with a `details` JSON column:
 
@@ -454,13 +454,103 @@ Facebook and Instagram are the first social platforms with real publishing. Ever
 | `POST /api/content/{id}/adapt` `{platforms?}` | Rewrite each platform version from the master copy |
 | `GET /api/content/calendar?start=&days=&client_id=` | Posts in a date range for the calendar |
 
+## Master Dashboard
+
+The home page (`GET /api/dashboard`, scoped to the clients each user can see) shows:
+
+- **Headline numbers:**
+  - clients, and how many are at risk
+  - reviews needing a reply (negative, over 48h)
+  - items **waiting for approval** (replies + posts)
+  - 30-day response rate with average reply time and rating
+  - posts going out in the next 7 days (published in 30 days, failed)
+  - leads, with the change against the previous 30 days
+- **Integrations strip:**
+  - Google profiles live, awaiting API approval, or in error
+  - clients live on Facebook/Instagram, and accounts that need reconnecting
+  - AI model, with AI vs template drafts and tokens used in 30 days (from `audit_logs`)
+  - scheduler mode
+- **Needs attention:** failed posts, negative reviews waiting, expired social logins, Google errors or pending approval. Each item links straight to the fix.
+- **Client health**, lowest first. Each client gets a 0–100 score with the reasons behind it:
+  - negative reviews waiting, replies over 48h
+  - failed posts
+  - Google not connected or failing, expired social logins
+  - leads down 20%+
+
+  Shown as *Good* (80+), *Watch* (50–79) or *At risk*, with Google/Meta live status and the client's numbers.
+
+The keys under `kpis` are unchanged for the mobile app; the new numbers are under `master`.
+
+## Approval guarantee
+
+**Nothing is published without approval.** The approval is recorded on the item itself (`approved_by`, `approved_at`), and the lowest-level publish functions refuse anything without it. So no button, API call, bulk action, scheduler run, Celery task or future code path can skip it.
+
+| | Rule |
+|---|---|
+| Review replies | Every reply needs **Approve** (permission `review.approve`) before **Publish** (`review.publish`), whatever the rating. People with both get *Approve & publish*, which records two steps. Editing, regenerating, rejecting or reopening clears the approval, and so does the reviewer editing the review on Google. |
+| Posts | Only *Approve & schedule* (or creating the post as scheduled, which needs approval rights; with client approval mode on, only the client) makes a post publishable. Unscheduling, requesting changes, editing or re-adapting a failed post sends it back to Draft and clears the approval. |
+| Last line of defence | `review_queue.publish` raises "hasn't been approved". `content_service` moves an unapproved row back to Draft and logs `publish blocked (not approved)`, so Google and Meta are never called. |
+| The one exception | **Auto-publish**: off by default. A person turns it on per client. It covers only positive 4–5★ replies to reviews under 14 days old, and is recorded as `approval_rule = "auto_publish"`. Negative reviews always wait for a person. |
+
+`tests/test_approval_guard.py` tries every route around this and checks that the fake Google and Meta receive nothing. The end-to-end test checks the same in a real browser.
+
+## End-to-end test
+
+`e2e/` drives the real API and Django site in a browser. Google, Meta and OpenAI are replaced by the same fakes the unit tests use, and the fakes report what they received.
+
+```bash
+pip install -r backend/requirements.txt -r web/requirements.txt
+cd e2e && npm install && npx playwright install chromium && ./run.sh
+```
+
+It runs these steps:
+1. The dashboard loads.
+2. Connect Google for a client: the location links, reviews are imported and AI drafts are written.
+3. The AI reply can't be published before approval, in the UI, through the API, or by a role without rights, and Google has received nothing.
+4. Edit, approve, then publish: Google receives exactly the approved text, and the review history records each step.
+5. Connect Meta and link the client's Page and Instagram.
+6. Save an AI post draft. It can't be published as a draft or while in review, and Meta has received nothing.
+7. Approve & schedule, then Publish now: a Facebook photo post and an Instagram post go out.
+8. The calendar, dashboard and audit trail show the result.
+
+Screenshots go to `e2e/artifacts/`. CI runs it on every push (job **End-to-end**).
+
+## Deploy the demo
+
+**Locally or on any server with Docker (production mode).** This runs PostgreSQL, Redis, the API, a Celery worker with beat, and Django on gunicorn:
+```bash
+docker compose -f docker-compose.demo.yml up -d --build --wait
+# http://127.0.0.1:8000 → sign in with a demo button (password demo1234)
+```
+- 24 demo clients are seeded on first start.
+- Google, Meta and OpenAI stay simulated until their keys are set; `docker-compose.demo.yml` passes them through from your shell or a `.env` file next to it.
+- To serve it on a domain:
+  - put HTTPS in front
+  - set `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS=https://your-domain`, `DJANGO_SECURE_COOKIES=1` and `WEB_APP_URL=https://your-domain`
+  - set strong `JWT_SECRET` and `DJANGO_SECRET_KEY`
+- CI builds and starts this stack on every push (job **Demo stack**).
+
+**Public demo on Render (free plan).** `render.yaml` is a blueprint:
+1. render.com → **New → Blueprint** → select this repository → **Apply**.
+2. It creates PostgreSQL, `greenmedia-api` and `greenmedia-web`, wires them together, and generates the secrets. Scheduling runs inside the API, so no Redis or worker is needed for the demo.
+3. Open the `greenmedia-web` URL and sign in with a demo button.
+4. Optional: add `OPENAI_API_KEY`, the Google keys (`GOOGLE_REDIRECT_URI=https://<api host>/api/google/callback`), the Meta keys, and your own `TOKEN_ENCRYPTION_KEY` in the API service's environment.
+
+> A public demo has well-known demo logins: anyone with the link can sign in. Don't connect real Google or Meta accounts to it. For real use, deploy with `SEED_DEMO=0` and create your own admin (`python -m app.manage create-admin`).
+
+Hosting notes:
+- `postgres://` database URLs are accepted (converted for SQLAlchemy).
+- Bare hostnames are accepted for `API_URL` and `WEB_APP_URL` (`https://` is added).
+- Django trusts the platform's HTTPS proxy on Render.
+
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 110 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 121 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
-                                 #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar)
+                                 #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
+                                 #   approval guarantee on every publish path, master dashboard KPIs)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
 cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
@@ -482,6 +572,8 @@ Release builds only talk to HTTPS APIs. Plain `http://` is allowed only in Andro
 **CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK** and an unsigned **iOS build**, which you can download from the run's Artifacts. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
 
 ## Deploying
+
+See also [Deploy the demo](#deploy-the-demo) (Docker images: `backend/Dockerfile`, `web/Dockerfile`).
 
 - **API:** `uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4` behind HTTPS. Set `DATABASE_URL` to PostgreSQL, a strong `JWT_SECRET`, and `SEED_DEMO=0`.
 - **Web:** `python manage.py collectstatic && gunicorn greenmedia_web.wsgi`. Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` and `API_URL`. Static files are served by WhiteNoise.

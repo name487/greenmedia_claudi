@@ -78,6 +78,37 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+  e2e:
+    name: End-to-end (browser; fake Google/Meta/OpenAI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r backend/requirements.txt -r web/requirements.txt
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - working-directory: e2e
+        run: npm install && npx playwright install --with-deps chromium
+      - working-directory: e2e
+        run: ./run.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: e2e-artifacts, path: e2e/artifacts }
+
+  demo-stack:
+    name: Demo stack (docker compose, production mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.demo.yml up -d --build --wait
+      - run: |
+          curl -sf http://127.0.0.1:8001/api/health
+          curl -sf -o /dev/null http://127.0.0.1:8000/login/
+          curl -sf -o /dev/null http://127.0.0.1:8000/static/portal/app.css
+      - if: failure()
+        run: docker compose -f docker-compose.demo.yml logs --tail 100
+
   flutter:
     name: Flutter analyze + test
     runs-on: ubuntu-latest

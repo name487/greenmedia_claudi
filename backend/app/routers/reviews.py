@@ -163,6 +163,7 @@ def edit(review_id: int, body: ReplyIn, user: User = Depends(require_section("re
         raise HTTPException(422, "Reply can't be empty")
     before = r.reply
     r.reply, r.reply_status = new, "drafted"  # an edit always needs re-approval
+    review_queue.clear_approval(r)
     if new != before:
         r.reply_source, r.reply_model = "human", ""
     audit(db, user, "edited reply", client_id=c.id, entity_type="review", entity_id=r.id, details={"before": before, "after": new})
@@ -188,26 +189,27 @@ def _act(db: Session, user: User, r: Review, c: Client, action: str) -> None:
         if not r.reply or r.reply_status not in ("drafted", "failed"):
             raise HTTPException(409, "Only drafted replies can be approved")
         r.reply_status = "approved"
+        review_queue.approve(r, user.id)
         details["reply"] = r.reply
     elif action == "publish":
         if not can(user, "review.publish"):
             raise HTTPException(403, "Your role cannot publish replies")
         if not r.reply:
             raise HTTPException(409, "Nothing to publish")
-        if r.rating <= 2 and r.reply_status != "approved":
-            raise HTTPException(409, "Replies to reviews of 2★ or less must be approved first")
-        if r.reply_status not in ("drafted", "approved", "failed"):
-            raise HTTPException(409, f"Cannot publish a {r.reply_status} reply")
+        if r.reply_status not in ("approved", "failed") or not r.approved_at:
+            raise HTTPException(409, "Replies must be approved first — Approve, then Publish" + (" (2★ or lower: an account manager should check it)" if r.rating <= 2 else ""))
         details.update(_publish(db, user, r, c))
     elif action == "reject":
         if r.reply_status == "published":
             raise HTTPException(409, "Already published")
         r.reply_status = "rejected"
+        review_queue.clear_approval(r)
         details["reply"] = r.reply
     else:  # reopen
         if r.reply_status != "rejected":
             raise HTTPException(409, "Only rejected reviews can be reopened")
         r.reply_status = "drafted" if r.reply else "new"
+        review_queue.clear_approval(r)
     verb = VERB[action]
     if action == "publish" and details.get("target") != "google":
         verb = "published reply (sample — not sent to Google)" if r.is_sample else "published reply (demo client — simulated)"

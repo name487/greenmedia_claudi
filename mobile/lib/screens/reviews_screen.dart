@@ -186,7 +186,7 @@ class _ReviewCardState extends State<ReviewCard> {
           if (r.needsEscalation && r.replyStatus != 'published')
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('Escalation: replies to 2★ or lower need approval before publishing.', style: t.bodySmall?.copyWith(color: Colors.orange.shade800)),
+              child: Text('2★ or lower — have an account manager check the reply before approving.', style: t.bodySmall?.copyWith(color: Colors.orange.shade800)),
             ),
           const SizedBox(height: 10),
           if (r.replyStatus == 'new')
@@ -224,11 +224,11 @@ class _ReviewCardState extends State<ReviewCard> {
                 ),
               if (me.can('review.publish'))
                 FilledButton(
-                  onPressed: _busy || (r.needsEscalation && r.replyStatus != 'approved')
+                  // Nothing publishes without approval: only approved (or failed-after-approval) replies can go out.
+                  onPressed: _busy || !(r.replyStatus == 'approved' || r.replyStatus == 'failed')
                       ? null
                       : () => _do((api) async {
-                            await _saveIfEdited(api);
-                            // An edit resets approval, so low-rated replies must be approved again first.
+                            await _saveIfEdited(api); // an edit clears the approval, so the API then refuses — by design
                             await api.post('/api/reviews/${r.id}/publish');
                           }, success: 'Reply published to Google'),
                   child: const Text('Publish'),

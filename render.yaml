@@ -1,0 +1,54 @@
+# One-click public demo on Render (render.com → New → Blueprint → pick this repo).
+# Free plan: PostgreSQL + two web services. Scheduling runs inside the API (no Redis/worker needed for the demo).
+# After the first deploy, open the "greenmedia-web" URL and sign in with a demo button (password demo1234).
+databases:
+  - name: greenmedia-db
+    plan: free
+    databaseName: greenmedia
+    user: greenmedia
+
+services:
+  - type: web
+    name: greenmedia-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: greenmedia-db, property: connectionString }
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY   # set your own Fernet key before connecting real Google/Meta accounts
+        sync: false
+      - key: SEED_DEMO
+        value: "1"
+      - key: SCHEDULER_INTERVAL_MINUTES
+        value: "1"
+      - key: WEB_APP_URL
+        fromService: { type: web, name: greenmedia-web, property: host }
+      - key: OPENAI_API_KEY        # optional: real AI drafts
+        sync: false
+      - key: GOOGLE_CLIENT_ID      # optional: live Google Business Profile
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI   # https://<greenmedia-api host>/api/google/callback
+        sync: false
+      - key: META_APP_ID           # optional: live Facebook/Instagram
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_REDIRECT_URI     # https://<greenmedia-api host>/api/meta/callback
+        sync: false
+
+  - type: web
+    name: greenmedia-web
+    runtime: docker
+    rootDir: web
+    plan: free
+    envVars:
+      - key: API_URL
+        fromService: { type: web, name: greenmedia-api, property: host }
+      - key: DJANGO_SECRET_KEY
+        generateValue: true

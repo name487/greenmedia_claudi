@@ -33,7 +33,7 @@
 </div>
 <section class="card"><header class="card-head"><h3>Audit trail</h3></header>
   <ul class="list">{% for a in audit %}
-    <li class="row between small"><span><strong>{{ a.user_name }}</strong> {{ a.action }}{% if a.client_name %}<span class="muted"> · {{ a.client_name }}</span>{% endif %}</span><span class="muted">{{ a.created_at|when }}</span></li>
+    <li class="row between small"><span><strong>{{ a.user_name|default:"System" }}</strong> {{ a.action }}{% if a.client_name %}<span class="muted"> · {{ a.client_name }}</span>{% endif %}</span><span class="muted">{{ a.created_at|when }}</span></li>
   {% empty %}<li class="muted">Actions taken in the app are logged here.</li>{% endfor %}</ul>
 </section>
 {% endblock %}

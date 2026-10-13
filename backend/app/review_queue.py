@@ -77,6 +77,7 @@ def draft(r: Review, c: Client, instruction: str = "") -> dict:
         brand_voice=c.brand_voice, author=r.author, rating=r.rating, text=r.text, language=r.language, sentiment=r.sentiment, instruction=instruction,
     )
     r.reply, r.reply_status, r.drafted_at = reply, "drafted", datetime.now(timezone.utc)
+    clear_approval(r)
     r.reply_source = meta["source"]
     r.reply_model = f"{meta['provider']}/{meta['model']}" if meta["source"] == "ai" else ""
     r.reply_error = meta.get("error", "") if meta["source"] == "template" else ""
@@ -92,16 +93,29 @@ def draft_details(meta: dict, reply: str, instruction: str = "") -> dict:
     return d
 
 
+def approve(r: Review, user_id: int | None, rule: str = "") -> None:
+    r.approved_by, r.approved_at, r.approval_rule = user_id, datetime.now(timezone.utc), rule
+
+
+def clear_approval(r: Review) -> None:
+    r.approved_by, r.approved_at, r.approval_rule = None, None, ""
+
+
 def publish(r: Review, c: Client) -> dict:
     """Post the reply through the official Google Business Profile API (reviews.updateReply) and mark it
-    published. Sample reviews are only marked. Returns audit details. Raises PublishError."""
+    published. Sample reviews are only marked. Returns audit details. Raises PublishError.
+
+    Last line of defence: whatever calls this, an unapproved reply is never sent."""
+    if not r.approved_at or r.reply_status not in ("approved", "failed"):
+        raise PublishError("This reply hasn't been approved — approve it before publishing")
     if r.is_sample:
         r.reply_status, r.published_at = "published", datetime.now(timezone.utc)
-        return {"target": "sample", "reply": r.reply}
+        return {"target": "sample", "reply": r.reply, "approved_by": r.approved_by, "approval_rule": r.approval_rule or None}
     res = publish_review_reply(c, r.external_review_id, r.reply or "") or {}
     r.reply_status = "published"
     r.published_at = google_api.parse_time(res.get("updateTime")) or datetime.now(timezone.utc)
     return {"target": "google" if c.gmb and c.gmb.is_live else "simulated", "reply": r.reply,
+            "approved_by": r.approved_by, "approval_rule": r.approval_rule or None,
             "google": {k: res[k] for k in ("updateTime",) if k in res} or None,
             "location": f"{c.gmb.google_account}/{c.gmb.location_id}" if c.gmb and c.gmb.is_live else None}
 
@@ -123,6 +137,8 @@ def process_new(db: Session, c: Client, reviews: list[Review], limit: int | None
         recent = datetime.now(timezone.utc) - _aware(r.created_at) < timedelta(days=14)  # never auto-reply to old reviews
         if c.auto_publish.get("reviews") and r.sentiment == "positive" and r.rating >= 4 and recent:
             try:
+                approve(r, None, rule="auto_publish")  # the client's standing approval for positive 4-5★ replies
+                r.reply_status = "approved"
                 details = publish(r, c)
                 auto += 1
                 audit(db, None, "[auto] published reply" + (" (sample — not sent to Google)" if r.is_sample else " to Google"), tenant_id=c.tenant_id,

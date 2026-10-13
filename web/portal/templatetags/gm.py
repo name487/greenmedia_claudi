@@ -75,7 +75,9 @@ def compact(n):
 @register.filter
 def delta(pct):
     pct = int(pct or 0)
-    return format_html('<span class="delta {}">{} {}%</span>', "up" if pct >= 0 else "down", "▲" if pct >= 0 else "▼", abs(pct))
+    if pct == 0:
+        return mark_safe('<span class="delta flat">– 0%</span>')  # no change isn't growth
+    return format_html('<span class="delta {}">{} {}%</span>', "up" if pct > 0 else "down", "▲" if pct > 0 else "▼", abs(pct))
 
 
 @register.filter

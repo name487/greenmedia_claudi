@@ -86,6 +86,14 @@ def _publish(db: Session, item: ContentItem, user: User | None) -> dict:
     """Post every variant that hasn't gone out, then settle the item's status. Caller holds the claim."""
     client = db.get(Client, item.client_id)
     now = utcnow()
+    if not item.approved_at:
+        # Last line of defence: however it got here, unapproved copy is never sent.
+        item.status, item.next_attempt_at, item.updated_at = "draft", None, now
+        item.last_error = "Not approved — send it for approval before it can be published"
+        audit(db, user, f"publish blocked (not approved): {item.topic}", tenant_id=item.tenant_id, client_id=item.client_id,
+              entity_type="content", entity_id=item.id)
+        db.commit()
+        return {"id": item.id, "status": "draft", "errors": [item.last_error]}
     item.attempts = (item.attempts or 0) + 1
     errors, transient = [], True
     for v in item.variants:

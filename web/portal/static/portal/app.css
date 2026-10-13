@@ -325,3 +325,13 @@ a.cal-post:hover { background: var(--surface-2); outline: 1px solid var(--border
 .check-line { margin-top: 2px; }
 .check-line.error { color: var(--red); }
 .check-line.warning { color: var(--amber); }
+
+/* master dashboard */
+a.stat.link { color: inherit; text-decoration: none; }
+a.stat.link:hover { outline: 1px solid var(--border); }
+.txt-red { color: var(--red); } .txt-amber { color: var(--amber); }
+.integrations-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; margin: 16px 0; }
+.integrations-strip > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.integrations-strip strong { font-size: 16px; }
+.list.attention li a { display: block; }
+.delta.flat { color: var(--muted); }

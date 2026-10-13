@@ -119,6 +119,7 @@ def seed(db: Session) -> None:
                 rating=rating, text=text, language=lang, sentiment=detect_sentiment(text, rating), created_at=now - timedelta(days=age),
                 reply_status="published" if replied else "new", reply=f"Thank you for your feedback, we truly appreciate it! — {name}" if replied else None,
                 published_at=now - timedelta(days=age - 1) if replied else None,
+                approved_at=now - timedelta(days=age - 1) if replied else None, approved_by=users["account_manager"].id if replied else None,
             ))
 
         ind = industry.lower()
@@ -153,6 +154,8 @@ def seed(db: Session) -> None:
                                status=r.choice(["draft", "in_review", "scheduled", "scheduled", "published"]), scheduled_at=when, created_by=users["content"].id)
             for p in ["gmb"] + ["facebook", "instagram", "linkedin"][: 1 if plan == "Starter" else 3]:
                 item.variants.append(ContentVariant(platform=p, copy=f"Something special is coming to {name}! {cta}.", format=PLATFORM_FORMAT[p]))
+            if item.status in ("scheduled", "published"):
+                item.approved_at, item.approved_by = now, users["account_manager"].id
             if item.status == "published":  # went out in the past, on every platform
                 item.scheduled_at = item.published_at = when - timedelta(days=14)
                 item.attempts = 1

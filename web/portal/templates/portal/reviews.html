@@ -59,7 +59,7 @@
   <span class="btn-row">
     <button class="btn ghost sm" name="action" value="bulk_draft">{% icon 'sparkle' 14 %} Draft AI replies</button>
     {% if can_approve %}<button class="btn soft sm" name="action" value="bulk_approve">Approve</button>{% endif %}
-    {% if can_publish %}<button class="btn sm" name="action" value="bulk_publish">Publish</button>{% endif %}
+    {% if can_publish %}<button class="btn sm" name="action" value="bulk_publish" title="Publishes the selected replies that are already approved">Publish approved</button>{% endif %}
     <button class="btn ghost sm" name="action" value="bulk_reject">Reject</button>
   </span>
 </form>
@@ -89,7 +89,7 @@
       </div>
     </div>
     {% if r.text %}<blockquote>{{ r.text }}</blockquote>{% else %}<blockquote class="muted">Rating only — no written review.</blockquote>{% endif %}
-    {% if r.needs_escalation and r.reply_status != 'published' %}<div class="notice small">Escalation: replies to 2★ or lower need approval before publishing.</div>{% endif %}
+    {% if r.needs_escalation and r.reply_status != 'published' %}<div class="notice small">2★ or lower — have an account manager check the reply before approving; consider calling the customer.</div>{% endif %}
 
     {% if r.reply_status == 'new' %}
       <form method="post">{% csrf_token %}<input type="hidden" name="review_id" value="{{ r.id }}">
@@ -112,7 +112,9 @@
           <button class="btn ghost sm" name="action" value="save">Save edit</button>
           <button class="btn ghost sm" name="action" value="draft">{% icon 'sparkle' 14 %} Regenerate</button>
           <button class="btn ghost sm" name="action" value="reject">Reject</button>
-          {% if can_publish %}<button class="btn sm" name="action" value="publish"{% if r.needs_escalation and r.reply_status != 'approved' %} disabled title="Approve first"{% endif %}>{% if r.is_sample %}Publish (sample){% else %}Publish to Google{% endif %}</button>{% endif %}
+          {% if can_publish %}{% if r.reply_status == 'approved' or r.reply_status == 'failed' %}<button class="btn sm" name="action" value="publish">{% if r.is_sample %}Publish (sample){% else %}Publish to Google{% endif %}</button>
+          {% elif can_approve %}<button class="btn sm" name="action" value="approve_publish" title="Records your approval, then publishes">Approve &amp; publish</button>
+          {% else %}<button class="btn sm" disabled title="Needs approval first">Publish</button>{% endif %}{% endif %}
         </div>
       </form>
     {% endif %}

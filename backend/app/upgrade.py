@@ -49,6 +49,11 @@ def add_missing_columns(engine: Engine) -> list[str]:
             # reviews now use the "demo_" prefix so linking a real location can remove them safely.
             conn.execute(text("UPDATE gmb_reviews SET external_review_id = 'demo_' || substr(external_review_id, 3) "
                               "WHERE external_review_id LIKE 'g\\_%' ESCAPE '\\'"))
+        # Approval columns: items already approved/scheduled/published under the previous rules keep their approval.
+        if "gmb_reviews.approved_at" in added:
+            conn.execute(text("UPDATE gmb_reviews SET approved_at = COALESCE(published_at, created_at) WHERE reply_status IN ('approved', 'published', 'failed')"))
+        if "content_items.approved_at" in added:
+            conn.execute(text("UPDATE content_items SET approved_at = COALESCE(updated_at, created_at) WHERE status IN ('scheduled', 'publishing', 'published', 'failed')"))
         if "content_variants.status" in added:
             # Variants that already went out (they have a post id) are published, not pending.
             conn.execute(text("UPDATE content_variants SET status = 'published' WHERE external_post_id IS NOT NULL AND external_post_id <> ''"))

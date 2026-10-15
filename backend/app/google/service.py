@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..models import SAMPLE_REVIEW_PREFIX, Client, GmbAccount, GoogleConnection, MetricDaily, Review
+from ..models import SAMPLE_REVIEW_PREFIX, Client, GmbAccount, GoogleConnection, MetricDaily, Review, SearchKeyword
 from ..sentiment import detect_language, detect_sentiment
 from . import api, tokens
 
@@ -60,6 +60,7 @@ def _loc_out(acct: dict, loc: dict) -> dict:
         "website": loc.get("websiteUri", ""),
         "phone": (loc.get("phoneNumbers") or {}).get("primaryPhone", ""),
         "maps_uri": (loc.get("metadata") or {}).get("mapsUri", ""),
+        "review_uri": (loc.get("metadata") or {}).get("newReviewUri", ""),
     }
 
 
@@ -83,11 +84,12 @@ def link(db: Session, client: Client, conn: GoogleConnection | None, loc: dict) 
         # Going live: drop this client's simulated reviews and metrics so real Google data isn't mixed with demo data.
         db.execute(delete(Review).where(Review.client_id == client.id, Review.external_review_id.startswith(SAMPLE_REVIEW_PREFIX)))
         db.execute(delete(MetricDaily).where(MetricDaily.client_id == client.id))
+        db.execute(delete(SearchKeyword).where(SearchKeyword.client_id == client.id, SearchKeyword.is_sample.is_(True)))
     if not gmb.is_live or gmb.location_id != loc["location"]:
         gmb.rating, gmb.review_count, gmb.last_sync = 0, 0, None  # demo or other-location figures; the sync fills them in
     gmb.connection_id = conn.id if conn else None
     gmb.google_account, gmb.location_id, gmb.title = loc["account"], loc["location"], loc.get("title", "")
-    gmb.address, gmb.maps_uri = loc.get("address", ""), loc.get("maps_uri", "")
+    gmb.address, gmb.maps_uri, gmb.review_uri = loc.get("address", ""), loc.get("maps_uri", ""), loc.get("review_uri", "")
     gmb.status, gmb.last_error = "connected", ""
     db.flush()
     return gmb
@@ -186,6 +188,23 @@ def sync_metrics(db: Session, client: Client, days: int = 90) -> int:
     return n
 
 
+def sync_search_keywords(db: Session, client: Client, months: int = 3) -> int:
+    """Replace the client's search keywords with the last `months` full months from Google."""
+    gmb = client.gmb
+    g = client_for(source(gmb))
+    first_this_month = date.today().replace(day=1)
+    end = first_this_month - timedelta(days=1)
+    start = end.replace(day=1)
+    for _ in range(months - 1):
+        start = (start - timedelta(days=1)).replace(day=1)
+    rows = g.search_keywords(gmb.location_id, start, end)
+    db.execute(delete(SearchKeyword).where(SearchKeyword.client_id == client.id))
+    for kw, n, approx in rows:
+        db.add(SearchKeyword(tenant_id=client.tenant_id, client_id=client.id, keyword=kw[:200], impressions=n, below_threshold=approx,
+                             period_start=start, period_end=end))
+    return len(rows)
+
+
 def sync_client(db: Session, client: Client) -> dict:
     """Full live sync. Errors are recorded on the profile so the UI can show them."""
     gmb = client.gmb
@@ -195,6 +214,11 @@ def sync_client(db: Session, client: Client) -> dict:
             out["metric_days"] = sync_metrics(db, client)
         except api.GoogleApiError as e:  # insights are optional (Performance API may not be enabled yet)
             out["metrics_error"] = str(e)
+        else:
+            try:
+                out["search_keywords"] = sync_search_keywords(db, client)
+            except api.GoogleApiError as e:
+                out["metrics_error"] = str(e)
         gmb.last_sync, gmb.status, gmb.last_error = datetime.now(timezone.utc), "connected", out.get("metrics_error", "")
         return out
     except api.GoogleApiError as e:

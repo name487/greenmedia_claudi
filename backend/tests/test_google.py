@@ -72,7 +72,8 @@ class FakeGoogle:
             return j({"accounts": [{"name": ACCOUNT, "accountName": "Green Media SEO", "type": "PERSONAL"}]})
         if url.startswith(f"{api.INFO_BASE}/{ACCOUNT}/locations"):
             return j({"locations": [{"name": LOCATION, "title": "Smile Dental Studio - Baner", "websiteUri": "https://smile.example",
-                                     "storefrontAddress": {"addressLines": ["12 Baner Rd"], "locality": "Pune"}, "metadata": {"mapsUri": "https://maps.google.com/?cid=1"}},
+                                     "storefrontAddress": {"addressLines": ["12 Baner Rd"], "locality": "Pune"}, "metadata": {"mapsUri": "https://maps.google.com/?cid=1",
+                                                                                                "newReviewUri": "https://search.google.com/local/writereview?placeid=PID1"}},
                                     *self.extra_locations]})
         if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/reviews") and m == "GET":
             return j({"reviews": self.reviews, "averageRating": 4.6, "totalReviewCount": 212})
@@ -83,6 +84,12 @@ class FakeGoogle:
         if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/localPosts") and m == "POST":
             self.posts.append(json.loads(body))
             return j({"name": f"{ACCOUNT}/{LOCATION}/localPosts/p{len(self.posts)}", "state": "LIVE"})
+        if url.split("?")[0].endswith(f"{LOCATION}/searchkeywords/impressions/monthly"):
+            q = parse_qs(urlparse(url).query)
+            assert q["monthlyRange.start_month.year"] and q["monthlyRange.end_month.month"]
+            return j({"searchKeywordsCounts": [{"searchKeyword": "dentist near me", "insightsValue": {"value": "161"}},
+                                               {"searchKeyword": "dental clinic baner", "insightsValue": {"value": "86"}},
+                                               {"searchKeyword": "root canal pune", "insightsValue": {"threshold": "15"}}]})
         if ":fetchMultiDailyMetricsTimeSeries" in url:
             q = parse_qs(urlparse(url).query)
             assert "CALL_CLICKS" in q["dailyMetrics"]

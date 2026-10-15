@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 130 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 136 tests: business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 130 tests: clients/contacts CRUD, CSV import,
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 13 tests: phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 16 tests: business score home, phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -593,6 +593,27 @@ Staff can still use **Sign in with email**.
 | `POST /api/auth/otp/request` `{phone, country_code?}` | Send a code. Returns `masked`, `length`, `resend_in` (and `dev_code` on console/demo only). |
 | `POST /api/auth/otp/verify` `{phone, code}` | Returns `otp_token` (10 min) and `profiles` (title, subtitle, kind, Google state, group). |
 | `POST /api/auth/otp/select` `{otp_token, user_id}` | Signs in to that profile, returning the normal access token. |
+
+## Mobile home for business owners (Business Score)
+
+A business owner who signs in to the app lands on their **Business Score** (agency staff open it from a client's page):
+
+- **Score out of 100** with a gauge and *Check Detailed Report*: the points for Google rating, number of reviews,
+  replies to the last 50 reviews, new reviews, Google posts, profile connection, search visibility and customer actions,
+  each with a tip. *Download Report* opens a printable page (Save as PDF) through a signed link valid for 15 minutes.
+- **Activity heatmap** (15 weeks of reviews, replies and posts), **Reply pending / Reviews / Views / Engagements** tiles
+  and **Reply With AI**, which opens the review queue.
+- **Profile views chart** — monthly, daily or weekly views against calls, directions and website clicks.
+- **Search Keywords** — what people typed on Google before the profile appeared. Synced from the Business Profile
+  Performance API (`searchkeywords/impressions/monthly`, last 3 months) with every Google sync; terms Google only
+  reports as "fewer than N" show as `<N`.
+- **Competitor Analysis** — the client against nearby businesses by rating and reviews. Staff add the real ones with
+  `POST /api/clients/{id}/competitors` (which drops the demo list); `DELETE …/competitors/{competitor_id}` removes one.
+- **Get more Google reviews** — a QR of the profile's "write a review" link (`newReviewUri`, stored on linking) to print
+  for the counter, plus share-on-WhatsApp and copy.
+
+Demo databases get sample search keywords and competitors (marked as sample in the app) until Google is connected.
+API: `GET /api/clients/{id}/score`, `POST /api/clients/{id}/score/report-link`.
 
 ## Building the mobile apps
 

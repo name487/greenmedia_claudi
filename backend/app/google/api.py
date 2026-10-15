@@ -201,3 +201,22 @@ class Gbp:
                     d = dv["date"]
                     vals[date(d["year"], d["month"], d["day"])] = int(dv.get("value", 0) or 0)
         return out
+
+    def search_keywords(self, location: str, start: date, end: date, max_pages: int = 5) -> list[tuple[str, int, bool]]:
+        """Search terms that showed the profile between the months of start and end, as (keyword, impressions,
+        below_threshold). Google hides exact counts for rare terms and gives only an upper bound ("threshold")."""
+        params = {"monthlyRange.start_month.year": start.year, "monthlyRange.start_month.month": start.month,
+                  "monthlyRange.end_month.year": end.year, "monthlyRange.end_month.month": end.month, "pageSize": 100}
+        out, token = [], None
+        for _ in range(max_pages):
+            body = self._get(f"{PERF_BASE}/{location}/searchkeywords/impressions/monthly", pageToken=token, **params)
+            for row in body.get("searchKeywordsCounts", []):
+                v = row.get("insightsValue") or {}
+                if "value" in v:
+                    out.append((row.get("searchKeyword", ""), int(v["value"]), False))
+                elif "threshold" in v:
+                    out.append((row.get("searchKeyword", ""), int(v["threshold"]), True))
+            token = body.get("nextPageToken")
+            if not token:
+                break
+        return out

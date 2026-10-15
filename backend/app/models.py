@@ -123,6 +123,7 @@ class GmbAccount(Base):
     last_error: Mapped[str] = mapped_column(Text, default="")
     address: Mapped[str] = mapped_column(String(300), default="")
     maps_uri: Mapped[str] = mapped_column(String(500), default="")
+    review_uri: Mapped[str] = mapped_column(String(500), default="")  # Google's "write a review" link (metadata.newReviewUri)
     # The client's own Google sign-in (per-client OAuth). Tokens are Fernet-encrypted; the access token is
     # cached here with its expiry and refreshed from the refresh token shortly before it runs out.
     google_email: Mapped[str] = mapped_column(String(200), default="")
@@ -297,6 +298,37 @@ class Keyword(Base):
     current_rank: Mapped[int] = mapped_column(Integer)
     previous_rank: Mapped[int] = mapped_column(Integer)
     volume: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class SearchKeyword(Base):
+    """What people typed on Google Search/Maps before the business profile appeared, with how often it appeared
+    (Business Profile Performance API, searchkeywords.impressions.monthly). Replaced on every sync."""
+
+    __tablename__ = "gmb_search_keywords"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    keyword: Mapped[str] = mapped_column(String(200))
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    below_threshold: Mapped[bool] = mapped_column(Boolean, default=False)  # Google only says "fewer than N"
+    period_start: Mapped[date] = mapped_column(Date)
+    period_end: Mapped[date] = mapped_column(Date)
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Competitor(Base):
+    """A nearby business the client is compared against on the Business Score screen."""
+
+    __tablename__ = "competitors"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    rating: Mapped[float] = mapped_column(Float, default=0)
+    review_count: Mapped[int] = mapped_column(Integer, default=0)
+    maps_uri: Mapped[str] = mapped_column(String(500), default="")
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class MetricDaily(Base):

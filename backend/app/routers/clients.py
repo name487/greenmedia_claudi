@@ -12,7 +12,7 @@ from ..db import get_db
 from ..google import api as google_api
 from .. import review_queue
 from ..metrics import compare, periods, series, totals
-from ..models import AuditLog, Client, ClientContact, ContentItem, GmbAccount, Keyword, MetricDaily, Report, Review, Task, User
+from ..models import AuditLog, Client, ClientContact, Competitor, ContentItem, GmbAccount, Keyword, MetricDaily, Report, Review, SearchKeyword, Task, User
 from ..security import audit, get_client, require, require_section, visible_client_ids
 from ..serializers import client_brief, client_out, contact_out, content_out, keyword_out, report_out, review_out, task_out
 from .common import user_names
@@ -265,6 +265,8 @@ def delete_client(client_id: int, confirm_name: str, user: User = Depends(requir
         "metric_days": db.execute(delete(MetricDaily).where(MetricDaily.client_id == cid)).rowcount,
         "tasks": db.execute(delete(Task).where(Task.client_id == cid)).rowcount,
         "reports": db.execute(delete(Report).where(Report.client_id == cid)).rowcount,
+        "search_keywords": db.execute(delete(SearchKeyword).where(SearchKeyword.client_id == cid)).rowcount,
+        "competitors": db.execute(delete(Competitor).where(Competitor.client_id == cid)).rowcount,
     }
     for item in db.scalars(select(ContentItem).where(ContentItem.client_id == cid)):
         db.delete(item)  # ORM delete so content variants go with it

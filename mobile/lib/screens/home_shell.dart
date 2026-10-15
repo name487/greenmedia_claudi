@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/session.dart';
 import 'analytics_screen.dart';
+import 'business_score_screen.dart';
 import 'calendar_screen.dart';
 import 'clients_screen.dart';
 import 'content_screen.dart';
@@ -21,7 +22,11 @@ class Destination {
 }
 
 final destinations = <Destination>[
-  Destination('dashboard', 'Dashboard', Icons.space_dashboard_outlined, (_) => const DashboardScreen()),
+  // A business owner's home is their own Business Score; the agency sees the multi-client dashboard.
+  Destination('dashboard', 'Home', Icons.space_dashboard_outlined, (c) {
+    final me = c.read<Session>().me!;
+    return me.isClient ? BusinessScoreScreen(clientId: me.clientId!) : const DashboardScreen();
+  }),
   Destination('reviews', 'Reviews', Icons.star_outline_rounded, (_) => const ReviewsScreen()),
   Destination('content', 'Content', Icons.edit_note_rounded, (_) => const ContentScreen()),
   Destination('social', 'Calendar', Icons.calendar_month_outlined, (_) => const CalendarScreen()),

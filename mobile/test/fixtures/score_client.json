@@ -1,0 +1,575 @@
+{
+ "client": {
+  "id": 1,
+  "company_name": "Smile Dental Studio",
+  "industry": "Dental Clinic",
+  "city": "Pune",
+  "email": "owner@smiledentalstudio.in",
+  "phone": "+91 9339670711",
+  "address": "",
+  "maps_uri": "",
+  "review_uri": "https://search.google.com/local/writereview?placeid=demo-1",
+  "google_connected": true
+ },
+ "as_of": "2026-10-15T09:13:18.666962+00:00",
+ "score": {
+  "value": 67,
+  "label": "good",
+  "items": [
+   {
+    "key": "rating",
+    "label": "Google rating",
+    "points": 8,
+    "max": 20,
+    "detail": "3.7 out of 5",
+    "tip": "Ask happy customers to review you — put your review QR at the counter and share it on WhatsApp.",
+    "status": "poor"
+   },
+   {
+    "key": "review_count",
+    "label": "Number of reviews",
+    "points": 10,
+    "max": 10,
+    "detail": "798 reviews",
+    "tip": "Businesses with 300+ reviews win most local searches. Ask every satisfied customer.",
+    "status": "good"
+   },
+   {
+    "key": "replies",
+    "label": "Replies to reviews",
+    "points": 11,
+    "max": 20,
+    "detail": "4 of the last 7 answered",
+    "tip": "Reply to every review, good or bad — use Reply with AI to answer in seconds.",
+    "status": "ok"
+   },
+   {
+    "key": "fresh_reviews",
+    "label": "New reviews (30 days)",
+    "points": 9,
+    "max": 10,
+    "detail": "7 in the last 30 days",
+    "tip": "Google favours businesses that keep getting reviews. Aim for 2 a week.",
+    "status": "good"
+   },
+   {
+    "key": "posts",
+    "label": "Google posts (30 days)",
+    "points": 4,
+    "max": 15,
+    "detail": "1 published",
+    "tip": "Post an offer, update or festival greeting at least once a week, with your area and service in the caption.",
+    "status": "poor"
+   },
+   {
+    "key": "profile",
+    "label": "Google profile connected",
+    "points": 10,
+    "max": 10,
+    "detail": "Connected",
+    "tip": "Connect your Google Business Profile so replies and posts go live.",
+    "status": "good"
+   },
+   {
+    "key": "search",
+    "label": "Search visibility",
+    "points": 10,
+    "max": 10,
+    "detail": "Found for 14 search terms",
+    "tip": "Use the search terms below in your posts, services and replies to appear for more searches.",
+    "status": "good"
+   },
+   {
+    "key": "actions",
+    "label": "Customer actions",
+    "points": 5,
+    "max": 5,
+    "detail": "16.7% of viewers called, visited or got directions",
+    "tip": "Add photos, opening hours and an offer so more viewers call or visit.",
+    "status": "good"
+   }
+  ]
+ },
+ "stats": {
+  "reply_pending": 3,
+  "reply_window": 7,
+  "reviews_lifetime": 798,
+  "rating": 3.7,
+  "views_30d": 14831,
+  "views_change_pct": 5,
+  "engagements_30d": 2471,
+  "engagements_change_pct": 8,
+  "engagement_rate": 16.7
+ },
+ "heatmap": {
+  "start": "2026-07-06",
+  "weeks": 15,
+  "counts": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   1,
+   2,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   1,
+   4,
+   0,
+   0,
+   1,
+   1,
+   0,
+   0,
+   0,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "today_index": 101
+ },
+ "chart": {
+  "daily": [
+   {
+    "start": "2026-09-16",
+    "views": 477,
+    "actions": 85
+   },
+   {
+    "start": "2026-09-17",
+    "views": 458,
+    "actions": 89
+   },
+   {
+    "start": "2026-09-18",
+    "views": 600,
+    "actions": 106
+   },
+   {
+    "start": "2026-09-19",
+    "views": 496,
+    "actions": 68
+   },
+   {
+    "start": "2026-09-20",
+    "views": 319,
+    "actions": 59
+   },
+   {
+    "start": "2026-09-21",
+    "views": 476,
+    "actions": 80
+   },
+   {
+    "start": "2026-09-22",
+    "views": 539,
+    "actions": 88
+   },
+   {
+    "start": "2026-09-23",
+    "views": 635,
+    "actions": 89
+   },
+   {
+    "start": "2026-09-24",
+    "views": 481,
+    "actions": 77
+   },
+   {
+    "start": "2026-09-25",
+    "views": 597,
+    "actions": 88
+   },
+   {
+    "start": "2026-09-26",
+    "views": 437,
+    "actions": 65
+   },
+   {
+    "start": "2026-09-27",
+    "views": 373,
+    "actions": 65
+   },
+   {
+    "start": "2026-09-28",
+    "views": 462,
+    "actions": 89
+   },
+   {
+    "start": "2026-09-29",
+    "views": 579,
+    "actions": 95
+   },
+   {
+    "start": "2026-09-30",
+    "views": 469,
+    "actions": 77
+   },
+   {
+    "start": "2026-10-01",
+    "views": 425,
+    "actions": 80
+   },
+   {
+    "start": "2026-10-02",
+    "views": 499,
+    "actions": 102
+   },
+   {
+    "start": "2026-10-03",
+    "views": 409,
+    "actions": 75
+   },
+   {
+    "start": "2026-10-04",
+    "views": 372,
+    "actions": 66
+   },
+   {
+    "start": "2026-10-05",
+    "views": 533,
+    "actions": 71
+   },
+   {
+    "start": "2026-10-06",
+    "views": 528,
+    "actions": 76
+   },
+   {
+    "start": "2026-10-07",
+    "views": 627,
+    "actions": 88
+   },
+   {
+    "start": "2026-10-08",
+    "views": 460,
+    "actions": 88
+   },
+   {
+    "start": "2026-10-09",
+    "views": 568,
+    "actions": 97
+   },
+   {
+    "start": "2026-10-10",
+    "views": 482,
+    "actions": 73
+   },
+   {
+    "start": "2026-10-11",
+    "views": 466,
+    "actions": 65
+   },
+   {
+    "start": "2026-10-12",
+    "views": 504,
+    "actions": 90
+   },
+   {
+    "start": "2026-10-13",
+    "views": 525,
+    "actions": 88
+   },
+   {
+    "start": "2026-10-14",
+    "views": 484,
+    "actions": 104
+   },
+   {
+    "start": "2026-10-15",
+    "views": 551,
+    "actions": 88
+   }
+  ],
+  "weekly": [
+   {
+    "start": "2026-07-20",
+    "views": 1255,
+    "actions": 193
+   },
+   {
+    "start": "2026-07-27",
+    "views": 2915,
+    "actions": 503
+   },
+   {
+    "start": "2026-08-03",
+    "views": 3050,
+    "actions": 473
+   },
+   {
+    "start": "2026-08-10",
+    "views": 2977,
+    "actions": 495
+   },
+   {
+    "start": "2026-08-17",
+    "views": 3096,
+    "actions": 505
+   },
+   {
+    "start": "2026-08-24",
+    "views": 3224,
+    "actions": 535
+   },
+   {
+    "start": "2026-08-31",
+    "views": 3255,
+    "actions": 534
+   },
+   {
+    "start": "2026-09-07",
+    "views": 3490,
+    "actions": 561
+   },
+   {
+    "start": "2026-09-14",
+    "views": 3376,
+    "actions": 563
+   },
+   {
+    "start": "2026-09-21",
+    "views": 3538,
+    "actions": 552
+   },
+   {
+    "start": "2026-09-28",
+    "views": 3215,
+    "actions": 584
+   },
+   {
+    "start": "2026-10-05",
+    "views": 3664,
+    "actions": 558
+   },
+   {
+    "start": "2026-10-12",
+    "views": 2064,
+    "actions": 370
+   }
+  ],
+  "monthly": [
+   {
+    "start": "2026-08-01",
+    "views": 13475,
+    "actions": 2196
+   },
+   {
+    "start": "2026-09-01",
+    "views": 14741,
+    "actions": 2395
+   },
+   {
+    "start": "2026-10-01",
+    "views": 7433,
+    "actions": 1251
+   }
+  ]
+ },
+ "keywords": {
+  "source": "sample",
+  "period_start": "2026-07-01",
+  "period_end": "2026-09-30",
+  "items": [
+   {
+    "keyword": "dental clinic near me",
+    "impressions": 424,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic in pune",
+    "impressions": 342,
+    "below_threshold": false
+   },
+   {
+    "keyword": "best dental clinic in pune",
+    "impressions": 247,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic",
+    "impressions": 233,
+    "below_threshold": false
+   },
+   {
+    "keyword": "top dental clinic near me",
+    "impressions": 152,
+    "below_threshold": false
+   },
+   {
+    "keyword": "smile dental studio",
+    "impressions": 146,
+    "below_threshold": false
+   },
+   {
+    "keyword": "pune dental clinic",
+    "impressions": 110,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic open now",
+    "impressions": 95,
+    "below_threshold": false
+   },
+   {
+    "keyword": "affordable dental clinic near me",
+    "impressions": 77,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic near me open today",
+    "impressions": 65,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic reviews",
+    "impressions": 56,
+    "below_threshold": false
+   },
+   {
+    "keyword": "good dental clinic in pune",
+    "impressions": 37,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic contact number",
+    "impressions": 37,
+    "below_threshold": false
+   },
+   {
+    "keyword": "dental clinic timings",
+    "impressions": 28,
+    "below_threshold": false
+   }
+  ]
+ },
+ "competitors": [
+  {
+   "id": 4,
+   "name": "Classic Dental Clinic",
+   "rating": 3.9,
+   "review_count": 1057,
+   "maps_uri": "",
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "name": "Smile Dental Studio",
+   "rating": 3.7,
+   "review_count": 798,
+   "is_you": true
+  },
+  {
+   "id": 2,
+   "name": "City Dental Clinic",
+   "rating": 4.3,
+   "review_count": 681,
+   "maps_uri": "",
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "id": 3,
+   "name": "Elite Dental Clinic",
+   "rating": 4.7,
+   "review_count": 566,
+   "maps_uri": "",
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "id": 1,
+   "name": "Lotus Dental Clinic",
+   "rating": 3.8,
+   "review_count": 60,
+   "maps_uri": "",
+   "is_sample": true,
+   "is_you": false
+  }
+ ]
+}

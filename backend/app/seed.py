@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine
 from .models import (
-    Client, ClientContact, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, SocialAccount, Task, Tenant, User,
+    Client, ClientContact, Competitor, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, SearchKeyword, SocialAccount, Task, Tenant, User,
 )
 from .ai import PLATFORM_FORMAT
+from .config import settings
 from .security import ensure_default_roles, hash_password
 from .upgrade import add_missing_columns
 from .sentiment import detect_sentiment
@@ -63,8 +64,32 @@ REVIEW_TEXT = [
     (2, "The quality has dropped compared to last year. Disappointed.", "en"),
 ]
 
+# What customers type on Google before the profile shows up (Business Profile "search keywords")
+SEARCHES = ["{i} near me", "{i} in {c}", "best {i} in {c}", "{i}", "{n}", "top {i} near me", "{c} {i}", "{i} open now",
+            "affordable {i} near me", "{i} near me open today", "{i} reviews", "good {i} in {c}", "{i} contact number", "{i} timings"]
+RIVAL_PREFIX = ["Royal", "City", "Prime", "Sunrise", "Elite", "Urban", "Shree", "Galaxy", "Classic", "Metro", "Lotus", "Apex"]
 KEYWORDS = ["{i} near me", "best {i} in {c}", "{i} {c}", "affordable {i}", "top rated {i}", "{i} open now"]
 PLANS = ["Starter", "Growth", "Pro", "Agency"]
+
+
+def seed_insights(db: Session, c: Client) -> None:
+    """Sample search keywords, competitors and a review link for one demo client. Uses its own random stream
+    so the rest of the demo data stays identical to earlier versions."""
+    r = random.Random(c.id * 7919)
+    today = date.today()
+    end = today.replace(day=1) - timedelta(days=1)
+    start = (end.replace(day=1) - timedelta(days=62)).replace(day=1)
+    ind, city = c.industry.lower(), c.city.lower()
+    top = r.randint(120, 420)
+    for k, tpl in enumerate(SEARCHES):
+        n = round(top * (0.82 ** k) * (0.85 + r.random() * 0.3))
+        db.add(SearchKeyword(tenant_id=c.tenant_id, client_id=c.id, keyword=tpl.format(i=ind, c=city, n=c.company_name.lower()),
+                             impressions=max(n, 15), below_threshold=n < 15, period_start=start, period_end=end, is_sample=True))
+    for name in r.sample(RIVAL_PREFIX, 4):
+        db.add(Competitor(tenant_id=c.tenant_id, client_id=c.id, name=f"{name} {c.industry.title()}", rating=round(3.7 + r.random() * 1.2, 1),
+                          review_count=r.randint(25, 1100), is_sample=True))
+    if c.gmb and not c.gmb.review_uri:
+        c.gmb.review_uri = f"https://search.google.com/local/writereview?placeid=demo-{c.id}"
 
 
 def seed(db: Session) -> None:
@@ -167,6 +192,8 @@ def seed(db: Session) -> None:
             db.add(item)
 
     db.flush()
+    for c in db.scalars(select(Client)):
+        seed_insights(db, c)
     smile = db.scalar(select(Client).where(Client.company_name == "Smile Dental Studio"))
     users["client"].client_id = smile.id
     # The same owner also runs a salon: one phone number, two businesses → the app's "Select profile" screen
@@ -184,6 +211,13 @@ def init_db(seed_if_empty: bool = True) -> None:
             ensure_default_roles(db, tid)
         db.commit()
     if seed_if_empty:
+        with SessionLocal() as db:  # demo databases from before the Business Score screen
+            for c in db.scalars(select(Client)):
+                has = db.scalar(select(func.count()).select_from(SearchKeyword).where(SearchKeyword.client_id == c.id))
+                has = has or db.scalar(select(func.count()).select_from(Competitor).where(Competitor.client_id == c.id))
+                if not has and settings.seed_demo and not (c.gmb and c.gmb.is_live):
+                    seed_insights(db, c)
+            db.commit()
         with SessionLocal() as db:
             if not db.scalar(select(func.count()).select_from(Tenant)):
                 seed(db)

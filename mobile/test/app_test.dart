@@ -61,6 +61,10 @@ MockClient fakeApi(List<String> calls) {
         return json(fixture('clients_admin'));
       case '/api/content':
         return json(fixture('content_admin'));
+      case '/api/clients/1/score':
+        return json(fixture('score_client'));
+      case '/api/clients/1/score/report-link':
+        return json({'url': 'http://api.test/api/clients/1/score/report?t=x', 'expires_at': '2026-10-15T10:00:00Z'});
     }
     return json({'detail': 'not found'}, 404);
   });
@@ -134,7 +138,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.signedIn, isTrue);
       expect(session.me!.isClient, isTrue);
-      expect(calls, containsAllInOrder(['POST /api/auth/otp/request', 'POST /api/auth/otp/verify', 'POST /api/auth/otp/select', 'GET /api/dashboard']));
+      expect(calls, containsAllInOrder(['POST /api/auth/otp/request', 'POST /api/auth/otp/verify', 'POST /api/auth/otp/select', 'GET /api/clients/1/score']));
     });
 
     testWidgets('a single profile opens straight away; demo code chip fills the code', (tester) async {
@@ -172,20 +176,64 @@ void main() {
     await tester.scrollUntilVisible(find.text('Client performance'), 300, scrollable: find.byType(Scrollable).first);
     expect(find.text('Client performance'), findsOneWidget);
     // Staff bottom navigation
-    for (final tab in ['Dashboard', 'Reviews', 'Content', 'Calendar', 'More']) {
+    for (final tab in ['Home', 'Reviews', 'Content', 'Calendar', 'More']) {
       expect(find.descendant(of: find.byType(NavigationBar), matching: find.text(tab)), findsOneWidget);
     }
   });
 
   testWidgets('client-portal user gets a client-only experience', (tester) async {
-    await pumpApp(tester, []);
+    final calls = <String>[];
+    await pumpApp(tester, calls);
     await signIn(tester, 'anjali@smiledental.in');
     expect(find.text('Active clients'), findsNothing);
-    await tester.scrollUntilVisible(find.text('Where your leads come from'), 300, scrollable: find.byType(Scrollable).first);
-    expect(find.text('Where your leads come from'), findsOneWidget);
+    expect(calls, contains('GET /api/clients/1/score'));
+    expect(calls, isNot(contains('GET /api/dashboard')));
     final nav = find.byType(NavigationBar);
     expect(find.descendant(of: nav, matching: find.text('Calendar')), findsNothing);
     expect(find.descendant(of: nav, matching: find.text('Analytics')), findsOneWidget);
+  });
+
+  group('business score home (owner)', () {
+    final score = fixture('score_client') as Map<String, dynamic>;
+
+    testWidgets('gauge, stats, keywords and competitors come from the API', (tester) async {
+      await pumpApp(tester, []);
+      await signIn(tester, 'anjali@smiledental.in');
+      expect(find.byKey(const Key('score-value')), findsOneWidget);
+      expect(find.text('${(score['score'] as Map)['value']}%'), findsOneWidget);
+      expect(find.text((score['score'] as Map)['label'] as String), findsOneWidget);
+      final stats = score['stats'] as Map<String, dynamic>;
+      expect(find.text('${stats['reply_pending']} / ${stats['reply_window']}'), findsOneWidget);
+      // the Keywords tab jumps to the search keywords
+      await tester.tap(find.text('Keywords'));
+      await tester.pumpAndSettle();
+      final top = ((score['keywords'] as Map)['items'] as List).first as Map;
+      expect(find.text(top['keyword'] as String), findsOneWidget);
+      expect(find.text('Search Keywords'), findsOneWidget);
+      await tester.tap(find.text('Competitor').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Smile Dental Studio (you)'), findsOneWidget);
+      expect(find.textContaining("You're #"), findsOneWidget);
+    });
+
+    testWidgets('detailed report lists every part of the score with a tip', (tester) async {
+      await pumpApp(tester, []);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.text('Check Detailed Report'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your score: ${(score['score'] as Map)['value']} / 100'), findsOneWidget);
+      expect(find.text('Google rating'), findsOneWidget);
+      expect(find.textContaining('Tip: '), findsWidgets);
+    });
+
+    testWidgets('area chart switches between monthly, daily and weekly', (tester) async {
+      await pumpApp(tester, []);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.scrollUntilVisible(find.text('Weekly'), 300, scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text('Daily'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>)).selected, {'daily'});
+    });
   });
 
   testWidgets('review queue: escalated replies cannot be published before approval', (tester) async {

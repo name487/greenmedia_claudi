@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../api/models.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
+import 'business_score_screen.dart';
 import 'reports_screen.dart';
 import 'reviews_screen.dart';
 
@@ -51,6 +52,11 @@ class ClientDetailScreen extends StatelessWidget {
               StatTile(label: 'Leads (30d)', value: '${k['leads']['current']}', delta: k['leads']['change_pct'] as num),
             ]),
             Wrap(spacing: 6, children: [
+              FilledButton.icon(
+                icon: const Icon(Icons.speed_rounded, size: 18),
+                onPressed: () => openBusinessScore(context, clientId),
+                label: const Text('Business score'),
+              ),
               if (me.sees('reviews'))
                 FilledButton.tonal(
                   onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: const Text('Reviews')), body: ReviewsScreen(clientId: clientId)))),

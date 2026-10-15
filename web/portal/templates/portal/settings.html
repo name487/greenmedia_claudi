@@ -31,7 +31,7 @@
     <tbody>
     {% for u in users %}
       <tr>
-        <td class="primary">{{ u.name }}{% if u.id == me_id %} <span class="badge badge-blue">you</span>{% endif %}<div class="muted small">{{ u.email }}</div></td>
+        <td class="primary">{{ u.name }}{% if u.id == me_id %} <span class="badge badge-blue">you</span>{% endif %}<div class="muted small">{{ u.email }}{% if u.phone %} · {{ u.phone }}{% endif %}</div></td>
         <td data-label="Role">{{ u.role_label }}{% if u.client_id %}{% for c in clients %}{% if c.id == u.client_id %}<div class="muted small">{{ c.company_name }}</div>{% endif %}{% endfor %}{% endif %}</td>
         <td data-label="Status">{% if u.status == 'active' %}<span class="badge badge-green">Active</span>{% else %}<span class="badge badge-gray">Disabled</span>{% endif %}</td>
         {% if can_edit %}<td>
@@ -40,6 +40,7 @@
             <select class="input" name="role" aria-label="Role">{% for r in roles.roles %}<option value="{{ r.name }}"{% if r.name == u.role %} selected{% endif %}>{{ r.label }}</option>{% endfor %}</select>
             <select class="input" name="client_id" aria-label="Client (client-portal role only)"><option value="">— client —</option>{% for c in clients %}<option value="{{ c.id }}"{% if c.id == u.client_id %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select>
             <select class="input" name="status" aria-label="Status"><option value="active"{% if u.status == 'active' %} selected{% endif %}>Active</option><option value="disabled"{% if u.status != 'active' %} selected{% endif %}>Disabled</option></select>
+            <input class="input" type="tel" name="phone" value="{{ u.phone }}" placeholder="Mobile (app sign-in)" aria-label="Mobile number for app sign-in" style="max-width:170px">
             <input class="input" type="password" name="password" placeholder="New password (optional)" minlength="8" autocomplete="new-password" style="max-width:200px">
             <button class="btn sm">Save</button>
           </form>{% endif %}
@@ -57,6 +58,7 @@
         <label class="field">Role <select class="input" name="role">{% for r in roles.roles %}<option value="{{ r.name }}">{{ r.label }}</option>{% endfor %}</select></label>
         <label class="field">Client <span>only for the Client role</span><select class="input" name="client_id"><option value="">—</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.company_name }}</option>{% endfor %}</select></label>
         <label class="field">Temporary password <span>at least 8 characters</span><input class="input" name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+        <label class="field">Mobile number <span>optional — lets them sign in to the app with an SMS code</span><input class="input" name="phone" type="tel" placeholder="98765 43210"></label>
       </div>
       <div><button class="btn">Create user</button></div>
     </form>

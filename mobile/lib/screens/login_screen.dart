@@ -15,7 +15,10 @@ const demoUsers = [
 ];
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.onUsePhone});
+
+  /// Back to mobile-number sign-in (shown when this screen is opened from it).
+  final VoidCallback? onUsePhone;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -114,6 +117,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                       ]),
                       const SizedBox(height: 8),
+                      if (widget.onUsePhone != null)
+                        TextButton.icon(
+                          icon: const Icon(Icons.smartphone, size: 18),
+                          label: const Text('Use mobile number instead'),
+                          onPressed: widget.onUsePhone,
+                        ),
                       TextButton.icon(
                         icon: const Icon(Icons.dns_outlined, size: 18),
                         label: Text('Server: ${context.watch<Session>().api.baseUrl}', overflow: TextOverflow.ellipsis),

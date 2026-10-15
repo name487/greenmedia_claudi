@@ -26,7 +26,7 @@ class DashboardScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Good $greeting, ${me.name.split(' ').first}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text('Good $greeting, ${firstName(me.name)}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
               Text(me.isClient ? '${me.clientName} · last 30 days' : '${perf.length} clients · last 30 days', style: Theme.of(context).textTheme.bodySmall),
             ]),
           ),

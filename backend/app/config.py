@@ -51,6 +51,20 @@ class Settings:
     meta_graph_version: str = os.getenv("META_GRAPH_VERSION", "v23.0")
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
+    # Phone OTP sign-in (mobile app). SMS_PROVIDER: console (code only in the server log — development/demo),
+    # msg91 (India: MSG91_AUTH_KEY + MSG91_TEMPLATE_ID with an ##OTP## variable) or twilio (TWILIO_ACCOUNT_SID,
+    # TWILIO_AUTH_TOKEN, TWILIO_FROM).
+    sms_provider: str = os.getenv("SMS_PROVIDER", "console").lower()
+    msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
+    msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
+    twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    twilio_from: str = os.getenv("TWILIO_FROM", "")
+    otp_length: int = int(os.getenv("OTP_LENGTH", "4"))
+    otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
+    otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))
+    otp_max_per_hour: int = int(os.getenv("OTP_MAX_PER_HOUR", "5"))
+    otp_max_attempts: int = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
     #   celery -A app.celery_app worker -B -l info
     # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.

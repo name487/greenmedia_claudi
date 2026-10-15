@@ -8,6 +8,7 @@ import 'package:greenmedia/api/models.dart';
 import 'package:greenmedia/main.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
+import 'package:greenmedia/widgets/common.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
@@ -40,6 +41,18 @@ MockClient fakeApi(List<String> calls) {
         if ((jsonDecode(req.body) as Map)['password'] != 'demo1234') return json({'detail': 'Incorrect email or password'}, 401);
         who = email.startsWith('anjali') ? 'client' : 'admin';
         return json(fixture('login_$who'));
+      case '/api/auth/otp/request':
+        final digits = ((jsonDecode(req.body) as Map)['phone'] as String).replaceAll(RegExp(r'\D'), '');
+        final phone = '+91$digits';
+        return json({...fixture('otp_request') as Map, 'phone': phone, 'masked': '${phone.substring(0, phone.length - 6)}••••${phone.substring(phone.length - 2)}'});
+      case '/api/auth/otp/verify':
+        final b = jsonDecode(req.body) as Map;
+        if (b['code'] != '1234') return json({'detail': 'Incorrect code — 4 attempts left'}, 400);
+        return json(fixture(b['phone'] == '+919000000001' ? 'otp_verify_admin' : 'otp_verify_owner'));
+      case '/api/auth/otp/select':
+        final b = jsonDecode(req.body) as Map;
+        who = b['otp_token'] == 'otp-token-admin' ? 'admin' : 'client';
+        return json(fixture('login_$who'));
       case '/api/dashboard':
         return json(fixture('dashboard_$who'));
       case '/api/reviews':
@@ -63,13 +76,85 @@ Future<Session> pumpApp(WidgetTester tester, List<String> calls) async {
 }
 
 Future<void> signIn(WidgetTester tester, String email, [String password = 'demo1234']) async {
+  // The app opens on mobile-number sign-in; staff use the email form behind this link.
+  final emailLink = find.text('Agency team? Sign in with email');
+  if (emailLink.evaluate().isNotEmpty) {
+    await tester.tap(emailLink);
+    await tester.pumpAndSettle();
+  }
   await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
   await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
   await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
   await tester.pumpAndSettle();
 }
 
+Future<void> requestCode(WidgetTester tester, String phone) async {
+  await tester.enterText(find.byKey(const Key('phone')), phone);
+  await tester.pump();
+  await tester.tap(find.text('Get OTP'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
+  group('phone OTP sign-in', () {
+    testWidgets('Get OTP is enabled only for a valid mobile number', (tester) async {
+      await pumpApp(tester, []);
+      expect(find.text('Enter your\nphone number'), findsOneWidget);
+      Opacity button() => tester.widget<Opacity>(find.ancestor(of: find.text('Get OTP'), matching: find.byType(Opacity)).first);
+      expect(button().opacity, lessThan(1));
+      await tester.enterText(find.byKey(const Key('phone')), '5876543210'); // Indian mobiles start 6-9
+      await tester.pump();
+      expect(button().opacity, lessThan(1));
+      await tester.enterText(find.byKey(const Key('phone')), '98765abc43210'); // letters are filtered out
+      await tester.pump();
+      expect(button().opacity, 1);
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+    });
+
+    testWidgets('owner of two businesses: code → choose profile → home', (tester) async {
+      final calls = <String>[];
+      final session = await pumpApp(tester, calls);
+      await requestCode(tester, '9876543210');
+      expect(find.text('Verify your\nmobile number'), findsOneWidget);
+      expect(find.text('Code sent to +919876••••10'), findsOneWidget);
+      expect(find.text('00:30'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('otp')), '9999');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Incorrect code'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('otp')), '1234'); // verifies automatically when complete
+      await tester.pumpAndSettle();
+      expect(find.text('Select profile'), findsOneWidget);
+      expect(find.text('Smile Dental Studio'), findsOneWidget);
+      expect(find.text('GlowUp Salon & Spa'), findsOneWidget);
+      expect(find.text('Needs Google'), findsOneWidget);
+
+      await tester.tap(find.text('Smile Dental Studio'));
+      await tester.pumpAndSettle();
+      expect(session.signedIn, isTrue);
+      expect(session.me!.isClient, isTrue);
+      expect(calls, containsAllInOrder(['POST /api/auth/otp/request', 'POST /api/auth/otp/verify', 'POST /api/auth/otp/select', 'GET /api/dashboard']));
+    });
+
+    testWidgets('a single profile opens straight away; demo code chip fills the code', (tester) async {
+      final session = await pumpApp(tester, []);
+      await requestCode(tester, '9000000001');
+      await tester.tap(find.text('Demo server — code 1234'));
+      await tester.pumpAndSettle();
+      expect(session.signedIn, isTrue);
+      expect(session.me!.role, 'admin');
+    });
+
+    testWidgets('back from the code step returns to the number', (tester) async {
+      await pumpApp(tester, []);
+      await requestCode(tester, '9876543210');
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter your\nphone number'), findsOneWidget);
+    });
+  });
+
   testWidgets('wrong password shows the server message', (tester) async {
     await pumpApp(tester, []);
     await signIn(tester, 'admin@greenmedia.in', 'nope');
@@ -148,6 +233,13 @@ void main() {
 
     expect((await publishFor('drafted')).onPressed, isNull); // 5★ but not approved
     expect((await publishFor('approved')).onPressed, isNotNull);
+  });
+
+  test('greetings use the first name, not the title', () {
+    expect(firstName('Dr. Anjali Rao'), 'Anjali');
+    expect(firstName('Aarav Mehta'), 'Aarav');
+    expect(firstName('Mrs Kavya Iyer'), 'Kavya');
+    expect(firstName('Dr.'), 'Dr.');
   });
 
   test('fixtures parse into typed models', () {

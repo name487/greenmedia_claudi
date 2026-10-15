@@ -546,17 +546,53 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 121 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 130 tests: clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
-                                 #   approval guarantee on every publish path, master dashboard KPIs)
+                                 #   approval guarantee on every publish path, master dashboard KPIs,
+                                 #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 7 tests: login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 13 tests: phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
+
+## Mobile app sign-in (phone + OTP)
+
+The Flutter app opens on **mobile-number sign-in**, built for business owners:
+1. **Enter your phone number.** +91 by default; +971, +1 and +44 are also supported. A tick appears when the number is valid, and *Get OTP* enables.
+2. **Verify your mobile number.** Enter the 4-digit code; it checks itself once the last digit is in. A 30-second timer runs before *Resend code*, and SMS autofill and paste work.
+3. **Select profile.** Every account linked to that number is listed. A business owner with two businesses sees both. Businesses not yet linked to Google show **Needs Google**, and agency staff appear under *Agency team*. With a single profile the app opens straight away.
+
+Staff can still use **Sign in with email**.
+
+**Who can sign in.** Only existing accounts whose **Mobile number** is set: *Settings → Team members*, or `phone` on `POST/PATCH /api/users`. Several accounts may share a number; that's what profile selection is for.
+
+**Security**
+- Only a hash of the code is stored.
+- A code expires after 5 minutes and can be used once.
+- 5 wrong tries lock the code; at most 5 codes per number per hour, 30 seconds apart.
+- The request step answers the same way for unknown numbers, so it can't be used to probe which numbers have accounts, and no SMS is sent for them.
+- Choosing a profile requires the short-lived token from verification, and the chosen account must use that number.
+- Sign-ins are audited as `signed in (phone OTP)`.
+
+**Sending the SMS** (`backend/.env`)
+- `SMS_PROVIDER=console` (default): the code only appears in the API log. On demo installs (`SEED_DEMO=1`) the app also shows a "Demo server — code 1234" chip.
+- `SMS_PROVIDER=msg91`: for India. Needs `MSG91_AUTH_KEY` and a DLT-approved OTP template (`MSG91_TEMPLATE_ID`, with `##OTP##`).
+- `SMS_PROVIDER=twilio`: needs `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM`.
+- With a real provider the code is never in the API response.
+
+**Demo numbers:**
+- **98765 43210:** Dr. Anjali Rao, who owns *Smile Dental Studio* and *GlowUp Salon & Spa*, so you'll see profile selection.
+- **90000 00001 … 90000 00005:** admin, account manager, SEO, content, designer.
+
+| Method & path | What it does |
+|---|---|
+| `POST /api/auth/otp/request` `{phone, country_code?}` | Send a code. Returns `masked`, `length`, `resend_in` (and `dev_code` on console/demo only). |
+| `POST /api/auth/otp/verify` `{phone, code}` | Returns `otp_token` (10 min) and `profiles` (title, subtitle, kind, Google state, group). |
+| `POST /api/auth/otp/select` `{otp_token, user_id}` | Signs in to that profile, returning the normal access token. |
 
 ## Building the mobile apps
 

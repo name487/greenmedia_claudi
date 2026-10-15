@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import phone as phones
 from ..db import get_db
 from ..models import Role, User
 from ..security import ALL_ACTIONS, ALL_SECTIONS, audit, get_client, hash_password, require, require_section
@@ -38,6 +39,16 @@ class UserIn(BaseModel):
     password: str = Field(min_length=MIN_PASSWORD, max_length=128)
     role: str
     client_id: int | None = None  # required for the client-portal role
+    phone: str = ""  # mobile number for OTP sign-in in the app (e.g. 9876543210 or +919876543210)
+
+
+def _norm_phone(raw: str | None) -> str:
+    if not raw or not raw.strip():
+        return ""
+    try:
+        return phones.normalize(raw)
+    except ValueError as e:
+        raise HTTPException(422, f"Phone: {e}") from e
 
 
 def _check_role_and_client(db: Session, admin: User, role: str, client_id: int | None) -> None:
@@ -57,7 +68,8 @@ def create_user(body: UserIn, user: User = Depends(require("settings.edit")), db
     email = body.email.strip().lower()
     if db.scalar(select(User).where(func.lower(User.email) == email)):
         raise HTTPException(409, "A user with that email already exists")
-    u = User(tenant_id=user.tenant_id, name=body.name.strip(), email=email, password_hash=hash_password(body.password), role=body.role, client_id=body.client_id)
+    u = User(tenant_id=user.tenant_id, name=body.name.strip(), email=email, password_hash=hash_password(body.password), role=body.role, client_id=body.client_id,
+             phone=_norm_phone(body.phone))
     db.add(u)
     db.flush()
     audit(db, user, f"created user {email} ({body.role})", entity_type="user", entity_id=u.id)
@@ -71,6 +83,7 @@ class UserPatch(BaseModel):
     client_id: int | None = None
     status: str | None = Field(default=None, pattern="^(active|disabled)$")
     password: str | None = Field(default=None, min_length=MIN_PASSWORD, max_length=128)
+    phone: str | None = None  # "" removes it
 
 
 @router.patch("/users/{user_id}")
@@ -86,6 +99,8 @@ def update_user(user_id: int, body: UserPatch, user: User = Depends(require("set
     for k, v in changes.items():
         if k == "password":
             u.password_hash = hash_password(v)
+        elif k == "phone":
+            u.phone = _norm_phone(v)
         elif k == "role":
             u.role = v
             if v != "client":

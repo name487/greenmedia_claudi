@@ -96,7 +96,7 @@ class _SeoScreenState extends State<SeoScreen> {
                     const SizedBox(width: 6),
                     StatusChip(
                       (k['change'] as int) > 0 ? 'published' : (k['change'] as int) < 0 ? 'failed' : 'draft',
-                      label: (k['change'] as int) > 0 ? '▲ ${k['change']}' : (k['change'] as int) < 0 ? '▼ ${-(k['change'] as int)}' : '—',
+                      label: (k['change'] as int) > 0 ? '+${k['change']}' : (k['change'] as int) < 0 ? '−${-(k['change'] as int)}' : '—',
                     ),
                   ]),
                 ),

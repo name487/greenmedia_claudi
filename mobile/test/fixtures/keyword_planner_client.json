@@ -1,0 +1,46 @@
+{
+ "tracked": [
+  {
+   "id": 1,
+   "keyword": "dental clinic near me",
+   "location": "Pune",
+   "volume": 3190
+  },
+  {
+   "id": 2,
+   "keyword": "best dental clinic in pune",
+   "location": "Pune",
+   "volume": 2491
+  },
+  {
+   "id": 3,
+   "keyword": "dental clinic pune",
+   "location": "Pune",
+   "volume": 1665
+  },
+  {
+   "id": 4,
+   "keyword": "affordable dental clinic",
+   "location": "Pune",
+   "volume": 5507
+  },
+  {
+   "id": 5,
+   "keyword": "top rated dental clinic",
+   "location": "Pune",
+   "volume": 2460
+  },
+  {
+   "id": 6,
+   "keyword": "dental clinic open now",
+   "location": "Pune",
+   "volume": 1997
+  }
+ ],
+ "credits": {
+  "used": 0,
+  "limit": 20
+ },
+ "country": "India",
+ "city": "Pune"
+}

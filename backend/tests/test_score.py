@@ -1,7 +1,10 @@
 """Business Score (mobile home for owners): score parts, stats, heatmap, chart, search keywords, competitors, report link."""
 
+from datetime import date
+
+from app.config import settings
 from app.db import SessionLocal
-from app.models import Competitor, SearchKeyword
+from app.models import Competitor, Keyword, ScoreSnapshot, SearchKeyword
 
 from .conftest import login
 from .test_google import _link
@@ -21,7 +24,7 @@ def test_score_shape_and_consistency(client, portal):
     assert len(d["chart"]["daily"]) == 30 and 1 <= len(d["chart"]["monthly"]) <= 6
     assert d["keywords"]["source"] == "sample" and d["keywords"]["items"][0]["impressions"] >= d["keywords"]["items"][-1]["impressions"]
     you = [x for x in d["competitors"] if x["is_you"]]
-    assert len(you) == 1 and you[0]["name"] == "Smile Dental Studio" and len(d["competitors"]) == 5
+    assert len(you) == 1 and you[0]["name"] == "Smile Dental Studio" and len(d["competitors"]) == 8
     assert d["client"]["review_uri"].startswith("https://search.google.com/local/writereview")
 
 
@@ -73,3 +76,70 @@ def test_live_google_sync_replaces_sample_keywords(client, admin, google):
     assert d["client"]["review_uri"] == "https://search.google.com/local/writereview?placeid=PID1"
     with SessionLocal() as db:
         assert not db.query(SearchKeyword).filter_by(client_id=1, is_sample=True).count()
+
+
+# ---------- owner home screen ----------
+
+def test_home_extras(client, portal):
+    d = client.get("/api/clients/1/score", headers=portal).json()
+    # today's score is recorded for the "Growth in Marketing Score" chart; the week is Monday first
+    week = d["history"]
+    assert len(week) == 7 and date.fromisoformat(week[0]["date"]).weekday() == 0
+    today = next(h for h in week if h["date"] == date.today().isoformat())
+    assert today["value"] == d["score"]["value"]
+    assert all(h["value"] is None for h in week if h["date"] > date.today().isoformat())
+    with SessionLocal() as db:
+        assert db.query(ScoreSnapshot).filter_by(client_id=1, date=date.today()).count() == 1
+    client.get("/api/clients/1/score", headers=portal)
+    with SessionLocal() as db:  # one row per day, however often the screen is opened
+        assert db.query(ScoreSnapshot).filter_by(client_id=1, date=date.today()).count() == 1
+    # tracker and checklist
+    tasks = {t["key"]: t for t in d["tracker"]["tasks"]}
+    assert set(tasks) == {"posts_approved", "posts_published", "review_replies"}
+    assert all(t["pending"] == max(0, t["target"] - t["achieved"]) for t in tasks.values())
+    assert "more to achieve the target" in d["tracker"]["headline"] or "done" in d["tracker"]["headline"]
+    assert len(d["actions"]) == 10 and all({"title", "done", "action", "target"} <= set(a) for a in d["actions"])
+    # competitors split by distance; you are always in the local list
+    g = d["competitor_groups"]
+    assert any(x["is_you"] for x in g["local"]) and all(x["distance_km"] > g["local_km"] for x in g["surrounding"])
+    assert len(g["local"]) + len(g["surrounding"]) == len(d["competitors"])
+    assert {s["platform"] for s in d["social"]} == {"facebook", "instagram"}
+    assert d["support"]["phone"].startswith("+91")
+
+
+def test_performance_and_calendar(client, portal, admin):
+    p30 = client.get("/api/clients/1/performance", headers=portal).json()
+    p120 = client.get("/api/clients/1/performance", headers=portal, params={"days": 120}).json()
+    assert len(p30["series"]) == 30 and len(p120["series"]) == 90  # the demo has 90 days of metrics
+    assert p30["totals"]["views"] == sum(x["views"] for x in p30["series"]) and set(p30["totals"]) == {"views", "leads", "calls", "directions", "website"}
+    assert client.get("/api/clients/1/performance", headers=portal, params={"days": 45}).status_code == 422
+    body = {"client_id": 1, "topic": "Diwali offer", "master_copy": "x", "status": "draft", "variants": [{"platform": "gmb", "copy": "x", "format": "4:3"}]}
+    client.post("/api/content", headers=admin, json=body)
+    cal = client.get("/api/clients/1/calendar", headers=portal).json()
+    assert cal["month"] == date.today().isoformat()[:7] and cal["days"].get(date.today().isoformat()) in ("generated", "approved", "posted")
+    assert client.get("/api/clients/1/calendar", headers=portal, params={"month": "2026-13"}).status_code == 422
+
+
+def test_keyword_planner(client, portal, monkeypatch):
+    monkeypatch.setattr(settings, "keyword_search_monthly_limit", 2)
+    kp = client.get("/api/clients/1/keyword-planner", headers=portal).json()
+    assert kp["credits"] == {"used": 0, "limit": 2} and kp["city"] == "Pune"
+    r = client.post("/api/clients/1/keyword-planner/search", headers=portal, json={"keyword": "dental clinic", "city": "Pune"}).json()
+    assert r["credits"]["used"] == 1 and len(r["results"]) >= 15
+    first = r["results"][0]
+    assert first["source"] == "google" and "dental clinic" in first["keyword"]  # real Google terms come first
+    assert {x["source"] for x in r["results"]} == {"google", "estimate"}
+    assert all(x["competition"] in ("low", "medium", "high") for x in r["results"] if x["source"] == "estimate")
+    again = client.post("/api/clients/1/keyword-planner/search", headers=portal, json={"keyword": "dental clinic", "city": "Pune"}).json()
+    assert [x["searches"] for x in again["results"]] == [x["searches"] for x in r["results"]]  # stable estimates
+    assert client.post("/api/clients/1/keyword-planner/search", headers=portal, json={"keyword": "implants"}).status_code == 429
+    # add and remove a keyword to track
+    k = client.post("/api/clients/1/keyword-planner/keywords", headers=portal, json={"keyword": "Dental implants Pune", "volume": 880})
+    assert k.status_code == 201 and k.json()["location"] == "Pune"
+    assert client.post("/api/clients/1/keyword-planner/keywords", headers=portal, json={"keyword": "dental implants pune"}).status_code == 409
+    assert any(x["keyword"] == "Dental implants Pune" for x in client.get("/api/clients/1/score", headers=portal).json()["tracked_keywords"])
+    assert client.delete(f"/api/clients/1/keyword-planner/keywords/{k.json()['id']}", headers=portal).status_code == 204
+    with SessionLocal() as db:
+        assert not db.query(Keyword).filter_by(client_id=1, keyword="Dental implants Pune").count()
+    other = client.get("/api/clients/2/keyword-planner", headers=portal)
+    assert other.status_code == 404

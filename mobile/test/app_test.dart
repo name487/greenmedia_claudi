@@ -65,7 +65,20 @@ MockClient fakeApi(List<String> calls) {
         return json(fixture('score_client'));
       case '/api/clients/1/score/report-link':
         return json({'url': 'http://api.test/api/clients/1/score/report?t=x', 'expires_at': '2026-10-15T10:00:00Z'});
+      case '/api/clients/1/performance':
+        final p = fixture('performance_client') as Map<String, dynamic>;
+        return json({...p, 'days': int.parse(req.url.queryParameters['days'] ?? '30')});
+      case '/api/clients/1/calendar':
+        return json(fixture('calendar_client'));
+      case '/api/clients/1/keyword-planner':
+        return json(fixture('keyword_planner_client'));
+      case '/api/clients/1/keyword-planner/search':
+        return json(fixture('keyword_search_client'));
+      case '/api/clients/1/keyword-planner/keywords':
+        final b = jsonDecode(req.body) as Map;
+        return json({'id': 999, 'keyword': b['keyword'], 'location': b['location'], 'volume': b['volume']}, 201);
     }
+    if (req.method == 'DELETE' && req.url.path.startsWith('/api/clients/1/keyword-planner/keywords/')) return http.Response('', 204);
     return json({'detail': 'not found'}, 404);
   });
 }
@@ -193,46 +206,109 @@ void main() {
     expect(find.descendant(of: nav, matching: find.text('Analytics')), findsOneWidget);
   });
 
-  group('business score home (owner)', () {
+  group('owner home', () {
     final score = fixture('score_client') as Map<String, dynamic>;
 
-    testWidgets('gauge, stats, keywords and competitors come from the API', (tester) async {
-      await pumpApp(tester, []);
+    // scroll until visible, then bring it to the top so the floating Growth Action pill doesn't cover it
+    Future<void> scrollTo(WidgetTester tester, Finder f) async {
+      await tester.scrollUntilVisible(f, 300, scrollable: find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(f);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('top bar, score carousel and Growth Action come from the API', (tester) async {
+      final calls = <String>[];
+      await pumpApp(tester, calls);
       await signIn(tester, 'anjali@smiledental.in');
+      expect(find.text('Smile Dental Studio'), findsWidgets);
+      expect(find.text('Help'), findsOneWidget);
       expect(find.byKey(const Key('score-value')), findsOneWidget);
       expect(find.text('${(score['score'] as Map)['value']}%'), findsOneWidget);
-      expect(find.text((score['score'] as Map)['label'] as String), findsOneWidget);
-      final stats = score['stats'] as Map<String, dynamic>;
-      expect(find.text('${stats['reply_pending']} / ${stats['reply_window']}'), findsOneWidget);
-      // the Keywords tab jumps to the search keywords
-      await tester.tap(find.text('Keywords'));
+      expect(calls, containsAll(['GET /api/clients/1/score', 'GET /api/clients/1/performance', 'GET /api/clients/1/calendar']));
+      // owner wording in the bottom bar
+      final nav = find.byType(NavigationBar);
+      for (final tab in ['Home', 'Replies', 'AI Post']) {
+        expect(find.descendant(of: nav, matching: find.text(tab)), findsOneWidget);
+      }
+      // carousel: growth this week, then the tracker
+      await tester.drag(find.byType(PageView), const Offset(-400, 0));
       await tester.pumpAndSettle();
-      final top = ((score['keywords'] as Map)['items'] as List).first as Map;
-      expect(find.text(top['keyword'] as String), findsOneWidget);
-      expect(find.text('Search Keywords'), findsOneWidget);
-      await tester.tap(find.text('Competitor').first);
+      expect(find.text('Growth in Marketing Score'), findsOneWidget);
+      await tester.drag(find.byType(PageView), const Offset(-400, 0));
       await tester.pumpAndSettle();
-      expect(find.text('Smile Dental Studio (you)'), findsOneWidget);
-      expect(find.textContaining("You're #"), findsOneWidget);
+      expect(find.text('Marketing Tracker'), findsOneWidget);
+      expect(find.text((score['tracker'] as Map)['headline'] as String), findsOneWidget);
+      // Growth Action checklist
+      final actions = (score['actions'] as List).cast<Map>();
+      final done = actions.where((a) => a['done'] == true).length;
+      expect(find.text('$done of 10 done · ${10 - done} left'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('growth-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('Complete your profile'), findsOneWidget);
+      expect(find.text('Approve posts'), findsOneWidget);
     });
 
-    testWidgets('detailed report lists every part of the score with a tip', (tester) async {
+    testWidgets('improve score opens the breakdown with tips', (tester) async {
       await pumpApp(tester, []);
       await signIn(tester, 'anjali@smiledental.in');
-      await tester.tap(find.text('Check Detailed Report'));
+      await tester.tap(find.text('Improve Marketing Score'));
       await tester.pumpAndSettle();
       expect(find.text('Your score: ${(score['score'] as Map)['value']} / 100'), findsOneWidget);
-      expect(find.text('Google rating'), findsOneWidget);
       expect(find.textContaining('Tip: '), findsWidgets);
     });
 
-    testWidgets('area chart switches between monthly, daily and weekly', (tester) async {
-      await pumpApp(tester, []);
+    testWidgets('performance filter, calendar months, keywords and competitors', (tester) async {
+      final calls = <String>[];
+      await pumpApp(tester, calls);
       await signIn(tester, 'anjali@smiledental.in');
-      await tester.scrollUntilVisible(find.text('Weekly'), 300, scrollable: find.byType(Scrollable).first);
-      await tester.tap(find.text('Daily'));
+      expect(find.text("Google's Performance"), findsOneWidget);
+      await tester.tap(find.byKey(const Key('perf-days')));
       await tester.pumpAndSettle();
-      expect(tester.widget<SegmentedButton<String>>(find.byType(SegmentedButton<String>)).selected, {'daily'});
+      await tester.tap(find.byType(CheckedPopupMenuItem<int>).last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('perf-days')), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('perf-days'))).data, '120 Days');
+
+      await scrollTo(tester, find.byKey(const Key('cal-month')));
+      final month = tester.widget<Text>(find.byKey(const Key('cal-month'))).data;
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('cal-month'))).data, isNot(month));
+
+      final tracked = (score['tracked_keywords'] as List).first as Map;
+      await scrollTo(tester, find.text(tracked['keyword'] as String));
+      await scrollTo(tester, find.text('Competitor Analysis'));
+      expect(find.textContaining('LOCAL COMPETITORS'), findsOneWidget);
+      await scrollTo(tester, find.text('Smile Dental Studio (you)'));
+      await scrollTo(tester, find.text('Stay active on Social Media'));
+      expect(find.text('Facebook'), findsOneWidget);
+    });
+
+    testWidgets('keyword planner: search, add and remove', (tester) async {
+      final calls = <String>[];
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await scrollTo(tester, find.text('Access Keyword Planner'));
+      await tester.tap(find.text('Access Keyword Planner'));
+      await tester.pumpAndSettle();
+      expect(find.text('Keyword Planner'), findsOneWidget);
+      final kp = fixture('keyword_planner_client') as Map<String, dynamic>;
+      expect(find.text((kp['tracked'] as List).first['keyword'] as String), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('kp-keyword')), 'dental implants');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final search = fixture('keyword_search_client') as Map<String, dynamic>;
+      final credits = search['credits'] as Map;
+      expect(tester.widget<Text>(find.byKey(const Key('kp-credits'))).data, '${credits['used']} / ${credits['limit']}');
+      final results = (search['results'] as List).cast<Map>();
+      final i = results.indexWhere((r) => !(kp['tracked'] as List).any((t) => (t as Map)['keyword'] == r['keyword']));
+      final row = find.text('${i + 1}. ${results[i]['keyword']}');
+      await tester.scrollUntilVisible(row, 200, scrollable: find.descendant(of: find.byType(ListView).last, matching: find.byType(Scrollable)).first);
+      final card = find.ancestor(of: row, matching: find.byType(Card)).first;
+      await tester.tap(find.descendant(of: card, matching: find.text('ADD')));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/clients/1/keyword-planner/keywords'));
+      expect(find.descendant(of: card, matching: find.text('ADDED')), findsOneWidget);
     });
   });
 

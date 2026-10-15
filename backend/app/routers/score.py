@@ -8,13 +8,14 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from .. import home
 from .. import score as scoring
 from ..config import settings
 from ..db import get_db
-from ..models import Client, Competitor, User
+from ..models import Client, Competitor, Keyword, KeywordSearchLog, User
 from ..security import audit, get_client, require, require_section
 
 router = APIRouter(prefix="/api/clients", tags=["score"])
@@ -24,7 +25,94 @@ REPORT_LINK_MINUTES = 15
 
 @router.get("/{client_id}/score")
 def business_score(client_id: int, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
-    return scoring.build(db, get_client(db, user, client_id))
+    """Everything on the owner's home screen in one call."""
+    c = get_client(db, user, client_id)
+    today = date.today()
+    d = scoring.build(db, c, today)
+    home.record_snapshot(db, c, d["score"]["value"], today)
+    db.flush()
+    track = home.tracker(db, c, today)
+    kws = home.tracked(db, c)
+    d.update(history=home.history(db, c, today), tracker=track, tracked_keywords=kws,
+             actions=home.growth_actions(c, d, track, len(kws)), social=home.social(c), support=home.support(db, c),
+             competitor_groups=home.competitor_groups(d["competitors"]))
+    db.commit()
+    return d
+
+
+@router.get("/{client_id}/performance")
+def google_performance(client_id: int, days: int = 30, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    if days not in (30, 60, 120):
+        raise HTTPException(422, "days must be 30, 60 or 120")
+    return home.performance(db, get_client(db, user, client_id), days, date.today())
+
+
+@router.get("/{client_id}/calendar")
+def social_calendar(client_id: int, month: str | None = None, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    try:
+        first = date.fromisoformat(f"{month}-01") if month else date.today().replace(day=1)
+    except ValueError:
+        raise HTTPException(422, "month must look like 2026-10")
+    return home.calendar(db, get_client(db, user, client_id), first)
+
+
+# ---------- Keyword Planner ----------
+
+@router.get("/{client_id}/keyword-planner")
+def keyword_planner(client_id: int, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    return {"tracked": home.tracked(db, c), "credits": home.credits(db, c, date.today()), "country": "India", "city": c.city}
+
+
+class KeywordSearchIn(BaseModel):
+    keyword: str = Field(min_length=2, max_length=100)
+    city: str = Field("", max_length=100)
+    country: str = Field("India", max_length=60)
+
+
+@router.post("/{client_id}/keyword-planner/search")
+def keyword_search(client_id: int, body: KeywordSearchIn, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    cr = home.credits(db, c, date.today())
+    if cr["used"] >= cr["limit"]:
+        raise HTTPException(429, f"You've used all {cr['limit']} keyword searches for this month")
+    db.add(KeywordSearchLog(tenant_id=c.tenant_id, client_id=c.id, user_id=user.id, keyword=body.keyword.strip(), city=body.city.strip()))
+    db.commit()
+    return {"keyword": body.keyword.strip(), "city": body.city.strip() or c.city, "results": home.ideas(db, c, body.keyword, body.city),
+            "credits": home.credits(db, c, date.today())}
+
+
+class TrackKeywordIn(BaseModel):
+    keyword: str = Field(min_length=2, max_length=200)
+    location: str = Field("", max_length=100)
+    volume: int = Field(0, ge=0)
+
+
+@router.post("/{client_id}/keyword-planner/keywords", status_code=201)
+def track_keyword(client_id: int, body: TrackKeywordIn, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    kw = body.keyword.strip()
+    if db.scalar(select(Keyword).where(Keyword.client_id == c.id, func.lower(Keyword.keyword) == kw.lower())):
+        raise HTTPException(409, f'"{kw}" is already added')
+    # Rank is filled in by the rank tracker; 100 = not ranked yet (same as the SEO screen)
+    k = Keyword(tenant_id=c.tenant_id, client_id=c.id, keyword=kw, target_url=c.website, location=body.location.strip() or c.city,
+                current_rank=100, previous_rank=100, volume=body.volume)
+    db.add(k)
+    db.flush()
+    audit(db, user, f'tracking keyword "{kw}"', client_id=c.id, entity_type="seo_keyword", entity_id=k.id)
+    db.commit()
+    return {"id": k.id, "keyword": k.keyword, "location": k.location, "volume": k.volume}
+
+
+@router.delete("/{client_id}/keyword-planner/keywords/{keyword_id}", status_code=204)
+def untrack_keyword(client_id: int, keyword_id: int, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    k = db.scalar(select(Keyword).where(Keyword.id == keyword_id, Keyword.client_id == c.id))
+    if not k:
+        raise HTTPException(404, "Keyword not found")
+    db.delete(k)
+    audit(db, user, f'stopped tracking keyword "{k.keyword}"', client_id=c.id, entity_type="seo_keyword", entity_id=keyword_id)
+    db.commit()
 
 
 # ---------- printable report ----------
@@ -102,6 +190,8 @@ class CompetitorIn(BaseModel):
     rating: float = Field(0, ge=0, le=5)
     review_count: int = Field(0, ge=0)
     maps_uri: str = Field("", max_length=500)
+    address: str = Field("", max_length=300)
+    distance_km: float | None = Field(None, ge=0)
 
 
 @router.post("/{client_id}/competitors", status_code=201)
@@ -109,12 +199,13 @@ def add_competitor(client_id: int, body: CompetitorIn, user: User = Depends(requ
     c = get_client(db, user, client_id)
     db.execute(delete(Competitor).where(Competitor.client_id == c.id, Competitor.is_sample.is_(True)))  # real list replaces the demo one
     x = Competitor(tenant_id=c.tenant_id, client_id=c.id, name=body.name.strip(), rating=round(body.rating, 1), review_count=body.review_count,
-                   maps_uri=body.maps_uri.strip())
+                   maps_uri=body.maps_uri.strip(), address=body.address.strip(), distance_km=body.distance_km)
     db.add(x)
     db.flush()
     audit(db, user, f"added competitor {x.name}", client_id=c.id, entity_type="competitor", entity_id=x.id)
     db.commit()
-    return {"id": x.id, "name": x.name, "rating": x.rating, "review_count": x.review_count, "maps_uri": x.maps_uri, "is_sample": False, "is_you": False}
+    return {"id": x.id, "name": x.name, "rating": x.rating, "review_count": x.review_count, "maps_uri": x.maps_uri, "address": x.address,
+            "distance_km": x.distance_km, "is_sample": False, "is_you": False}
 
 
 @router.delete("/{client_id}/competitors/{competitor_id}", status_code=204)

@@ -11,7 +11,7 @@
   "review_uri": "https://search.google.com/local/writereview?placeid=demo-1",
   "google_connected": true
  },
- "as_of": "2026-10-15T09:13:18.666962+00:00",
+ "as_of": "2026-10-15T11:05:51.242648+00:00",
  "score": {
   "value": 67,
   "label": "good",
@@ -530,11 +530,13 @@
  },
  "competitors": [
   {
-   "id": 4,
-   "name": "Classic Dental Clinic",
-   "rating": 3.9,
-   "review_count": 1057,
+   "id": 7,
+   "name": "Metro Dental Clinic",
+   "rating": 4.3,
+   "review_count": 1085,
    "maps_uri": "",
+   "address": "Shop 53, Civil Lines, Pune",
+   "distance_km": 13.7,
    "is_sample": true,
    "is_you": false
   },
@@ -542,14 +544,62 @@
    "name": "Smile Dental Studio",
    "rating": 3.7,
    "review_count": 798,
-   "is_you": true
+   "is_you": true,
+   "address": "",
+   "distance_km": 0.0
+  },
+  {
+   "id": 1,
+   "name": "Lotus Dental Clinic",
+   "rating": 4.3,
+   "review_count": 681,
+   "maps_uri": "",
+   "address": "Shop 56, Station Road, Pune",
+   "distance_km": 3.6,
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "id": 5,
+   "name": "Royal Dental Clinic",
+   "rating": 4.5,
+   "review_count": 556,
+   "maps_uri": "",
+   "address": "Shop 6, Link Road, Pune",
+   "distance_km": 9.7,
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "id": 4,
+   "name": "Classic Dental Clinic",
+   "rating": 4.8,
+   "review_count": 402,
+   "maps_uri": "",
+   "address": "Shop 54, Main Market, Pune",
+   "distance_km": 12.8,
+   "is_sample": true,
+   "is_you": false
+  },
+  {
+   "id": 6,
+   "name": "Prime Dental Clinic",
+   "rating": 4.5,
+   "review_count": 367,
+   "maps_uri": "",
+   "address": "Shop 15, Main Market, Pune",
+   "distance_km": 12.5,
+   "is_sample": true,
+   "is_you": false
   },
   {
    "id": 2,
    "name": "City Dental Clinic",
-   "rating": 4.3,
-   "review_count": 681,
+   "rating": 4.0,
+   "review_count": 317,
    "maps_uri": "",
+   "address": "Shop 33, Ring Road, Pune",
+   "distance_km": 3.5,
    "is_sample": true,
    "is_you": false
   },
@@ -557,19 +607,303 @@
    "id": 3,
    "name": "Elite Dental Clinic",
    "rating": 4.7,
-   "review_count": 566,
+   "review_count": 270,
    "maps_uri": "",
-   "is_sample": true,
-   "is_you": false
-  },
-  {
-   "id": 1,
-   "name": "Lotus Dental Clinic",
-   "rating": 3.8,
-   "review_count": 60,
-   "maps_uri": "",
+   "address": "Shop 41, Civil Lines, Pune",
+   "distance_km": 2.2,
    "is_sample": true,
    "is_you": false
   }
- ]
+ ],
+ "history": [
+  {
+   "date": "2026-10-12",
+   "value": 58
+  },
+  {
+   "date": "2026-10-13",
+   "value": 60
+  },
+  {
+   "date": "2026-10-14",
+   "value": 60
+  },
+  {
+   "date": "2026-10-15",
+   "value": 67
+  },
+  {
+   "date": "2026-10-16",
+   "value": null
+  },
+  {
+   "date": "2026-10-17",
+   "value": null
+  },
+  {
+   "date": "2026-10-18",
+   "value": null
+  }
+ ],
+ "tracker": {
+  "week_start": "2026-10-12",
+  "tasks": [
+   {
+    "key": "posts_approved",
+    "label": "AI posts approved",
+    "target": 5,
+    "achieved": 1,
+    "pending": 4,
+    "section": "content"
+   },
+   {
+    "key": "posts_published",
+    "label": "AI posts published",
+    "target": 5,
+    "achieved": 0,
+    "pending": 5,
+    "section": "content"
+   },
+   {
+    "key": "review_replies",
+    "label": "Review replies",
+    "target": 5,
+    "achieved": 0,
+    "pending": 5,
+    "section": "reviews"
+   }
+  ],
+  "headline": "AI posts approved - 4 more to achieve the target"
+ },
+ "tracked_keywords": [
+  {
+   "id": 1,
+   "keyword": "dental clinic near me",
+   "location": "Pune",
+   "volume": 3190
+  },
+  {
+   "id": 2,
+   "keyword": "best dental clinic in pune",
+   "location": "Pune",
+   "volume": 2491
+  },
+  {
+   "id": 3,
+   "keyword": "dental clinic pune",
+   "location": "Pune",
+   "volume": 1665
+  },
+  {
+   "id": 4,
+   "keyword": "affordable dental clinic",
+   "location": "Pune",
+   "volume": 5507
+  },
+  {
+   "id": 5,
+   "keyword": "top rated dental clinic",
+   "location": "Pune",
+   "volume": 2460
+  },
+  {
+   "id": 6,
+   "keyword": "dental clinic open now",
+   "location": "Pune",
+   "volume": 1997
+  }
+ ],
+ "actions": [
+  {
+   "key": "profile",
+   "title": "Complete your profile",
+   "detail": "Google connected, phone and brand voice set",
+   "done": true,
+   "action": "Complete now",
+   "target": "profile"
+  },
+  {
+   "key": "approve",
+   "title": "Approve posts",
+   "detail": "1 of 5 this week",
+   "done": false,
+   "action": "Approve",
+   "target": "content"
+  },
+  {
+   "key": "publish",
+   "title": "Publish posts",
+   "detail": "0 of 5 this week",
+   "done": false,
+   "action": "Create post",
+   "target": "content"
+  },
+  {
+   "key": "reply",
+   "title": "Reply to every review",
+   "detail": "3 waiting",
+   "done": false,
+   "action": "Reply",
+   "target": "reviews"
+  },
+  {
+   "key": "replies_week",
+   "title": "Review replies this week",
+   "detail": "0 of 5",
+   "done": false,
+   "action": "Reply",
+   "target": "reviews"
+  },
+  {
+   "key": "facebook",
+   "title": "Connect Facebook",
+   "detail": "Post to your Page automatically",
+   "done": true,
+   "action": "Connect",
+   "target": "social"
+  },
+  {
+   "key": "instagram",
+   "title": "Connect Instagram",
+   "detail": "Post to Instagram automatically",
+   "done": false,
+   "action": "Connect",
+   "target": "social"
+  },
+  {
+   "key": "keywords",
+   "title": "Track your keywords",
+   "detail": "6 of 3 added",
+   "done": true,
+   "action": "Add keywords",
+   "target": "keyword_planner"
+  },
+  {
+   "key": "new_reviews",
+   "title": "Get new Google reviews",
+   "detail": "7 in the last 30 days",
+   "done": true,
+   "action": "Share QR",
+   "target": "review_qr"
+  },
+  {
+   "key": "score",
+   "title": "Reach a score of 70",
+   "detail": "Now 67",
+   "done": false,
+   "action": "Improve",
+   "target": "score"
+  }
+ ],
+ "social": [
+  {
+   "platform": "facebook",
+   "connected": true,
+   "status": "connected",
+   "handle": "@smiledentalstudio"
+  },
+  {
+   "platform": "instagram",
+   "connected": false,
+   "status": "not_connected",
+   "handle": ""
+  }
+ ],
+ "support": {
+  "name": "Priya Nair",
+  "phone": "+919000000002",
+  "email": "priya@greenmedia.in"
+ },
+ "competitor_groups": {
+  "local": [
+   {
+    "name": "Smile Dental Studio",
+    "rating": 3.7,
+    "review_count": 798,
+    "is_you": true,
+    "address": "",
+    "distance_km": 0.0
+   },
+   {
+    "id": 1,
+    "name": "Lotus Dental Clinic",
+    "rating": 4.3,
+    "review_count": 681,
+    "maps_uri": "",
+    "address": "Shop 56, Station Road, Pune",
+    "distance_km": 3.6,
+    "is_sample": true,
+    "is_you": false
+   },
+   {
+    "id": 2,
+    "name": "City Dental Clinic",
+    "rating": 4.0,
+    "review_count": 317,
+    "maps_uri": "",
+    "address": "Shop 33, Ring Road, Pune",
+    "distance_km": 3.5,
+    "is_sample": true,
+    "is_you": false
+   },
+   {
+    "id": 3,
+    "name": "Elite Dental Clinic",
+    "rating": 4.7,
+    "review_count": 270,
+    "maps_uri": "",
+    "address": "Shop 41, Civil Lines, Pune",
+    "distance_km": 2.2,
+    "is_sample": true,
+    "is_you": false
+   }
+  ],
+  "surrounding": [
+   {
+    "id": 7,
+    "name": "Metro Dental Clinic",
+    "rating": 4.3,
+    "review_count": 1085,
+    "maps_uri": "",
+    "address": "Shop 53, Civil Lines, Pune",
+    "distance_km": 13.7,
+    "is_sample": true,
+    "is_you": false
+   },
+   {
+    "id": 5,
+    "name": "Royal Dental Clinic",
+    "rating": 4.5,
+    "review_count": 556,
+    "maps_uri": "",
+    "address": "Shop 6, Link Road, Pune",
+    "distance_km": 9.7,
+    "is_sample": true,
+    "is_you": false
+   },
+   {
+    "id": 4,
+    "name": "Classic Dental Clinic",
+    "rating": 4.8,
+    "review_count": 402,
+    "maps_uri": "",
+    "address": "Shop 54, Main Market, Pune",
+    "distance_km": 12.8,
+    "is_sample": true,
+    "is_you": false
+   },
+   {
+    "id": 6,
+    "name": "Prime Dental Clinic",
+    "rating": 4.5,
+    "review_count": 367,
+    "maps_uri": "",
+    "address": "Shop 15, Main Market, Pune",
+    "distance_km": 12.5,
+    "is_sample": true,
+    "is_you": false
+   }
+  ],
+  "local_km": 5.0
+ }
 }

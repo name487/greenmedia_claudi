@@ -107,7 +107,8 @@ def build(db: Session, c: Client, today: date | None = None) -> dict:
     gmb = c.gmb
     contact = c.contacts[0] if c.contacts else None
     live = bool(keywords) and not keywords[0].is_sample
-    you = {"name": c.company_name, "rating": score["rating"], "review_count": score["total_reviews"], "is_you": True}
+    you = {"name": c.company_name, "rating": score["rating"], "review_count": score["total_reviews"], "is_you": True,
+           "address": gmb.address if gmb else "", "distance_km": 0.0}
     return {
         "client": {"id": c.id, "company_name": c.company_name, "industry": c.industry, "city": c.city,
                    "email": (gmb.google_email if gmb else "") or (contact.email if contact else ""), "phone": contact.phone if contact else "",
@@ -135,6 +136,7 @@ def build(db: Session, c: Client, today: date | None = None) -> dict:
                      "period_end": keywords[0].period_end.isoformat() if keywords else None,
                      "items": [{"keyword": k.keyword, "impressions": k.impressions, "below_threshold": k.below_threshold} for k in keywords]},
         "competitors": sorted([you] + [{"id": x.id, "name": x.name, "rating": x.rating, "review_count": x.review_count, "maps_uri": x.maps_uri,
-                                        "is_sample": x.is_sample, "is_you": False} for x in rivals],
+                                        "address": x.address, "distance_km": x.distance_km, "is_sample": x.is_sample, "is_you": False}
+                                       for x in rivals],
                               key=lambda x: (-x["review_count"], -x["rating"])),
     }

@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 136 tests: business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 139 tests: owner home, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 136 tests: business score, clients/contacts C
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 16 tests: business score home, phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 17 tests: owner home (carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -594,26 +594,39 @@ Staff can still use **Sign in with email**.
 | `POST /api/auth/otp/verify` `{phone, code}` | Returns `otp_token` (10 min) and `profiles` (title, subtitle, kind, Google state, group). |
 | `POST /api/auth/otp/select` `{otp_token, user_id}` | Signs in to that profile, returning the normal access token. |
 
-## Mobile home for business owners (Business Score)
+## Mobile home for business owners
 
-A business owner who signs in to the app lands on their **Business Score** (agency staff open it from a client's page):
+A business owner who signs in to the app lands on a home page modelled on Dhanda AI's (agency staff open the same
+page from a client's screen with **Business score**). Top to bottom:
 
-- **Score out of 100** with a gauge and *Check Detailed Report*: the points for Google rating, number of reviews,
-  replies to the last 50 reviews, new reviews, Google posts, profile connection, search visibility and customer actions,
-  each with a tip. *Download Report* opens a printable page (Save as PDF) through a signed link valid for 15 minutes.
-- **Activity heatmap** (15 weeks of reviews, replies and posts), **Reply pending / Reviews / Views / Engagements** tiles
-  and **Reply With AI**, which opens the review queue.
-- **Profile views chart** — monthly, daily or weekly views against calls, directions and website clicks.
-- **Search Keywords** — what people typed on Google before the profile appeared. Synced from the Business Profile
-  Performance API (`searchkeywords/impressions/monthly`, last 3 months) with every Google sync; terms Google only
-  reports as "fewer than N" show as `<N`.
-- **Competitor Analysis** — the client against nearby businesses by rating and reviews. Staff add the real ones with
-  `POST /api/clients/{id}/competitors` (which drops the demo list); `DELETE …/competitors/{competitor_id}` removes one.
-- **Get more Google reviews** — a QR of the profile's "write a review" link (`newReviewUri`, stored on linking) to print
-  for the counter, plus share-on-WhatsApp and copy.
+- **Top bar** with the business, phone and city, and **Help** (WhatsApp or call the account manager).
+- **Score carousel** (swipe):
+  - **Marketing Score** gauge out of 100. *Improve Marketing Score* lists the points for rating, reviews, replies to
+    the last 50 reviews, new reviews, Google posts, profile connection, search visibility and customer actions, each with
+    a tip, plus *Download Report* (a printable page behind a signed 15-minute link).
+  - **Growth in Marketing Score** — this week's daily score (saved once a day in `score_snapshots`).
+  - **Marketing Tracker** — this week's targets vs achieved: AI posts approved, AI posts published and review replies
+    (`WEEKLY_POST_TARGET`, `WEEKLY_REPLY_TARGET`, default 5), with "N more to achieve the target".
+- **Google's Performance** — Views, Leads, Calls, Directions, Website for 30 / 60 / 120 days with a daily chart.
+- **Social Calendar** — posts per day (Generated / Approved / Posted) and how many wait for approval.
+- **Keywords** and the **Keyword Planner**: the keywords the business tracks, and a search (country, city, keyword)
+  that returns ideas with monthly searches and competition. Terms Google already showed the profile for come first with
+  their real impressions (marked *Google*); the rest are **estimates** until a keyword-volume provider is connected.
+  Each search uses one of the month's credits (`KEYWORD_SEARCH_MONTHLY_LIMIT`, default 20).
+- **Competitor Analysis** — local competitors within 5 km and the surrounding area beyond, each row expanding to the
+  address, distance and number of ratings. Staff add real competitors with
+  `POST /api/clients/{id}/competitors` (`name`, `rating`, `review_count`, `address`, `distance_km`), which replaces the
+  demo list.
+- **Stay active on Social Media** — Facebook / Instagram status; *Connect* asks the account manager (Meta is connected
+  by the agency).
+- **Get more Google reviews** — QR of the profile's "write a review" link, WhatsApp share and copy.
+- **Growth Action** — a floating checklist of 10 actions (profile, approve and publish posts, reply to reviews, connect
+  Facebook and Instagram, track keywords, get new reviews, reach a score of 70), each opening the right screen.
 
-Demo databases get sample search keywords and competitors (marked as sample in the app) until Google is connected.
-API: `GET /api/clients/{id}/score`, `POST /api/clients/{id}/score/report-link`.
+Search keywords sync from the Business Profile Performance API (`searchkeywords/impressions/monthly`) with every Google
+sync. Demo databases get sample keywords, competitors and two weeks of score history (marked as sample in the app).
+API: `GET /api/clients/{id}/score` (the whole home page), `GET …/performance?days=30|60|120`, `GET …/calendar?month=YYYY-MM`,
+`GET …/keyword-planner`, `POST …/keyword-planner/search`, `POST|DELETE …/keyword-planner/keywords`.
 
 ## Building the mobile apps
 

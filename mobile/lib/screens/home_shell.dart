@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../api/models.dart';
 import '../state/session.dart';
 import 'analytics_screen.dart';
 import 'business_score_screen.dart';
@@ -15,8 +16,9 @@ import 'settings_screen.dart';
 import 'tasks_screen.dart';
 
 class Destination {
-  const Destination(this.section, this.label, this.icon, this.builder);
+  const Destination(this.section, this.label, this.icon, this.builder, {this.ownerLabel});
   final String section, label;
+  final String? ownerLabel; // wording for business owners (client role)
   final IconData icon;
   final WidgetBuilder builder;
 }
@@ -27,8 +29,8 @@ final destinations = <Destination>[
     final me = c.read<Session>().me!;
     return me.isClient ? BusinessScoreScreen(clientId: me.clientId!) : const DashboardScreen();
   }),
-  Destination('reviews', 'Reviews', Icons.star_outline_rounded, (_) => const ReviewsScreen()),
-  Destination('content', 'Content', Icons.edit_note_rounded, (_) => const ContentScreen()),
+  Destination('reviews', 'Reviews', Icons.star_outline_rounded, (_) => const ReviewsScreen(), ownerLabel: 'Replies'),
+  Destination('content', 'Content', Icons.edit_note_rounded, (_) => const ContentScreen(), ownerLabel: 'AI Post'),
   Destination('social', 'Calendar', Icons.calendar_month_outlined, (_) => const CalendarScreen()),
   Destination('clients', 'Clients', Icons.groups_outlined, (_) => const ClientsScreen()),
   Destination('analytics', 'Analytics', Icons.insights_outlined, (_) => const AnalyticsScreen()),
@@ -36,6 +38,8 @@ final destinations = <Destination>[
   Destination('reports', 'Reports', Icons.description_outlined, (_) => const ReportsScreen()),
   Destination('tasks', 'Tasks', Icons.task_alt_outlined, (_) => const TasksScreen()),
 ];
+
+String label(Destination d, Me me) => me.isClient ? d.ownerLabel ?? d.label : d.label;
 
 /// Bottom navigation with the role's first four sections; everything else lives under "More".
 class HomeShell extends StatefulWidget {
@@ -47,6 +51,17 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  // One primary scroll controller per tab: the tabs stay alive side by side in the IndexedStack, and sharing the
+  // route's controller breaks keyboard scrolling ("too many elements") and scroll-to-top.
+  final _scrollers = <String, ScrollController>{};
+
+  @override
+  void dispose() {
+    for (final c in _scrollers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +71,14 @@ class _HomeShellState extends State<HomeShell> {
     final more = allowed.skip(4).toList();
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: [for (final t in tabs) _Page(title: t.label, child: t.builder(context))]),
+      body: IndexedStack(index: _index, children: [
+        for (final t in tabs)
+          PrimaryScrollController(
+            controller: _scrollers.putIfAbsent(t.section, ScrollController.new),
+            // The owner's home draws its own top bar
+            child: me.isClient && t.section == 'dashboard' ? t.builder(context) : _Page(title: label(t, me), child: t.builder(context)),
+          ),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) {
@@ -67,7 +89,7 @@ class _HomeShellState extends State<HomeShell> {
           }
         },
         destinations: [
-          for (final t in tabs) NavigationDestination(icon: Icon(t.icon), label: t.label),
+          for (final t in tabs) NavigationDestination(icon: Icon(t.icon), label: label(t, me)),
           const NavigationDestination(icon: Icon(Icons.menu_rounded), label: 'More'),
         ],
       ),
@@ -90,10 +112,10 @@ class _HomeShellState extends State<HomeShell> {
           for (final d in more)
             ListTile(
               leading: Icon(d.icon),
-              title: Text(d.label),
+              title: Text(label(d, session.me!)),
               onTap: () {
                 Navigator.pop(sheet);
-                Navigator.push(context, MaterialPageRoute<void>(builder: (c) => _Page(title: d.label, child: d.builder(c))));
+                Navigator.push(context, MaterialPageRoute<void>(builder: (c) => _Page(title: label(d, session.me!), child: d.builder(c))));
               },
             ),
           ListTile(

@@ -6,12 +6,12 @@ import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine
 from .models import (
-    Client, ClientContact, Competitor, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, SearchKeyword, SocialAccount, Task, Tenant, User,
+    Client, ClientContact, Competitor, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, ScoreSnapshot, SearchKeyword, SocialAccount, Task, Tenant, User,
 )
 from .ai import PLATFORM_FORMAT
 from .config import settings
@@ -67,6 +67,7 @@ REVIEW_TEXT = [
 # What customers type on Google before the profile shows up (Business Profile "search keywords")
 SEARCHES = ["{i} near me", "{i} in {c}", "best {i} in {c}", "{i}", "{n}", "top {i} near me", "{c} {i}", "{i} open now",
             "affordable {i} near me", "{i} near me open today", "{i} reviews", "good {i} in {c}", "{i} contact number", "{i} timings"]
+AREAS = ["Station Road", "Main Market", "MG Road", "Sector 17", "Link Road", "Gandhi Nagar", "Ring Road", "Civil Lines"]
 RIVAL_PREFIX = ["Royal", "City", "Prime", "Sunrise", "Elite", "Urban", "Shree", "Galaxy", "Classic", "Metro", "Lotus", "Apex"]
 KEYWORDS = ["{i} near me", "best {i} in {c}", "{i} {c}", "affordable {i}", "top rated {i}", "{i} open now"]
 PLANS = ["Starter", "Growth", "Pro", "Agency"]
@@ -85,9 +86,15 @@ def seed_insights(db: Session, c: Client) -> None:
         n = round(top * (0.82 ** k) * (0.85 + r.random() * 0.3))
         db.add(SearchKeyword(tenant_id=c.tenant_id, client_id=c.id, keyword=tpl.format(i=ind, c=city, n=c.company_name.lower()),
                              impressions=max(n, 15), below_threshold=n < 15, period_start=start, period_end=end, is_sample=True))
-    for name in r.sample(RIVAL_PREFIX, 4):
+    for k, name in enumerate(r.sample(RIVAL_PREFIX, 7)):
+        km = round(0.4 + r.random() * 4.4, 1) if k < 3 else round(5.5 + r.random() * 9, 1)  # 3 local, 4 in the surrounding area
         db.add(Competitor(tenant_id=c.tenant_id, client_id=c.id, name=f"{name} {c.industry.title()}", rating=round(3.7 + r.random() * 1.2, 1),
-                          review_count=r.randint(25, 1100), is_sample=True))
+                          review_count=r.randint(25, 1100), address=f"Shop {r.randint(1, 60)}, {r.choice(AREAS)}, {c.city}", distance_km=km,
+                          is_sample=True))
+    value = r.randint(40, 60)  # two weeks of daily scores for the "Growth in Marketing Score" chart
+    for d in range(14, 0, -1):
+        value = max(20, min(95, value + r.choice([-2, -1, 0, 1, 1, 2, 3])))
+        db.add(ScoreSnapshot(tenant_id=c.tenant_id, client_id=c.id, date=today - timedelta(days=d), value=value))
     if c.gmb and not c.gmb.review_uri:
         c.gmb.review_uri = f"https://search.google.com/local/writereview?placeid=demo-{c.id}"
 
@@ -211,12 +218,19 @@ def init_db(seed_if_empty: bool = True) -> None:
             ensure_default_roles(db, tid)
         db.commit()
     if seed_if_empty:
-        with SessionLocal() as db:  # demo databases from before the Business Score screen
+        with SessionLocal() as db:  # demo databases from before the owner home screen: (re)fill its sample data
             for c in db.scalars(select(Client)):
-                has = db.scalar(select(func.count()).select_from(SearchKeyword).where(SearchKeyword.client_id == c.id))
-                has = has or db.scalar(select(func.count()).select_from(Competitor).where(Competitor.client_id == c.id))
-                if not has and settings.seed_demo and not (c.gmb and c.gmb.is_live):
-                    seed_insights(db, c)
+                if not settings.seed_demo or (c.gmb and c.gmb.is_live):
+                    continue
+                if db.scalar(select(func.count()).select_from(ScoreSnapshot).where(ScoreSnapshot.client_id == c.id)):
+                    continue
+                real = db.scalar(select(func.count()).select_from(Competitor).where(Competitor.client_id == c.id, Competitor.is_sample.is_(False)))
+                if real or db.scalar(select(func.count()).select_from(SearchKeyword).where(SearchKeyword.client_id == c.id,
+                                                                                         SearchKeyword.is_sample.is_(False))):
+                    continue  # the agency already entered real data for this client
+                db.execute(delete(Competitor).where(Competitor.client_id == c.id))
+                db.execute(delete(SearchKeyword).where(SearchKeyword.client_id == c.id))
+                seed_insights(db, c)
             db.commit()
         with SessionLocal() as db:
             if not db.scalar(select(func.count()).select_from(Tenant)):

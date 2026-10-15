@@ -327,8 +327,35 @@ class Competitor(Base):
     rating: Mapped[float] = mapped_column(Float, default=0)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
     maps_uri: Mapped[str] = mapped_column(String(500), default="")
+    address: Mapped[str] = mapped_column(String(300), default="")
+    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # from the client; ≤5 km counts as local
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ScoreSnapshot(Base):
+    """The Business Score once a day, for the "Growth in Marketing Score" chart."""
+
+    __tablename__ = "score_snapshots"
+    __table_args__ = (UniqueConstraint("client_id", "date"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    date: Mapped[date] = mapped_column(Date)
+    value: Mapped[int] = mapped_column(Integer)
+
+
+class KeywordSearchLog(Base):
+    """One Keyword Planner search; counted against the client's monthly search credits."""
+
+    __tablename__ = "keyword_searches"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    keyword: Mapped[str] = mapped_column(String(200))
+    city: Mapped[str] = mapped_column(String(100), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
 
 
 class MetricDaily(Base):

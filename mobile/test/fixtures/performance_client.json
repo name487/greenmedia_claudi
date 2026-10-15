@@ -1,0 +1,252 @@
+{
+ "days": 30,
+ "totals": {
+  "views": 14831,
+  "leads": 251,
+  "calls": 502,
+  "directions": 784,
+  "website": 1185
+ },
+ "series": [
+  {
+   "date": "2026-09-16",
+   "views": 477,
+   "leads": 9,
+   "calls": 20,
+   "directions": 28,
+   "website": 37
+  },
+  {
+   "date": "2026-09-17",
+   "views": 458,
+   "leads": 8,
+   "calls": 16,
+   "directions": 26,
+   "website": 47
+  },
+  {
+   "date": "2026-09-18",
+   "views": 600,
+   "leads": 10,
+   "calls": 23,
+   "directions": 30,
+   "website": 53
+  },
+  {
+   "date": "2026-09-19",
+   "views": 496,
+   "leads": 7,
+   "calls": 13,
+   "directions": 24,
+   "website": 31
+  },
+  {
+   "date": "2026-09-20",
+   "views": 319,
+   "leads": 6,
+   "calls": 13,
+   "directions": 21,
+   "website": 25
+  },
+  {
+   "date": "2026-09-21",
+   "views": 476,
+   "leads": 9,
+   "calls": 15,
+   "directions": 28,
+   "website": 37
+  },
+  {
+   "date": "2026-09-22",
+   "views": 539,
+   "leads": 8,
+   "calls": 20,
+   "directions": 29,
+   "website": 39
+  },
+  {
+   "date": "2026-09-23",
+   "views": 635,
+   "leads": 9,
+   "calls": 16,
+   "directions": 27,
+   "website": 46
+  },
+  {
+   "date": "2026-09-24",
+   "views": 481,
+   "leads": 9,
+   "calls": 17,
+   "directions": 24,
+   "website": 36
+  },
+  {
+   "date": "2026-09-25",
+   "views": 597,
+   "leads": 11,
+   "calls": 17,
+   "directions": 27,
+   "website": 44
+  },
+  {
+   "date": "2026-09-26",
+   "views": 437,
+   "leads": 8,
+   "calls": 12,
+   "directions": 20,
+   "website": 33
+  },
+  {
+   "date": "2026-09-27",
+   "views": 373,
+   "leads": 7,
+   "calls": 16,
+   "directions": 20,
+   "website": 29
+  },
+  {
+   "date": "2026-09-28",
+   "views": 462,
+   "leads": 9,
+   "calls": 18,
+   "directions": 29,
+   "website": 42
+  },
+  {
+   "date": "2026-09-29",
+   "views": 579,
+   "leads": 9,
+   "calls": 18,
+   "directions": 31,
+   "website": 46
+  },
+  {
+   "date": "2026-09-30",
+   "views": 469,
+   "leads": 8,
+   "calls": 15,
+   "directions": 23,
+   "website": 39
+  },
+  {
+   "date": "2026-10-01",
+   "views": 425,
+   "leads": 7,
+   "calls": 16,
+   "directions": 26,
+   "website": 38
+  },
+  {
+   "date": "2026-10-02",
+   "views": 499,
+   "leads": 8,
+   "calls": 20,
+   "directions": 31,
+   "website": 51
+  },
+  {
+   "date": "2026-10-03",
+   "views": 409,
+   "leads": 9,
+   "calls": 16,
+   "directions": 22,
+   "website": 37
+  },
+  {
+   "date": "2026-10-04",
+   "views": 372,
+   "leads": 7,
+   "calls": 14,
+   "directions": 20,
+   "website": 32
+  },
+  {
+   "date": "2026-10-05",
+   "views": 533,
+   "leads": 9,
+   "calls": 15,
+   "directions": 21,
+   "website": 35
+  },
+  {
+   "date": "2026-10-06",
+   "views": 528,
+   "leads": 8,
+   "calls": 14,
+   "directions": 24,
+   "website": 38
+  },
+  {
+   "date": "2026-10-07",
+   "views": 627,
+   "leads": 8,
+   "calls": 19,
+   "directions": 31,
+   "website": 38
+  },
+  {
+   "date": "2026-10-08",
+   "views": 460,
+   "leads": 9,
+   "calls": 15,
+   "directions": 30,
+   "website": 43
+  },
+  {
+   "date": "2026-10-09",
+   "views": 568,
+   "leads": 11,
+   "calls": 20,
+   "directions": 28,
+   "website": 49
+  },
+  {
+   "date": "2026-10-10",
+   "views": 482,
+   "leads": 9,
+   "calls": 13,
+   "directions": 21,
+   "website": 39
+  },
+  {
+   "date": "2026-10-11",
+   "views": 466,
+   "leads": 8,
+   "calls": 14,
+   "directions": 23,
+   "website": 28
+  },
+  {
+   "date": "2026-10-12",
+   "views": 504,
+   "leads": 7,
+   "calls": 19,
+   "directions": 31,
+   "website": 40
+  },
+  {
+   "date": "2026-10-13",
+   "views": 525,
+   "leads": 8,
+   "calls": 18,
+   "directions": 29,
+   "website": 41
+  },
+  {
+   "date": "2026-10-14",
+   "views": 484,
+   "leads": 8,
+   "calls": 21,
+   "directions": 33,
+   "website": 50
+  },
+  {
+   "date": "2026-10-15",
+   "views": 551,
+   "leads": 8,
+   "calls": 19,
+   "directions": 27,
+   "website": 42
+  }
+ ]
+}

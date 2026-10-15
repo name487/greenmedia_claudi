@@ -65,6 +65,10 @@ class Settings:
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))
     otp_max_per_hour: int = int(os.getenv("OTP_MAX_PER_HOUR", "5"))
     otp_max_attempts: int = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
+    # Keyword Planner: searches each client may run per calendar month, and weekly targets on the home screen tracker
+    keyword_search_monthly_limit: int = int(os.getenv("KEYWORD_SEARCH_MONTHLY_LIMIT", "20"))
+    weekly_post_target: int = int(os.getenv("WEEKLY_POST_TARGET", "5"))
+    weekly_reply_target: int = int(os.getenv("WEEKLY_REPLY_TARGET", "5"))
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
     #   celery -A app.celery_app worker -B -l info
     # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.

@@ -35,7 +35,12 @@ services:
     build: ./backend
     command: ["celery", "-A", "app.celery_app", "worker", "-B", "-l", "info", "--concurrency", "2", "-s", "/tmp/celerybeat-schedule"]
     environment: *api-env
-    healthcheck: { disable: true }
+    healthcheck:   # `up --wait` needs every service healthy; the worker answers a Celery ping
+      test: ["CMD-SHELL", "celery -A app.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 10s
     depends_on: { api: { condition: service_healthy } }   # the API creates/upgrades the schema first
   web:
     build: ./web

@@ -794,12 +794,12 @@ def settings_view(request):
                 messages.error(request, f"AI connection failed ({r['code']}): {r['error']} {r.get('hint', '')}")
             return HttpResponseRedirect(reverse("settings") + "#ai")
         elif action == "create_user":
-            body = {k: request.POST.get(k, "").strip() for k in ("name", "email", "password", "role")}
+            body = {k: request.POST.get(k, "").strip() for k in ("name", "email", "password", "role", "phone")}
             body["client_id"] = _int(request.POST.get("client_id")) if body["role"] == "client" else None
             u = request.api.post("/api/users", body)
             messages.success(request, f"Created {u['email']} as {u['role_label']}. Share the password with them securely.")
         elif action == "update_user":
-            patch = {"role": request.POST["role"], "status": request.POST["status"]}
+            patch = {"role": request.POST["role"], "status": request.POST["status"], "phone": request.POST.get("phone", "").strip()}
             if request.POST["role"] == "client":
                 patch["client_id"] = _int(request.POST.get("client_id"))
             if request.POST.get("password"):

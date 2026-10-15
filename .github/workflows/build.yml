@@ -94,7 +94,8 @@ jobs:
         run: ./run.sh
       - if: always()
         uses: actions/upload-artifact@v4
-        with: { name: e2e-artifacts, path: e2e/artifacts }
+        continue-on-error: true   # a full artifact quota must not fail a passing run
+        with: { name: e2e-artifacts, path: e2e/artifacts, retention-days: 7 }
 
   demo-stack:
     name: Demo stack (docker compose, production mode)
@@ -134,7 +135,8 @@ jobs:
         with: { channel: stable, cache: true }
       - run: flutter build apk --release --dart-define=API_URL=${{ vars.API_URL || 'https://api.example.com' }}
       - uses: actions/upload-artifact@v4
-        with: { name: greenmedia-android-apk, path: mobile/build/app/outputs/flutter-apk/app-release.apk }
+        continue-on-error: true
+        with: { name: greenmedia-android-apk, path: mobile/build/app/outputs/flutter-apk/app-release.apk, retention-days: 7 }
 
   ios:
     name: iOS build (unsigned)
@@ -148,4 +150,5 @@ jobs:
       - run: flutter build ios --release --no-codesign --dart-define=API_URL=${{ vars.API_URL || 'https://api.example.com' }}
       - run: cd build/ios/iphoneos && mkdir Payload && cp -r Runner.app Payload/ && zip -qr greenmedia-unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
-        with: { name: greenmedia-ios-unsigned, path: mobile/build/ios/iphoneos/greenmedia-unsigned.ipa }
+        continue-on-error: true
+        with: { name: greenmedia-ios-unsigned, path: mobile/build/ios/iphoneos/greenmedia-unsigned.ipa, retention-days: 7 }

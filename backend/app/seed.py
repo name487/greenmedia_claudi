@@ -19,6 +19,9 @@ from .upgrade import add_missing_columns
 from .sentiment import detect_sentiment
 
 DEMO_PASSWORD = "demo1234"
+# Demo mobile numbers for OTP sign-in (with SMS_PROVIDER=console the code is shown in the demo app / server log)
+DEMO_PHONES = {"admin": "+919000000001", "account_manager": "+919000000002", "seo": "+919000000003", "content": "+919000000004",
+               "designer": "+919000000005", "client": "+919876543210"}
 
 USERS = [
     ("Aarav Mehta", "admin@greenmedia.in", "admin"),
@@ -75,7 +78,7 @@ def seed(db: Session) -> None:
     ensure_default_roles(db, tenant.id)
 
     pw = hash_password(DEMO_PASSWORD)
-    users = {role: User(tenant_id=tenant.id, name=n, email=e, password_hash=pw, role=role) for n, e, role in USERS}
+    users = {role: User(tenant_id=tenant.id, name=n, email=e, password_hash=pw, role=role, phone=DEMO_PHONES[role]) for n, e, role in USERS}
     db.add_all(users.values())
     db.flush()
     managers = [users["account_manager"].id, users["admin"].id]
@@ -166,6 +169,10 @@ def seed(db: Session) -> None:
     db.flush()
     smile = db.scalar(select(Client).where(Client.company_name == "Smile Dental Studio"))
     users["client"].client_id = smile.id
+    # The same owner also runs a salon: one phone number, two businesses → the app's "Select profile" screen
+    glowup = db.scalar(select(Client).where(Client.company_name == "GlowUp Salon & Spa"))
+    db.add(User(tenant_id=tenant.id, name="Dr. Anjali Rao", email="anjali@glowupsalon.in", password_hash=pw, role="client",
+                client_id=glowup.id, phone=DEMO_PHONES["client"]))
     db.commit()
 
 

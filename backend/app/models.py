@@ -51,6 +51,22 @@ class User(Base):
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)  # client-portal users
     status: Mapped[str] = mapped_column(String(20), default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    # Mobile number in E.164 (+919876543210) for OTP sign-in. Several accounts may share one number — e.g. an owner of
+    # two businesses — and the app then asks which profile to open.
+    phone: Mapped[str] = mapped_column(String(20), default="", index=True)
+
+
+class OtpChallenge(Base):
+    """A one-time sign-in code sent by SMS. Only a hash is stored; it expires, allows a few attempts, and is used once."""
+
+    __tablename__ = "otp_challenges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
 
 
 class Client(Base):

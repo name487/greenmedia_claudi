@@ -17,7 +17,8 @@ def iso(dt):
 
 def user_out(u: User) -> dict:
     label = getattr(u, "role_label", None) or ROLE_LABELS.get(u.role, u.role)
-    return {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "role_label": label, "client_id": u.client_id, "status": u.status}
+    return {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "role_label": label, "client_id": u.client_id, "status": u.status,
+            "phone": u.phone or ""}
 
 
 def me_out(u: User, client_name: str | None) -> dict:

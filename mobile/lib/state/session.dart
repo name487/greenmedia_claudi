@@ -72,7 +72,23 @@ class Session extends ChangeNotifier {
   }
 
   Future<void> login(String email, String password) async {
-    final out = await api.post('/api/auth/login', {'email': email.trim(), 'password': password}) as Map<String, dynamic>;
+    await _signIn(await api.post('/api/auth/login', {'email': email.trim(), 'password': password}) as Map<String, dynamic>);
+  }
+
+  /// Phone sign-in, step 1: the server texts a one-time code.
+  Future<OtpSent> requestOtp(String phone, {String countryCode = '+91'}) async =>
+      OtpSent.fromJson(await api.post('/api/auth/otp/request', {'phone': phone, 'country_code': countryCode}) as Map<String, dynamic>);
+
+  /// Step 2: check the code; returns every profile (account) linked to the number.
+  Future<OtpVerified> verifyOtp(String phone, String code) async =>
+      OtpVerified.fromJson(await api.post('/api/auth/otp/verify', {'phone': phone, 'code': code}) as Map<String, dynamic>);
+
+  /// Step 3: open one profile.
+  Future<void> selectProfile(String otpToken, int userId) async {
+    await _signIn(await api.post('/api/auth/otp/select', {'otp_token': otpToken, 'user_id': userId}) as Map<String, dynamic>);
+  }
+
+  Future<void> _signIn(Map<String, dynamic> out) async {
     api.token = out['access_token'] as String;
     await store.writeToken(api.token);
     me = Me.fromJson(out['user'] as Map<String, dynamic>);

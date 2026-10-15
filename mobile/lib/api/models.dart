@@ -139,3 +139,49 @@ const platformLabels = {
   'youtube': 'YouTube',
   'x': 'X',
 };
+
+/// Answer to POST /api/auth/otp/request.
+class OtpSent {
+  OtpSent.fromJson(Map<String, dynamic> j)
+      : phone = j['phone'] as String,
+        masked = j['masked'] as String,
+        length = j['length'] as int,
+        resendIn = j['resend_in'] as int,
+        devCode = j['dev_code'] as String?;
+
+  final String phone, masked;
+  final int length, resendIn;
+
+  /// Only on demo servers without an SMS provider.
+  final String? devCode;
+}
+
+/// One account the verified phone number can open (POST /api/auth/otp/verify).
+class LoginProfile {
+  LoginProfile.fromJson(Map<String, dynamic> j)
+      : userId = j['user_id'] as int,
+        title = j['title'] as String,
+        subtitle = j['subtitle'] as String? ?? '',
+        kind = j['kind'] as String,
+        roleLabel = j['role_label'] as String? ?? '',
+        group = j['group'] as String,
+        googleState = (j['google'] as Map<String, dynamic>?)?['state'] as String?;
+
+  final int userId;
+  final String title, subtitle, kind, roleLabel, group;
+
+  /// connected | approval_pending | needs_google — null for agency profiles.
+  final String? googleState;
+
+  bool get needsGoogle => googleState == 'needs_google';
+}
+
+class OtpVerified {
+  OtpVerified.fromJson(Map<String, dynamic> j)
+      : otpToken = j['otp_token'] as String,
+        phone = j['phone'] as String,
+        profiles = [for (final p in j['profiles'] as List) LoginProfile.fromJson(p as Map<String, dynamic>)];
+
+  final String otpToken, phone;
+  final List<LoginProfile> profiles;
+}

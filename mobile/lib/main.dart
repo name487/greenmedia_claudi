@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/home_shell.dart';
-import 'screens/login_screen.dart';
+import 'screens/phone_login_screen.dart';
 import 'state/session.dart';
 
 void main() {
@@ -45,7 +45,7 @@ class GreenMediaApp extends StatelessWidget {
           builder: (context, s, _) {
             if (s.restoring) return const Scaffold(body: Center(child: CircularProgressIndicator()));
             // Keyed by user so switching accounts rebuilds every screen from scratch.
-            return s.signedIn ? HomeShell(key: ValueKey(s.me!.id)) : const LoginScreen();
+            return s.signedIn ? HomeShell(key: ValueKey(s.me!.id)) : const PhoneLoginScreen();
           },
         ),
       ),

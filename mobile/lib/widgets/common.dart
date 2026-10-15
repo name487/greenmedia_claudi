@@ -62,15 +62,28 @@ class Stars extends StatelessWidget {
   }
 }
 
+/// "Dr. Anjali Rao" → "Anjali": skips titles so greetings use the person's name.
+String firstName(String full) {
+  const titles = {'dr', 'mr', 'mrs', 'ms', 'miss', 'prof', 'shri', 'smt', 'sri'};
+  final parts = full.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  final name = parts.firstWhere((p) => !titles.contains(p.toLowerCase().replaceAll('.', '')), orElse: () => parts.isEmpty ? '' : parts.first);
+  return name;
+}
+
 class Delta extends StatelessWidget {
   const Delta(this.pct, {super.key});
   final num pct;
 
   @override
   Widget build(BuildContext context) {
-    final up = pct >= 0;
-    return Text('${up ? '▲' : '▼'} ${pct.abs()}%',
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: up ? Colors.green.shade700 : Colors.red.shade700));
+    // Icons instead of ▲/▼ glyphs, which some fonts (e.g. Flutter web's default) don't have. 0% is not growth.
+    final color = pct > 0 ? Colors.green.shade700 : (pct < 0 ? Colors.red.shade700 : Colors.blueGrey);
+    final icon = pct > 0 ? Icons.arrow_upward : (pct < 0 ? Icons.arrow_downward : Icons.remove);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: color),
+      const SizedBox(width: 2),
+      Text('${pct.abs()}%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+    ]);
   }
 }
 

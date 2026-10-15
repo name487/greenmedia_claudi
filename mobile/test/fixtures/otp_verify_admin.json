@@ -1,0 +1,19 @@
+{
+ "otp_token": "otp-token-admin",
+ "phone": "+919000000001",
+ "profiles": [
+  {
+   "user_id": 1,
+   "name": "Aarav Mehta",
+   "role": "admin",
+   "role_label": "Admin",
+   "kind": "agency",
+   "tenant_name": "Green Media Technology",
+   "title": "Green Media Technology",
+   "subtitle": "Admin",
+   "client_id": null,
+   "google": null,
+   "group": "Agency team"
+  }
+ ]
+}

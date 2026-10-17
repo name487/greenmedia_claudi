@@ -11,9 +11,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
-from . import ai
+from . import ai, reply_keywords
 from .config import settings
 from .google import api as google_api
 from .google import service as google_service
@@ -72,9 +72,12 @@ def add_samples(db: Session, client: Client, n: int, rnd: random.Random | None =
 def draft(r: Review, c: Client, instruction: str = "") -> dict:
     """AI-draft a reply with the client's brand-voice prompt (or the brand-voice template when the AI isn't
     available). Returns the AI meta: source ai|template, provider, model, usage, ms, error."""
+    db = object_session(c)
+    kws = [k for k, _ in reply_keywords.for_clients(db, [c.id])[c.id][:5]] if db else []
     reply, meta = ai.review_reply(
         company=c.company_name, industry=c.industry, city=c.city, phone=c.contacts[0].phone if c.contacts else "",
         brand_voice=c.brand_voice, author=r.author, rating=r.rating, text=r.text, language=r.language, sentiment=r.sentiment, instruction=instruction,
+        keywords=kws,
     )
     r.reply, r.reply_status, r.drafted_at = reply, "drafted", datetime.now(timezone.utc)
     clear_approval(r)

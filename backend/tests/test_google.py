@@ -77,6 +77,9 @@ class FakeGoogle:
                                     *self.extra_locations]})
         if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/reviews") and m == "GET":
             return j({"reviews": self.reviews, "averageRating": 4.6, "totalReviewCount": 212})
+        if "/reviews/" in url and url.endswith("/reply") and m == "DELETE":
+            self.replies.pop(url.split("/reviews/")[1].split("/")[0], None)
+            return j({})
         if "/reviews/" in url and url.endswith("/reply") and m == "PUT":
             rid = url.split("/reviews/")[1].split("/")[0]
             self.replies[rid] = json.loads(body)["comment"]

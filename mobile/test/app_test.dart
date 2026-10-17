@@ -7,6 +7,7 @@ import 'package:greenmedia/api/api_client.dart';
 import 'package:greenmedia/api/models.dart';
 import 'package:greenmedia/main.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
+import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
 import 'package:greenmedia/widgets/common.dart';
@@ -57,7 +58,16 @@ MockClient fakeApi(List<String> calls) {
       case '/api/dashboard':
         return json(fixture('dashboard_$who'));
       case '/api/reviews':
-        return json(fixture('reviews_$who'));
+        // the owner's Review Replies screen asks for one business
+        return json(fixture(who == 'client' && req.url.queryParameters.containsKey('client_id') ? 'reviews_owner_all' : 'reviews_$who'));
+      case '/api/reviews/summary':
+        return json(fixture('reviews_summary_client'));
+      case '/api/clients/1/reply-settings':
+        if (req.method == 'PUT') {
+          final saved = fixture('reply_settings_client') as Map<String, dynamic>;
+          return json({...saved, 'settings': jsonDecode(req.body)});
+        }
+        return json(fixture('reply_settings_client'));
       case '/api/clients':
         return json(fixture('clients_admin'));
       case '/api/content':
@@ -80,6 +90,15 @@ MockClient fakeApi(List<String> calls) {
         return json({'id': 999, 'keyword': b['keyword'], 'location': b['location'], 'volume': b['volume']}, 201);
     }
     if (req.method == 'DELETE' && req.url.path.startsWith('/api/clients/1/keyword-planner/keywords/')) return http.Response('', 204);
+    final post = RegExp(r'^/api/reviews/(\d+)/post$').firstMatch(req.url.path);
+    if (post != null) {
+      final id = int.parse(post.group(1)!);
+      final item = ((fixture('reviews_owner_all') as Map)['items'] as List).cast<Map<String, dynamic>>().firstWhere((r) => r['id'] == id);
+      final wasPublished = item['reply_status'] == 'published';
+      return json({...item, 'reply': (jsonDecode(req.body) as Map)['reply'], 'reply_status': 'published', 'posted': true,
+        'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
+    }
+    if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
     // Connect Facebook / Instagram from the app
     const accounts = [{'platform': 'facebook', 'is_live': true}, {'platform': 'instagram', 'is_live': true}];
     switch ((req.method, req.url.path)) {
@@ -397,6 +416,106 @@ void main() {
       await tester.tap(find.text('Show me step by step'));
       await tester.pumpAndSettle();
       expect(find.textContaining('step by step'), findsWidgets);
+    });
+  });
+
+  group('owner review replies', () {
+    final reviews = ((fixture('reviews_owner_all') as Map)['items'] as List).cast<Map<String, dynamic>>();
+
+    Future<void> openReplies(WidgetTester tester, List<String> calls) async {
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Replies')));
+      await tester.pumpAndSettle();
+    }
+
+    Finder inList(Finder f) => f;
+    Future<void> scrollTo(WidgetTester tester, Finder f) async {
+      await tester.scrollUntilVisible(f, 250, scrollable: find.descendant(of: find.byType(OwnerReviewsScreen), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(f);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('trend, tabs, keywords used and the reply with keywords in bold', (tester) async {
+      final calls = <String>[];
+      await openReplies(tester, calls);
+      expect(find.text('Review Replies'), findsOneWidget);
+      expect(find.text('Reviews Trend'), findsOneWidget);
+      expect(calls, containsAll(['GET /api/reviews/summary', 'GET /api/reviews']));
+      final counts = (fixture('reviews_summary_client') as Map)['counts'] as Map;
+      expect(find.text('All (${counts['all']})'), findsOneWidget);
+      expect(find.text('Replied (${counts['replied']})'), findsOneWidget);
+      final withKw = reviews.firstWhere((r) => (r['keywords_used'] as List).isNotEmpty);
+      await scrollTo(tester, inList(find.byKey(Key('keywords-${withKw['id']}'))));
+      expect(find.text('Keyword Used'), findsWidgets);
+      expect(find.text(((withKw['keywords_used'] as List).first as Map)['keyword'] as String), findsOneWidget);
+      final rich = tester.widget<RichText>(find.descendant(of: find.byKey(Key('reply-${withKw['id']}')), matching: find.byType(RichText)));
+      final bold = <String>[];
+      rich.text.visitChildren((s) {
+        if (s is TextSpan && s.style?.fontWeight == FontWeight.w800) bold.add(s.text!.toLowerCase());
+        return true;
+      });
+      expect(bold, containsAll(['dental', 'clinic']));
+      // switch to Pending
+      await tester.drag(find.byType(ListView).first, const Offset(0, 3000));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('tab-pending')));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c == 'GET /api/reviews').length, greaterThan(1));
+    });
+
+    testWidgets('write a reply and post it; edit a posted reply', (tester) async {
+      final calls = <String>[];
+      await openReplies(tester, calls);
+      final pending = reviews.firstWhere((r) => r['reply'] == null && (r['rating'] as int) >= 3);
+      final card = find.byKey(ValueKey(pending['id']));
+      await scrollTo(tester, find.descendant(of: card, matching: find.text('Write reply')));
+      await tester.tap(find.descendant(of: card, matching: find.text('Write reply')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(Key('reply-editor-${pending['id']}')), 'Thank you for visiting our dental clinic!');
+      await tester.tap(find.byKey(Key('save-${pending['id']}')));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/reviews/${pending['id']}/post'));
+      expect(find.text('Reply posted'), findsOneWidget);
+
+      final posted = reviews.firstWhere((r) => r['reply_status'] == 'published');
+      final pc = find.byKey(ValueKey(posted['id']));
+      await scrollTo(tester, find.descendant(of: pc, matching: find.byTooltip('Edit reply')));
+      await tester.tap(find.descendant(of: pc, matching: find.byTooltip('Edit reply')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('save-${posted['id']}')));
+      await tester.pumpAndSettle();
+      expect(find.text('Reply updated successfully'), findsOneWidget);
+    });
+
+    testWidgets('Reply Settings: category, length, language search and save', (tester) async {
+      final calls = <String>[];
+      await openReplies(tester, calls);
+      await tester.tap(find.byKey(const Key('reply-settings')));
+      await tester.pumpAndSettle();
+      expect(find.text('Reply Settings'), findsOneWidget);
+      expect(find.textContaining('in 24 hours'), findsOneWidget);
+      await tester.tap(find.text('1-2 Stars'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('lang-hi')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('lang-hi')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const Key('sample-reply'))).data, contains('खेद'));
+      await tester.ensureVisible(find.byKey(const Key('search-language')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('search-language')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('language-search')), 'tam');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tamil'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('lang-ta')), findsOneWidget);
+      expect(find.textContaining('written in Tamil'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('reply-settings-save')));
+      await tester.pumpAndSettle();
+      expect(calls, contains('PUT /api/clients/1/reply-settings'));
+      expect(find.text('Reply Settings'), findsNothing);
     });
   });
 

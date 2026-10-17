@@ -9,6 +9,7 @@ import 'calendar_screen.dart';
 import 'clients_screen.dart';
 import 'content_screen.dart';
 import 'dashboard_screen.dart';
+import 'owner_reviews_screen.dart';
 import 'reports_screen.dart';
 import 'reviews_screen.dart';
 import 'seo_screen.dart';
@@ -29,7 +30,11 @@ final destinations = <Destination>[
     final me = c.read<Session>().me!;
     return me.isClient ? BusinessScoreScreen(clientId: me.clientId!) : const DashboardScreen();
   }),
-  Destination('reviews', 'Reviews', Icons.star_outline_rounded, (_) => const ReviewsScreen(), ownerLabel: 'Replies'),
+  // Owners get Dhanda-style Review Replies (post / edit / delete, keywords, settings); staff keep the review queue.
+  Destination('reviews', 'Reviews', Icons.star_outline_rounded, (c) {
+    final me = c.read<Session>().me!;
+    return me.isClient ? OwnerReviewsScreen(clientId: me.clientId!) : const ReviewsScreen();
+  }, ownerLabel: 'Replies'),
   Destination('content', 'Content', Icons.edit_note_rounded, (_) => const ContentScreen(), ownerLabel: 'AI Post'),
   Destination('social', 'Calendar', Icons.calendar_month_outlined, (_) => const CalendarScreen()),
   Destination('clients', 'Clients', Icons.groups_outlined, (_) => const ClientsScreen()),
@@ -75,8 +80,10 @@ class _HomeShellState extends State<HomeShell> {
         for (final t in tabs)
           PrimaryScrollController(
             controller: _scrollers.putIfAbsent(t.section, ScrollController.new),
-            // The owner's home draws its own top bar
-            child: me.isClient && t.section == 'dashboard' ? t.builder(context) : _Page(title: label(t, me), child: t.builder(context)),
+            // The owner's home and Review Replies draw their own top bar
+            child: me.isClient && (t.section == 'dashboard' || t.section == 'reviews')
+                ? t.builder(context)
+                : _Page(title: label(t, me), child: t.builder(context)),
           ),
       ]),
       bottomNavigationBar: NavigationBar(

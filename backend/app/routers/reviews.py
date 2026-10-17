@@ -6,11 +6,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import review_queue
+from .. import reply_keywords, review_queue
 from ..config import settings
 from ..db import get_db
 from ..models import AuditLog, Client, Review, User
-from ..publishers import PublishError
+from ..publishers import PublishError, delete_review_reply
 from ..security import audit, can, get_client, require_section, scoped_ids
 from ..serializers import iso, review_out
 
@@ -74,6 +74,29 @@ def _priority(now: datetime):
     return key
 
 
+@router.get("/summary")
+def summary(client_id: int, period: Literal["month", "quarter"] = "month", user: User = Depends(require_section("reviews")),
+            db: Session = Depends(get_db)):
+    """For the app's Review Replies screen: reviews per week, the Google rating and the tab counts of one business."""
+    c = get_client(db, user, client_id)
+    rows = list(db.scalars(select(Review).where(Review.client_id == c.id)))
+    today = datetime.now(timezone.utc).date()
+    if period == "month":
+        first = today.replace(day=1)
+        weeks = [(f"W{i + 1}", first + timedelta(days=7 * i)) for i in range((today.day - 1) // 7 + 1)]
+        ends = [min(s + timedelta(days=6), today) for _, s in weeks]
+    else:
+        monday = today - timedelta(days=today.weekday())
+        weeks = [(f"W{i + 1}", monday - timedelta(weeks=11 - i)) for i in range(12)]
+        ends = [s + timedelta(days=6) for _, s in weeks]
+    trend = [{"label": label, "start": start.isoformat(),
+              "count": sum(1 for r in rows if start <= _aware(r.created_at).date() <= end)} for (label, start), end in zip(weeks, ends)]
+    gmb = c.gmb
+    rating = gmb.rating if gmb and gmb.rating else (round(sum(r.rating for r in rows) / len(rows), 1) if rows else 0)
+    return {"client_id": c.id, "period": period, "trend": trend, "rating": rating, "review_count": max(gmb.review_count if gmb else 0, len(rows)),
+            "counts": {"all": len(rows), "pending": sum(FILTERS["pending"](r) for r in rows), "replied": sum(FILTERS["published"](r) for r in rows)}}
+
+
 @router.get("")
 def list_reviews(filter: Literal["pending", "approved", "negative", "published", "all"] = "pending", client_id: int | None = None,
                  rating: int | None = None, sentiment: Literal["positive", "neutral", "negative"] | None = None,
@@ -104,9 +127,13 @@ def list_reviews(filter: Literal["pending", "approved", "negative", "published",
         items.sort(key=lambda r: _aware(r.created_at), reverse=sort == "newest")
     page = items[offset:offset + limit]
     hist = _history(db, user.tenant_id, [r.id for r in page], per_review=10)
+    kws = reply_keywords.for_clients(db, list({r.client_id for r in page}))
+    cities = {c.id: c.city for c in clients}
     return {
         "counts": counts, "total": len(items), "limit": limit, "offset": offset,
-        "items": [{**review_out(r, names[r.client_id]), "history": hist.get(r.id, [])} for r in page],
+        "items": [{**review_out(r, names[r.client_id]), "history": hist.get(r.id, []),
+                   "keywords_used": reply_keywords.used(r.reply, kws.get(r.client_id, []), cities.get(r.client_id, ""), names[r.client_id])}
+                  for r in page],
         "stats": _stats(rows, now), "sources": _sources(db, user, clients, rows),
     }
 
@@ -236,6 +263,64 @@ def _history(db: Session, tenant_id: int, ids: list[int], per_review: int = 20) 
         if len(lst) < per_review:
             lst.append({"action": a.action, "user_name": names.get(a.user_id) if a.user_id else "System", "created_at": iso(a.created_at), "details": a.details or {}})
     return out
+
+
+class PostIn(BaseModel):
+    reply: str = Field(min_length=1, max_length=4000)
+
+
+@router.post("/{review_id}/post")
+def post_reply(review_id: int, body: PostIn, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """Save a reply and post it to Google in one step (the app's Save / Post reply) — also used to update a reply that's
+    already on Google. Saving is the approval: only people who can approve may do it. Business owners post their own
+    replies, except to 1-2★ reviews, which wait for the account manager (the escalation rule)."""
+    r, c = _load(db, user, review_id)
+    if not can(user, "review.approve"):
+        raise HTTPException(403, "Your role cannot approve replies")
+    owner_only = user.client_id == c.id and not can(user, "review.publish")
+    if not owner_only and not can(user, "review.publish"):
+        raise HTTPException(403, "Your role cannot publish replies")
+    new = body.reply.strip()
+    if not new:
+        raise HTTPException(422, "Reply can't be empty")
+    before, was_published = r.reply, r.reply_status == "published"
+    if new != before:
+        r.reply_source, r.reply_model = "human", ""
+    r.reply, r.reply_status = new, "approved"
+    review_queue.approve(r, user.id, "owner" if owner_only else "")
+    if owner_only and r.rating <= 2:
+        audit(db, user, "approved reply (1-2★: waiting for the account manager to post)", client_id=c.id, entity_type="review", entity_id=r.id,
+              details={"before": before, "reply": new})
+        db.commit()
+        return {**review_out(r, c.company_name), "posted": False,
+                "message": "Saved — replies to 1-2★ reviews are checked and posted by your account manager"}
+    details = _publish(db, user, r, c)
+    verb = "updated reply on Google" if was_published else "published reply to Google"
+    if details.get("target") != "google":
+        verb += " (sample — not sent to Google)" if r.is_sample else " (demo client — simulated)"
+    audit(db, user, verb, client_id=c.id, entity_type="review", entity_id=r.id, details={**details, "before": before})
+    db.commit()
+    return {**review_out(r, c.company_name), "posted": True, "message": "Reply updated successfully" if was_published else "Reply posted"}
+
+
+@router.delete("/{review_id}/reply")
+def delete_reply(review_id: int, user: User = Depends(require_section("reviews")), db: Session = Depends(get_db)):
+    """Remove the reply (from Google too, when it was posted). The review goes back to Pending."""
+    r, c = _load(db, user, review_id)
+    if not (can(user, "review.publish") or (user.client_id == c.id and can(user, "review.approve"))):
+        raise HTTPException(403, "Your role cannot remove replies")
+    before, was_published = r.reply, r.reply_status == "published"
+    if was_published:
+        try:
+            delete_review_reply(c, r.external_review_id)
+        except PublishError as e:
+            raise HTTPException(502, str(e))
+    r.reply, r.reply_status, r.published_at, r.reply_source, r.reply_model = None, "new", None, "", ""
+    review_queue.clear_approval(r)
+    audit(db, user, "deleted reply from Google" if was_published else "deleted draft reply", client_id=c.id, entity_type="review", entity_id=r.id,
+          details={"reply": before})
+    db.commit()
+    return review_out(r, c.company_name)
 
 
 @router.post("/{review_id}/{action}")

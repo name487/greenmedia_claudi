@@ -84,6 +84,9 @@ class Client(Base):
     brand_voice: Mapped[dict] = mapped_column(JSON, default=dict)
     # Safety: empty = human approval on every channel. Keys: "reviews", "gmb", "facebook", ...
     auto_publish: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Google Post (app): {"daily": bool — the Content Agent drafts a text post a day, "auto": bool — post them without
+    # asking (a standing approval, approval_rule = "auto_google_post"), "auto_by": user id who turned it on, "time": "HH:MM"}
+    google_posts: Mapped[dict] = mapped_column(JSON, default=dict)
     notes: Mapped[str] = mapped_column(Text, default="")
 
     # Primary contact first, then in the order they were added.
@@ -289,7 +292,8 @@ class ContentItem(Base):
     image_url: Mapped[str] = mapped_column(String(1000), default="")  # public https image (required by Instagram)
     # AI posts from the app: a rendered poster (image) or viral video. Videos are rendered in the background:
     # status "generating" (gen_progress = steps done) → "in_review", or "gen_failed" with gen_error.
-    media_type: Mapped[str] = mapped_column(String(10), default="")  # "" | image | video
+    media_type: Mapped[str] = mapped_column(String(10), default="")  # "" | image | video | text (Google Post)
+    target_keyword: Mapped[str] = mapped_column(String(200), default="")  # the search term a Google Post is written around
     video_url: Mapped[str] = mapped_column(String(1000), default="")
     template: Mapped[str] = mapped_column(String(40), default="")
     gen_progress: Mapped[int] = mapped_column(Integer, default=0)
@@ -299,6 +303,7 @@ class ContentItem(Base):
     # the copy changes; the publisher refuses anything without it.
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_rule: Mapped[str] = mapped_column(String(40), default="")  # "" = a person approved; "auto_google_post" = standing approval
 
     variants: Mapped[list["ContentVariant"]] = relationship(cascade="all, delete-orphan", order_by="ContentVariant.id")
 

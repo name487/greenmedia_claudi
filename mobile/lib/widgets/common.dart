@@ -189,7 +189,9 @@ class AsyncListState<T> extends State<AsyncList<T>> {
     if (oldWidget.load != widget.load) reload();
   }
 
-  void reload() => setState(() => _future = widget.load(context.read<Session>().api));
+  void reload() => setState(() {
+        _future = widget.load(context.read<Session>().api);
+      });
 
   @override
   Widget build(BuildContext context) {

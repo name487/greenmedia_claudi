@@ -14,7 +14,7 @@ from ..config import settings
 from ..db import get_db
 from ..models import Client, ContentItem, ProductItem, User
 from ..security import audit, can, get_client, require_section
-from .content import _approve, _check_schedule, _publishable, can_approve
+from .content import _approve, _check_schedule, _publishable, _unapprove, can_approve
 
 router = APIRouter(prefix="/api/clients", tags=["ai posts"])
 templates_router = APIRouter(prefix="/api/video-templates", tags=["ai posts"])
@@ -84,7 +84,7 @@ def delete_item(client_id: int, item_id: int, user: User = Depends(require_secti
 @router.get("/{client_id}/ai-posts/overview")
 def overview(client_id: int, user: User = Depends(require_section("content")), db: Session = Depends(get_db)):
     c = _client(db, user, client_id)
-    rows = list(db.scalars(select(ContentItem.status).where(ContentItem.client_id == c.id)))
+    rows = list(db.scalars(select(ContentItem.status).where(ContentItem.client_id == c.id, ContentItem.media_type != "text")))
     counts = {g: 0 for g in ("pending", "approved", "rejected", "posted", "not_posted")}
     for s in rows:
         counts[ai_posts.GROUP.get(s, "pending")] += 1
@@ -97,7 +97,8 @@ def list_posts(client_id: int, tab: Literal["pending", "approved", "rejected", "
                period: Literal["week", "month", "quarter", "lifetime"] = "lifetime", user: User = Depends(require_section("content")),
                db: Session = Depends(get_db)):
     c = _client(db, user, client_id)
-    rows = [i for i in db.scalars(select(ContentItem).where(ContentItem.client_id == c.id)) if ai_posts.GROUP.get(i.status, "pending") == tab]
+    rows = [i for i in db.scalars(select(ContentItem).where(ContentItem.client_id == c.id, ContentItem.media_type != "text"))
+            if ai_posts.GROUP.get(i.status, "pending") == tab]
     if tab == "posted" and period != "lifetime":
         since = datetime.now(timezone.utc) - timedelta(days=PERIOD_DAYS[period])
         rows = [i for i in rows if i.published_at and ai_posts._aware(i.published_at) >= since]
@@ -225,7 +226,8 @@ def reject(client_id: int, post_id: int, user: User = Depends(require_section("c
     item = _post(db, c, post_id)
     if item.status in ("published", "publishing", "generating"):
         raise HTTPException(409, f"A {item.status} post can't be rejected")
-    item.status, item.approved_by, item.approved_at, item.updated_at = "rejected", None, None, datetime.now(timezone.utc)
+    _unapprove(item)
+    item.status, item.updated_at = "rejected", datetime.now(timezone.utc)
     audit(db, user, f"rejected: {item.topic}", client_id=c.id, entity_type="content", entity_id=item.id)
     db.commit()
     return ai_posts.post_out(item, _kws(db, c), c)

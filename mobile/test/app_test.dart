@@ -7,6 +7,7 @@ import 'package:greenmedia/api/api_client.dart';
 import 'package:greenmedia/api/models.dart';
 import 'package:greenmedia/main.dart';
 import 'package:greenmedia/screens/ai_post/items_screen.dart';
+import 'package:greenmedia/screens/google_post_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
@@ -33,6 +34,9 @@ class MemoryStore implements SessionStore {
 
 /// Request bodies the fake backend received, by route name.
 final sentBodies = <String, Object?>{};
+
+/// Which Google Post list the fake backend returns.
+var googlePostsFixture = 'google_posts_client';
 
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
@@ -103,6 +107,21 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // Google Post (fixtures captured from the real API)
+    switch ((req.method, req.url.path)) {
+      case ('GET', '/api/clients/1/google-posts'):
+        return json(fixture(googlePostsFixture));
+      case ('PUT', '/api/clients/1/google-posts/settings'):
+        sentBodies['gp-settings'] = jsonDecode(req.body);
+        return json(fixture('google_posts_auto'));
+      case ('POST', '/api/clients/1/google-posts/generate'):
+        return json(fixture('google_post_generated'), 201);
+    }
+    final gpEdit = RegExp(r'^/api/clients/1/google-posts/(\d+)$').firstMatch(req.url.path);
+    if (req.method == 'PATCH' && gpEdit != null) {
+      sentBodies['gp-edit'] = jsonDecode(req.body);
+      return json({...fixture('google_post_generated') as Map, 'id': int.parse(gpEdit.group(1)!), 'text': (jsonDecode(req.body) as Map)['text']});
+    }
     // AI Post (fixtures captured from the real API)
     const ai = '/api/clients/1/ai-posts';
     final videoId = (fixture('ai_post_video') as Map)['id'];
@@ -276,7 +295,10 @@ void main() {
     expect(calls, isNot(contains('GET /api/dashboard')));
     final nav = find.byType(NavigationBar);
     expect(find.descendant(of: nav, matching: find.text('Calendar')), findsNothing);
-    expect(find.descendant(of: nav, matching: find.text('Analytics')), findsOneWidget);
+    // owners get Dhanda's tabs; Analytics and Reports live under More
+    for (final tab in ['Home', 'Replies', 'AI Post', 'Google Post', 'More']) {
+      expect(find.descendant(of: nav, matching: find.text(tab)), findsOneWidget);
+    }
   });
 
   group('owner home', () {
@@ -666,6 +688,98 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls, contains('POST /api/clients/1/ai-posts/${(fixture('ai_post_poster') as Map)['id']}/reject'));
       expect(find.text('Your post is ready'), findsNothing);
+    });
+  });
+
+  group('owner Google Post', () {
+    final gp = fixture('google_posts_client') as Map<String, dynamic>;
+    final items = (gp['items'] as List).cast<Map<String, dynamic>>();
+    final pending = items.firstWhere((p) => p['group'] == 'pending');
+    final approved = items.firstWhere((p) => p['group'] == 'approved');
+
+    Future<void> openGooglePost(WidgetTester tester, List<String> calls) async {
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('Google Post')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('keywords card, posts by status, approve, edit and reject', (tester) async {
+      final calls = <String>[];
+      await openGooglePost(tester, calls);
+      expect(calls, contains('GET /api/clients/1/google-posts'));
+      expect(find.text('Google works best with keywords'), findsOneWidget);
+      expect(find.text(((gp['keywords'] as List).first as Map)['keyword'] as String), findsOneWidget);
+      expect(find.text('+${(gp['keyword_count'] as int) - 3} more'), findsOneWidget);
+      expect(find.text('WAITING FOR YOUR APPROVAL'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('SCHEDULED'), 200,
+          scrollable: find.descendant(of: find.byType(GooglePostScreen), matching: find.byType(Scrollable)).first);
+      expect(find.text('SCHEDULED'), findsOneWidget);
+      expect(find.byKey(Key('gp-approve-${approved['id']}')), findsNothing);
+      // the post's keyword words are highlighted in its text
+      final rich = tester.widget<RichText>(find.descendant(of: find.byKey(Key('gp-text-${pending['id']}')), matching: find.byType(RichText)));
+      final blue = <String>[];
+      rich.text.visitChildren((s) {
+        if (s is TextSpan && s.style?.color == const Color(0xFF1F63C6)) blue.add(s.text!.toLowerCase());
+        return true;
+      });
+      expect(blue, [pending['keyword']]);  // the whole search phrase, not "Dental" in the business name
+
+      await tapKey(tester, 'gp-approve-${pending['id']}');
+      expect(calls, contains('POST /api/clients/1/ai-posts/${pending['id']}/approve'));
+      expect(find.textContaining('Approved — it posts on'), findsOneWidget);
+      ScaffoldMessenger.of(tester.element(find.byType(GooglePostScreen))).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+
+      await tapKey(tester, 'gp-edit-${pending['id']}');
+      await tester.enterText(find.byKey(const Key('gp-edit-text')), 'Looking for a dental clinic near me in Pune? Call Smile Dental Studio.');
+      await tapKey(tester, 'gp-edit-save');
+      expect(sentBodies['gp-edit'], {'text': 'Looking for a dental clinic near me in Pune? Call Smile Dental Studio.'});
+      ScaffoldMessenger.of(tester.element(find.byType(GooglePostScreen))).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+
+      await tapKey(tester, 'gp-reject-${approved['id']}');
+      expect(calls, contains('POST /api/clients/1/ai-posts/${approved['id']}/reject'));
+    });
+
+    testWidgets('post automatically asks first; write a post now; optimise keywords', (tester) async {
+      final calls = <String>[];
+      await openGooglePost(tester, calls);
+      await tapKey(tester, 'gp-auto');
+      expect(find.text('Post automatically?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(calls, isNot(contains('PUT /api/clients/1/google-posts/settings')));
+      await tapKey(tester, 'gp-auto');
+      await tapKey(tester, 'gp-auto-confirm');
+      expect(sentBodies['gp-settings'], {'auto': true});
+      expect(find.textContaining('by Dr. Anjali Rao'), findsOneWidget);
+
+      await tapKey(tester, 'gp-write-now');
+      expect(calls, contains('POST /api/clients/1/google-posts/generate'));
+      final made = fixture('google_post_generated') as Map;
+      expect(find.textContaining('“${made['keyword']}”'), findsOneWidget);
+      ScaffoldMessenger.of(tester.element(find.byType(GooglePostScreen))).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+
+      await tapKey(tester, 'optimise-keywords');
+      expect(calls, contains('GET /api/clients/1/keyword-planner'));
+      expect(find.text('Keyword Planner'), findsWidgets);
+    });
+
+    testWidgets('no posts yet', (tester) async {
+      googlePostsFixture = 'google_posts_empty';
+      addTearDown(() => googlePostsFixture = 'google_posts_client');
+      await openGooglePost(tester, []);
+      expect(find.text('No text posts yet'), findsOneWidget);
+      expect(find.text('Text-only posts the Content Agent publishes for you will appear here.'), findsOneWidget);
     });
   });
 

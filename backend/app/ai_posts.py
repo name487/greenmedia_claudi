@@ -149,7 +149,8 @@ def render_job(content_id: int) -> None:
 def free_slot(db: Session, c: Client, month: date | None = None) -> dict:
     """The next day (from tomorrow) with nothing scheduled or posted, at 7:00 AM India time, plus the month's busy days."""
     taken = set()
-    for i in db.scalars(select(ContentItem).where(ContentItem.client_id == c.id, ContentItem.status.in_(("scheduled", "publishing", "published")))):
+    for i in db.scalars(select(ContentItem).where(ContentItem.client_id == c.id, ContentItem.status.in_(("scheduled", "publishing", "published")),
+                                         ContentItem.media_type != "text")):  # Google text posts have their own day
         when = _aware(i.published_at if i.status == "published" and i.published_at else i.scheduled_at)
         if when:
             taken.add(when.astimezone(TZ).date())

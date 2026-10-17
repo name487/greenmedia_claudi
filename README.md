@@ -490,7 +490,7 @@ The keys under `kpis` are unchanged for the mobile app; the new numbers are unde
 | Review replies | Every reply needs **Approve** (permission `review.approve`) before **Publish** (`review.publish`), whatever the rating. People with both get *Approve & publish*, which records two steps. Editing, regenerating, rejecting or reopening clears the approval, and so does the reviewer editing the review on Google. |
 | Posts | Only *Approve & schedule* (or creating the post as scheduled, which needs approval rights; with client approval mode on, only the client) makes a post publishable. Unscheduling, requesting changes, editing or re-adapting a failed post sends it back to Draft and clears the approval. |
 | Last line of defence | `review_queue.publish` raises "hasn't been approved". `content_service` moves an unapproved row back to Draft and logs `publish blocked (not approved)`, so Google and Meta are never called. |
-| The one exception | **Auto-publish**: off by default. A person turns it on per client. It covers only positive 4–5★ replies to reviews under 14 days old, and is recorded as `approval_rule = "auto_publish"`. Negative reviews always wait for a person. |
+| Exceptions | **Auto-publish**: off by default. A person turns it on per client. It covers only positive 4–5★ replies to reviews under 14 days old, and is recorded as `approval_rule = "auto_publish"`. Negative reviews always wait for a person. **Post automatically** (Google Post): off by default, turned on by someone who can approve, covers only the daily Google text posts, recorded as `approval_rule = "auto_google_post"`; editing a post clears it. |
 
 `tests/test_approval_guard.py` tries every route around this and checks that the fake Google and Meta receive nothing. The end-to-end test checks the same in a real browser.
 
@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 156 tests: AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 160 tests: Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 156 tests: AI Post (items, posters, viral vid
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 26 tests: AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 29 tests: Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -676,6 +676,31 @@ API: `GET|POST /api/clients/{id}/items` (multipart `image`, `name`, `description
 `GET /api/video-templates`, `GET /api/clients/{id}/ai-posts/overview`, `GET …/ai-posts?tab=pending|approved|rejected|posted|not_posted&period=`,
 `POST …/ai-posts/poster {item_id}`, `POST …/ai-posts/video {template, item_ids?}`, `GET …/ai-posts/{post}`,
 `GET …/ai-posts/free-slot?month=`, `POST …/ai-posts/{post}/approve {scheduled_at}`, `POST …/ai-posts/{post}/reject`.
+
+## Mobile Google Post (business owners)
+
+The owner's **Google Post** tab, modelled on Dhanda AI. The bottom bar for owners is now Home / Replies / AI Post /
+Google Post / More (Analytics, Reports).
+
+- **Google works best with keywords**: the card shows the business's keywords; **Optimise keywords** opens the Keyword
+  Planner to add or remove them.
+- **Content Agent**: with **Post daily on Google** on (the default), the scheduler writes tomorrow's text-only Google
+  post every day at the posting time (default 10:00 AM India time). Each post is built around one keyword, taking turns
+  by least-used and then by search volume; searches for the business's own name are skipped. Each day has a different
+  angle (tip, why us, FAQ, …). With an AI key the AI writes it in the brand voice without hashtags; otherwise a template
+  quotes the search phrase. **✎** writes the next one now.
+- Posts are grouped as **Waiting for your approval / Scheduled / Posted / Not posted / Rejected**. Each card shows the
+  keyword and its monthly searches, with the phrase highlighted in the text. Actions: **Approve** (posts on its day),
+  **Edit** (clears any approval), **Reject**.
+- **Post automatically**: off by default; turning it on asks first, and only someone who approves posts can. It is a
+  standing approval recorded on each post as `approval_rule = "auto_google_post"` with the person who turned it on. It
+  covers only these daily Google text posts, an edited post needs approval again, and if that person loses the right to
+  approve, posts wait again.
+
+API: `GET /api/clients/{id}/google-posts`, `PUT …/google-posts/settings {daily?, auto?, time?: "HH:MM"}`,
+`POST …/google-posts/generate {keyword?}`, `PATCH …/google-posts/{post} {text}`; approve / reject use
+`POST …/ai-posts/{post}/approve {scheduled_at}` and `…/reject`. The daily job runs in `python -m app.jobs`, the in-process
+scheduler, and Celery beat (`greenmedia.google_posts`, hourly).
 
 ## Building the mobile apps
 

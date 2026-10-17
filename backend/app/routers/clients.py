@@ -12,7 +12,7 @@ from ..db import get_db
 from ..google import api as google_api
 from .. import review_queue
 from ..metrics import compare, periods, series, totals
-from ..models import AuditLog, Client, ClientContact, Competitor, ContentItem, GmbAccount, Keyword, KeywordSearchLog, MetaConnectAttempt, MetricDaily, Report, Review, ScoreSnapshot, SearchKeyword, Task, User
+from ..models import AuditLog, Client, ClientContact, Competitor, ContentItem, GmbAccount, Keyword, KeywordSearchLog, MetaConnectAttempt, MetricDaily, ProductItem, Report, Review, ScoreSnapshot, SearchKeyword, Task, User
 from ..security import audit, get_client, require, require_section, visible_client_ids
 from ..serializers import client_brief, client_out, contact_out, content_out, keyword_out, report_out, review_out, task_out
 from .common import user_names
@@ -271,6 +271,7 @@ def delete_client(client_id: int, confirm_name: str, user: User = Depends(requir
     db.execute(delete(ScoreSnapshot).where(ScoreSnapshot.client_id == cid))
     db.execute(delete(KeywordSearchLog).where(KeywordSearchLog.client_id == cid))
     db.execute(delete(MetaConnectAttempt).where(MetaConnectAttempt.client_id == cid))
+    db.execute(delete(ProductItem).where(ProductItem.client_id == cid))
     for item in db.scalars(select(ContentItem).where(ContentItem.client_id == cid)):
         db.delete(item)  # ORM delete so content variants go with it
     db.flush()  # dependents must be gone before the client row (PostgreSQL enforces the foreign keys)

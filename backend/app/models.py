@@ -287,6 +287,14 @@ class ContentItem(Base):
     ai_source: Mapped[str] = mapped_column(String(20), default="")  # ai | template | "" (written by hand)
     ai_model: Mapped[str] = mapped_column(String(80), default="")
     image_url: Mapped[str] = mapped_column(String(1000), default="")  # public https image (required by Instagram)
+    # AI posts from the app: a rendered poster (image) or viral video. Videos are rendered in the background:
+    # status "generating" (gen_progress = steps done) → "in_review", or "gen_failed" with gen_error.
+    media_type: Mapped[str] = mapped_column(String(10), default="")  # "" | image | video
+    video_url: Mapped[str] = mapped_column(String(1000), default="")
+    template: Mapped[str] = mapped_column(String(40), default="")
+    gen_progress: Mapped[int] = mapped_column(Integer, default=0)
+    gen_error: Mapped[str] = mapped_column(Text, default="")
+    product_ids: Mapped[list] = mapped_column(JSON, default=list)
     # Approval of the current copy (Approve & schedule, or created/scheduled by someone allowed to approve). Cleared when
     # the copy changes; the publisher refuses anything without it.
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -335,6 +343,20 @@ class SearchKeyword(Base):
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ProductItem(Base):
+    """A product or service the business sells, with a photo — the raw material for AI posters and viral videos."""
+
+    __tablename__ = "product_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    price: Mapped[str] = mapped_column(String(40), default="")
+    image_path: Mapped[str] = mapped_column(String(300), default="")  # relative to MEDIA_DIR
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Competitor(Base):

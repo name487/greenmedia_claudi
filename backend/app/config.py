@@ -65,6 +65,14 @@ class Settings:
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))
     otp_max_per_hour: int = int(os.getenv("OTP_MAX_PER_HOUR", "5"))
     otp_max_attempts: int = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
+    # AI posts: uploaded product photos and generated posters/videos are stored here and served at /media.
+    # PUBLIC_BASE_URL is how the outside world (the app, and Facebook/Instagram when publishing) reaches this API —
+    # it must be https for Instagram.
+    media_dir: str = os.getenv("MEDIA_DIR", str(Path(__file__).resolve().parents[1] / "media"))
+    public_base_url: str = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8001").rstrip("/")
+    ai_posts_monthly: int = int(os.getenv("AI_POSTS_MONTHLY", "5"))
+    viral_videos_monthly: int = int(os.getenv("VIRAL_VIDEOS_MONTHLY", "5"))
+    video_width: int = int(os.getenv("VIDEO_WIDTH", "720"))  # 9:16; height = width * 16 / 9
     # Keyword Planner: searches each client may run per calendar month, and weekly targets on the home screen tracker
     keyword_search_monthly_limit: int = int(os.getenv("KEYWORD_SEARCH_MONTHLY_LIMIT", "20"))
     weekly_post_target: int = int(os.getenv("WEEKLY_POST_TARGET", "5"))

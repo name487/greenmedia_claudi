@@ -50,6 +50,16 @@ class ApiClient {
   Future<dynamic> put(String path, Object body) =>
       _send(() => _http.put(_uri(path), headers: _headers, body: jsonEncode(body)));
 
+  /// multipart/form-data upload (product photos).
+  Future<dynamic> upload(String path, Map<String, String> fields, {required String field, required List<int> bytes, required String filename}) =>
+      _send(() async {
+        final req = http.MultipartRequest('POST', _uri(path))
+          ..headers.addAll({if (token != null) 'Authorization': 'Bearer $token'})
+          ..fields.addAll(fields)
+          ..files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
+        return http.Response.fromStream(await _http.send(req));
+      });
+
   Future<dynamic> delete(String path) => _send(() => _http.delete(_uri(path), headers: _headers));
 
   Future<dynamic> _send(Future<http.Response> Function() request) async {

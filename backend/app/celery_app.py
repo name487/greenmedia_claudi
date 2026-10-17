@@ -51,6 +51,14 @@ def publish_content(content_id: int, user_id: int | None = None) -> dict:
         return content_service.run_publish(db, content_id, user)
 
 
+@celery.task(name="greenmedia.render_video")
+def render_video_task(content_id: int) -> None:
+    """Render an AI viral video (app → AI Post) off the web process."""
+    from . import ai_posts
+
+    ai_posts.render_job(content_id)
+
+
 @celery.task(name="greenmedia.dispatch_due")
 def dispatch_due() -> dict:
     """Beat, every minute: recover stuck rows and queue one publish task per due post."""

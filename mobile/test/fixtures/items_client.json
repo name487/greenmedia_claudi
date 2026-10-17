@@ -1,0 +1,22 @@
+{
+ "items": [
+  {
+   "id": 2,
+   "name": "Clear Aligners",
+   "description": "Brighter smile in one visit",
+   "price": "45000",
+   "price_label": "Rs 45,000",
+   "image_url": "https://api.test/media/c1/2d3a044b6105447fb6a8bcd98d7d9e43.jpg",
+   "created_at": "2026-10-17T09:08:45.798661"
+  },
+  {
+   "id": 1,
+   "name": "Teeth Whitening",
+   "description": "Brighter smile in one visit",
+   "price": "1499",
+   "price_label": "Rs 1,499",
+   "image_url": "https://api.test/media/c1/4614a6b210d1489c81a27ee35196452c.jpg",
+   "created_at": "2026-10-17T09:08:45.774617"
+  }
+ ]
+}

@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 145 tests: owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 151 tests: owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 145 tests: owner home, Meta connect from the 
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 20 tests: owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 23 tests: owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -632,6 +632,26 @@ Search keywords sync from the Business Profile Performance API (`searchkeywords/
 sync. Demo databases get sample keywords, competitors and two weeks of score history (marked as sample in the app).
 API: `GET /api/clients/{id}/score` (the whole home page), `GET …/performance?days=30|60|120`, `GET …/calendar?month=YYYY-MM`,
 `GET …/keyword-planner`, `POST …/keyword-planner/search`, `POST|DELETE …/keyword-planner/keywords`.
+
+## Mobile Review Replies (business owners)
+
+The owner's **Replies** tab, modelled on Dhanda AI:
+
+- **Reviews Trend** (reviews per week, this month or the last 3 months) and the **Google Ratings** card, swipeable.
+- **All / Pending / Replied** with counts, and a filter (sort, star rating).
+- Each review shows the reply as **Owner — You replied …** with **edit** and **delete**. A **Keyword Used | Search Volume**
+  table lists the business's search keywords the reply contains (the keyword words are bold in the reply); the
+  business's own name never counts, and keywords made of the same words show once.
+- Pending reviews: **Reply with AI** (drafts with the brand voice and Reply Settings) or **Write reply**, then **Post reply**.
+  Saving is the approval, so only people who can approve can post. Owners post their own replies directly, except to
+  1-2★ reviews, which are saved as approved and posted by the account manager (the escalation rule).
+- **Settings → Reply Settings**: per category (3-5★ / 1-2★) the reply length — Ultra, Short, Medium, Long — and the
+  language (same as the review, English, Hindi or any language from the searchable list), with a sample reply. AI drafts
+  follow it and work in a couple of the business's search keywords where natural.
+
+API: `POST /api/reviews/{id}/post` (`{"reply"}` — save, approve and post, or update a posted reply on Google),
+`DELETE /api/reviews/{id}/reply` (removes it from Google), `GET /api/reviews/summary?client_id=&period=month|quarter`,
+`GET|PUT /api/clients/{id}/reply-settings`; review lists now include `keywords_used`.
 
 ## Building the mobile apps
 

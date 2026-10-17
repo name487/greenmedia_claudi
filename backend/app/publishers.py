@@ -24,6 +24,16 @@ def _google_error(e: "google_api.GoogleApiError") -> PublishError:
     return PublishError(str(e), transient=transient)
 
 
+def delete_review_reply(client: Client, external_review_id: str) -> None:
+    """Remove the business's reply from a Google review (live clients); simulated for demo and sample reviews."""
+    if external_review_id.startswith(SAMPLE_REVIEW_PREFIX) or not (client.gmb and client.gmb.is_live):
+        return
+    try:
+        google.delete_reply(client, external_review_id)
+    except google_api.GoogleApiError as e:
+        raise _google_error(e) from e
+
+
 def publish_review_reply(client: Client, external_review_id: str, reply: str) -> dict | None:
     """Live clients: Google Business Profile API `PUT …/reviews/{id}/reply`; returns Google's response
     ({"comment", "updateTime"}). Demo clients: simulated (None)."""

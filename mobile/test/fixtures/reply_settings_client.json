@@ -1,0 +1,35 @@
+{
+ "account": {
+  "name": "Smile Dental Studio",
+  "email": "owner@smiledentalstudio.in",
+  "replies_24h": 1
+ },
+ "lengths": [
+  "ultra",
+  "short",
+  "medium",
+  "long"
+ ],
+ "settings": {
+  "positive": {
+   "length": "short",
+   "language": "",
+   "language_name": ""
+  },
+  "negative": {
+   "length": "medium",
+   "language": "",
+   "language_name": ""
+  }
+ },
+ "samples": {
+  "positive": {
+   "text": "Thank you so much for your kind words! 😊 We're really glad you liked your experience at Smile Dental Studio.",
+   "note": "Replies are written in the same language as the review."
+  },
+  "negative": {
+   "text": "We're really sorry to hear about your experience. This isn't the standard we hold ourselves to at Smile Dental Studio. We'd like to make it right — please call us so we can look into it personally.",
+   "note": "Replies are written in the same language as the review."
+  }
+ }
+}

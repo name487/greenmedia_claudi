@@ -179,6 +179,9 @@ class Gbp:
     def reply(self, account: str, location: str, review_id: str, comment: str) -> dict:
         return self._send("PUT", f"{V4_BASE}/{account}/{location}/reviews/{review_id}/reply", json={"comment": comment}).json()
 
+    def delete_reply(self, account: str, location: str, review_id: str) -> None:
+        self._send("DELETE", f"{V4_BASE}/{account}/{location}/reviews/{review_id}/reply")
+
     def create_post(self, account: str, location: str, summary: str, url: str | None = None) -> dict:
         body: dict = {"languageCode": "en", "summary": summary[:1500], "topicType": "STANDARD"}
         if url:

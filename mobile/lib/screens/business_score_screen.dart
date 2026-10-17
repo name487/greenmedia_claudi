@@ -13,6 +13,7 @@ import '../widgets/common.dart';
 import 'content_screen.dart';
 import 'keyword_planner_screen.dart';
 import 'meta_connect_screen.dart';
+import 'owner_reviews_screen.dart';
 import 'reviews_screen.dart';
 
 void openBusinessScore(BuildContext context, int clientId) =>
@@ -52,6 +53,11 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
     if (mounted) _reload();
   }
 
+  Future<void> _openOwnerReviews() async {
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(body: OwnerReviewsScreen(clientId: widget.clientId))));
+    if (mounted) _reload();
+  }
+
   Future<void> _openPlanner() async {
     await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => KeywordPlannerScreen(clientId: widget.clientId)));
     if (mounted) _reload();
@@ -71,6 +77,7 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
     final me = context.read<Session>().me!;
     switch (target) {
       case 'reviews':
+        if (me.sees('reviews') && me.isClient) return _openOwnerReviews();
         if (me.sees('reviews')) return _open(ReviewsScreen(clientId: widget.clientId), 'Review Replies');
       case 'content':
         if (me.sees('content')) return _open(const ContentScreen(), 'AI Post');

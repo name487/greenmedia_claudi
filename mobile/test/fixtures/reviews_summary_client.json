@@ -1,0 +1,28 @@
+{
+ "client_id": 1,
+ "period": "month",
+ "trend": [
+  {
+   "label": "W1",
+   "start": "2026-10-01",
+   "count": 2
+  },
+  {
+   "label": "W2",
+   "start": "2026-10-08",
+   "count": 1
+  },
+  {
+   "label": "W3",
+   "start": "2026-10-15",
+   "count": 1
+  }
+ ],
+ "rating": 3.7,
+ "review_count": 798,
+ "counts": {
+  "all": 7,
+  "pending": 2,
+  "replied": 5
+ }
+}

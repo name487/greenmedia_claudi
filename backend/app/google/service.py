@@ -228,6 +228,11 @@ def sync_client(db: Session, client: Client) -> dict:
         raise
 
 
+def delete_reply(client: Client, review_id: str) -> None:
+    gmb = client.gmb
+    client_for(source(gmb)).delete_reply(gmb.google_account, gmb.location_id, review_id)
+
+
 def publish_reply(client: Client, review_id: str, comment: str) -> dict:
     gmb = client.gmb
     return client_for(source(gmb)).reply(gmb.google_account, gmb.location_id, review_id, comment)

@@ -1,0 +1,27 @@
+{
+ "quota": {
+  "posts": {
+   "used": 1,
+   "limit": 5
+  },
+  "videos": {
+   "used": 1,
+   "limit": 5
+  }
+ },
+ "counts": {
+  "pending": 1,
+  "approved": 1,
+  "rejected": 0,
+  "posted": 1,
+  "not_posted": 0
+ },
+ "can_approve": true,
+ "can_create": true,
+ "business": {
+  "name": "Smile Dental Studio",
+  "phone": "+91 9339670711",
+  "address": "Pune",
+  "city": "Pune"
+ }
+}

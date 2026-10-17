@@ -16,6 +16,9 @@ os.environ["GOOGLE_CLIENT_SECRET"] = "test-secret"
 os.environ["GOOGLE_REDIRECT_URI"] = "http://testserver/api/google/callback"
 os.environ["WEB_APP_URL"] = "http://web.test"
 os.environ["SCHEDULER_INTERVAL_MINUTES"] = "0"
+os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="gm-media-")
+os.environ["PUBLIC_BASE_URL"] = "https://api.test"
+os.environ["VIDEO_WIDTH"] = "144"  # tiny test videos render fast
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

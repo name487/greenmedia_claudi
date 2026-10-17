@@ -7,6 +7,9 @@ bcrypt>=4.1
 httpx>=0.27
 psycopg[binary]>=3.2   # PostgreSQL driver (DATABASE_URL=postgresql+psycopg://...)
 python-dotenv>=1.0
+pillow>=10.3          # AI posters and video frames
+python-multipart>=0.0.9  # product photo uploads
+imageio-ffmpeg>=0.5   # bundled ffmpeg for AI viral videos
 # dev
 pytest>=8.0
 cryptography>=42

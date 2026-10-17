@@ -7,6 +7,7 @@ import 'analytics_screen.dart';
 import 'business_score_screen.dart';
 import 'calendar_screen.dart';
 import 'clients_screen.dart';
+import 'ai_post/ai_post_screen.dart';
 import 'content_screen.dart';
 import 'dashboard_screen.dart';
 import 'owner_reviews_screen.dart';
@@ -35,7 +36,11 @@ final destinations = <Destination>[
     final me = c.read<Session>().me!;
     return me.isClient ? OwnerReviewsScreen(clientId: me.clientId!) : const ReviewsScreen();
   }, ownerLabel: 'Replies'),
-  Destination('content', 'Content', Icons.edit_note_rounded, (_) => const ContentScreen(), ownerLabel: 'AI Post'),
+  // Owners get Dhanda-style AI Post (viral videos, posters from their products, approve & schedule).
+  Destination('content', 'Content', Icons.edit_note_rounded, (c) {
+    final me = c.read<Session>().me!;
+    return me.isClient ? AiPostScreen(clientId: me.clientId!) : const ContentScreen();
+  }, ownerLabel: 'AI Post'),
   Destination('social', 'Calendar', Icons.calendar_month_outlined, (_) => const CalendarScreen()),
   Destination('clients', 'Clients', Icons.groups_outlined, (_) => const ClientsScreen()),
   Destination('analytics', 'Analytics', Icons.insights_outlined, (_) => const AnalyticsScreen()),
@@ -81,7 +86,7 @@ class _HomeShellState extends State<HomeShell> {
           PrimaryScrollController(
             controller: _scrollers.putIfAbsent(t.section, ScrollController.new),
             // The owner's home and Review Replies draw their own top bar
-            child: me.isClient && (t.section == 'dashboard' || t.section == 'reviews')
+            child: me.isClient && (t.section == 'dashboard' || t.section == 'reviews' || t.section == 'content')
                 ? t.builder(context)
                 : _Page(title: label(t, me), child: t.builder(context)),
           ),

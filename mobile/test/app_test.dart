@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:greenmedia/api/api_client.dart';
 import 'package:greenmedia/api/models.dart';
 import 'package:greenmedia/main.dart';
+import 'package:greenmedia/screens/ai_post/items_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
@@ -30,9 +31,12 @@ class MemoryStore implements SessionStore {
   Future<void> writeBaseUrl(String u) async => url = u;
 }
 
+/// Request bodies the fake backend received, by route name.
+final sentBodies = <String, Object?>{};
+
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
-  var who = 'admin';
+  var who = 'admin', videoPolls = 0;
   return MockClient((req) async {
     calls.add('${req.method} ${req.url.path}');
     http.Response json(Object body, [int status = 200]) =>
@@ -99,6 +103,39 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // AI Post (fixtures captured from the real API)
+    const ai = '/api/clients/1/ai-posts';
+    final videoId = (fixture('ai_post_video') as Map)['id'];
+    switch ((req.method, req.url.path)) {
+      case ('GET', '/api/video-templates'):
+        return json(fixture('video_templates'));
+      case ('GET', '/api/clients/1/items'):
+        return json(fixture('items_client'));
+      case ('POST', '/api/clients/1/items'):
+        return json(((fixture('items_client') as Map)['items'] as List).first as Object, 201);
+      case ('GET', '$ai/overview'):
+        return json(fixture('ai_posts_overview'));
+      case ('GET', ai):
+        final tab = req.url.queryParameters['tab'];
+        if (tab == 'pending' || tab == 'approved') return json(fixture('ai_posts_$tab'));
+        return json({'tab': tab, 'period': req.url.queryParameters['period'], 'items': []});
+      case ('GET', '$ai/free-slot'):
+        return json(fixture('ai_post_free_slot'));
+      case ('POST', '$ai/video'):
+        return json(fixture('ai_post_video_generating'), 201);
+      case ('POST', '$ai/poster'):
+        return json(fixture('ai_post_poster'), 201);
+    }
+    final aiPost = RegExp('^$ai/(\\d+)(/approve|/reject)?\$').firstMatch(req.url.path);
+    if (aiPost != null) {
+      final id = int.parse(aiPost.group(1)!);
+      if (aiPost.group(2) == '/approve') sentBodies['approve'] = jsonDecode(req.body);
+      if (aiPost.group(2) == '/approve') return json({...fixture('ai_post_approved') as Map, 'id': id});
+      if (aiPost.group(2) == '/reject') return json({...fixture('ai_post_poster') as Map, 'id': id, 'status': 'rejected', 'group': 'rejected'});
+      // the video is still rendering on the first poll
+      if (id == videoId) return json(fixture(videoPolls++ == 0 ? 'ai_post_video_generating' : 'ai_post_video'));
+      return json(fixture('ai_post_poster'));
+    }
     // Connect Facebook / Instagram from the app
     const accounts = [{'platform': 'facebook', 'is_live': true}, {'platform': 'instagram', 'is_live': true}];
     switch ((req.method, req.url.path)) {
@@ -516,6 +553,119 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls, contains('PUT /api/clients/1/reply-settings'));
       expect(find.text('Reply Settings'), findsNothing);
+    });
+  });
+
+  group('owner AI post', () {
+    Future<void> openAiPost(WidgetTester tester, List<String> calls) async {
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.descendant(of: find.byType(NavigationBar), matching: find.text('AI Post')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('quota, scheduled tabs, the post detail with its keywords', (tester) async {
+      final calls = <String>[];
+      await openAiPost(tester, calls);
+      final q = (fixture('ai_posts_overview') as Map)['quota'] as Map;
+      expect(find.text('Try Generating Viral Video'), findsOneWidget);
+      expect(find.text('(${q['videos']['used']}/${q['videos']['limit']})'), findsOneWidget);
+      expect(find.text('Generate AI Post (${q['posts']['used']}/${q['posts']['limit']})'), findsOneWidget);
+      expect(calls, contains('GET /api/clients/1/ai-posts'));
+      final pending = ((fixture('ai_posts_pending') as Map)['items'] as List).first as Map<String, dynamic>;
+      expect(find.byKey(Key('post-${pending['id']}')), findsOneWidget);
+      expect(find.text('Waiting for your approval'), findsWidgets);
+
+      await tapKey(tester, 'seg-approved');
+      final approved = ((fixture('ai_posts_approved') as Map)['items'] as List).first as Map<String, dynamic>;
+      expect(find.byKey(Key('post-${approved['id']}')), findsOneWidget);
+      expect(find.text('Approved for 18 Oct'), findsOneWidget);
+      await tapKey(tester, 'seg-rejected');
+      expect(find.byKey(Key('post-${approved['id']}')), findsNothing);
+      await tapKey(tester, 'seg-posted');
+      expect(find.text('00 Posts'), findsOneWidget);
+      expect(find.text('Lifetime'), findsOneWidget);
+
+      await tapKey(tester, 'seg-scheduled');
+      await tapKey(tester, 'seg-pending');
+      await tapKey(tester, 'post-${pending['id']}');
+      expect(find.text('This post targets the following keywords'), findsOneWidget);
+      final kw = (pending['keywords'] as List).first as Map;
+      expect(find.descendant(of: find.byKey(const Key('targets-keywords')), matching: find.text(kw['keyword'] as String)), findsOneWidget);
+      expect(find.textContaining('~${pending['estimated_views']}'), findsWidgets);
+    });
+
+    testWidgets('viral video: template, preview, generating, review, schedule', (tester) async {
+      final calls = <String>[];
+      await openAiPost(tester, calls);
+      await tapKey(tester, 'viral-banner');
+      expect(calls, contains('GET /api/video-templates'));
+      await tapKey(tester, 'template-deal_alert');
+      expect(find.text('Preview'), findsWidgets);
+      await tester.ensureVisible(find.byKey(const Key('generate-video')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('generate-video')));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(calls, contains('POST /api/clients/1/ai-posts/video'));
+      expect(find.textContaining('Content Agent is creating'), findsOneWidget);
+      expect(find.byKey(const Key('gen-step')), findsOneWidget);
+      // the next poll finds the video ready
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.text('Your video is ready'), findsOneWidget);
+      final video = fixture('ai_post_video') as Map<String, dynamic>;
+      expect(tester.widget<Text>(find.byKey(const Key('review-caption'))).data, startsWith(video['caption'] as String));
+
+      await tapKey(tester, 'approve-post');
+      expect(find.text('Select Date & Time'), findsOneWidget);
+      expect(calls, contains('GET /api/clients/1/ai-posts/free-slot'));
+      // the suggested free slot is 7:00 AM India time, whatever the device's zone
+      expect(find.text('Schedule for 18 October'), findsOneWidget);
+      await tapKey(tester, 'schedule-post');
+      expect(sentBodies['approve'], {'scheduled_at': '2026-10-18T01:30:00.000Z'});
+      expect(calls, contains('POST /api/clients/1/ai-posts/${video['id']}/approve'));
+      expect(find.byKey(const Key('scheduled-ok')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('scheduled-ok')), findsNothing);
+    });
+
+    testWidgets('generate AI post: add an item, then make a poster from it', (tester) async {
+      final calls = <String>[];
+      AddItemScreen.pickPhoto = () async => (base64Decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), 'p.png');
+      await openAiPost(tester, calls);
+      await tapKey(tester, 'generate-ai-post');
+      expect(find.text('Select Item'), findsOneWidget);
+      expect(find.text('Teeth Whitening'), findsOneWidget);
+
+      await tapKey(tester, 'add-item');
+      await tester.tap(find.byKey(const Key('save-item')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a photo and a name'), findsOneWidget);
+      ScaffoldMessenger.of(tester.element(find.byKey(const Key('save-item')))).hideCurrentSnackBar();
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'pick-photo');
+      await tester.enterText(find.byKey(const Key('item-name')), 'Teeth Whitening');
+      await tapKey(tester, 'save-item');
+      expect(calls, contains('POST /api/clients/1/items'));
+      expect(find.text('Select Item'), findsOneWidget);
+
+      await tapKey(tester, 'item-1');
+      expect(calls, contains('POST /api/clients/1/ai-posts/poster'));
+      expect(find.text('Your post is ready'), findsOneWidget);
+      await tester.tap(find.text('Reject Post'));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/clients/1/ai-posts/${(fixture('ai_post_poster') as Map)['id']}/reject'));
+      expect(find.text('Your post is ready'), findsNothing);
     });
   });
 

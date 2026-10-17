@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 151 tests: owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 156 tests: AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 151 tests: owner review replies, owner home, 
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 23 tests: owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 26 tests: AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -652,6 +652,30 @@ The owner's **Replies** tab, modelled on Dhanda AI:
 API: `POST /api/reviews/{id}/post` (`{"reply"}` — save, approve and post, or update a posted reply on Google),
 `DELETE /api/reviews/{id}/reply` (removes it from Google), `GET /api/reviews/summary?client_id=&period=month|quarter`,
 `GET|PUT /api/clients/{id}/reply-settings`; review lists now include `keywords_used`.
+
+## Mobile AI Post (business owners)
+
+The owner's **AI Post** tab, modelled on Dhanda AI:
+
+- **Try Generating Viral Video (n/5)**: pick one of 8 templates (Stop Scrolling, POV: Found It, Deal Alert, …), see a
+  **Preview** with the business's own products and end card, then **Generate Viral Video**. The server renders a 9:16 MP4
+  in the background (Pillow frames + the bundled ffmpeg from `imageio-ffmpeg`; a Celery task when Redis is on). The app
+  shows "Content Agent is creating the best video for your business…" with each step, or **Notify me when it's ready**.
+- **Generate AI Post (n/5)**: **Select Item** or **Add New Item** (photo*, name*, description, price) and get a poster
+  (1080×1350) with an AI caption that works in the business's search keywords.
+- Review: **Your video is ready** → **Reject** or **Approve** → **Select Date & Time** (calendar with already-scheduled
+  days in green, time wheels; it suggests the next free day at 7:00 AM India time) → **Successfully Scheduled**.
+- Lists: **Scheduled (Pending / Approved / Rejected)**, **Posted** (This Week / This Month / Last 3 Months / Lifetime) and
+  **Not Posted**. Each post shows the keywords it targets with search volumes, an estimated view count, the caption with
+  keywords highlighted, and share / download.
+- Nothing posts without approval. Videos go to Facebook (`/{page}/videos`) and Instagram Reels; Google gets the cover image.
+  Media is served from `/media`; set `PUBLIC_BASE_URL` to the API's public **https** address (Meta and Google fetch media
+  from it) and `MEDIA_DIR` to a persistent volume. Monthly limits: `AI_POSTS_MONTHLY`, `VIRAL_VIDEOS_MONTHLY` (5 each).
+
+API: `GET|POST /api/clients/{id}/items` (multipart `image`, `name`, `description`, `price`), `DELETE …/items/{item}`,
+`GET /api/video-templates`, `GET /api/clients/{id}/ai-posts/overview`, `GET …/ai-posts?tab=pending|approved|rejected|posted|not_posted&period=`,
+`POST …/ai-posts/poster {item_id}`, `POST …/ai-posts/video {template, item_ids?}`, `GET …/ai-posts/{post}`,
+`GET …/ai-posts/free-slot?month=`, `POST …/ai-posts/{post}/approve {scheduled_at}`, `POST …/ai-posts/{post}/reject`.
 
 ## Building the mobile apps
 

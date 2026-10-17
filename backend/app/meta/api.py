@@ -135,6 +135,23 @@ def publish_facebook(page_id: str, page_token: str, message: str, image_url: str
     return _post(f"{page_id}/feed", message=message, link=link or None, access_token=page_token)["id"]
 
 
+def publish_facebook_video(page_id: str, page_token: str, description: str, video_url: str) -> str:
+    """POST /{page}/videos with a public file_url. Returns the video id."""
+    return _post(f"{page_id}/videos", file_url=video_url, description=description, access_token=page_token)["id"]
+
+
+def publish_instagram_reel(ig_user_id: str, page_token: str, caption: str, video_url: str) -> str:
+    """Reels: create a REELS container from a public video URL, then publish it. Instagram processes the video first;
+    until then publishing fails with "media not ready" (9007), which is reported as transient so the scheduler retries."""
+    container = _post(f"{ig_user_id}/media", media_type="REELS", video_url=video_url, caption=caption, access_token=page_token)["id"]
+    try:
+        return _post(f"{ig_user_id}/media_publish", creation_id=container, access_token=page_token)["id"]
+    except MetaApiError as e:
+        if e.code == 9007:
+            raise MetaApiError(e.status, str(e), e.code, e.subcode, transient=True) from e
+        raise
+
+
 def publish_instagram(ig_user_id: str, page_token: str, caption: str, image_url: str) -> str:
     """Two steps: create a media container from a public image URL, then publish it. Returns the media id."""
     container = _post(f"{ig_user_id}/media", image_url=image_url, caption=caption, access_token=page_token)["id"]

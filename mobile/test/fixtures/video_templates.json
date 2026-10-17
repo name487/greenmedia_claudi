@@ -1,0 +1,106 @@
+{
+ "templates": [
+  {
+   "key": "stop_scrolling",
+   "name": "Stop Scrolling",
+   "tagline": "A bold hook that stops the thumb",
+   "intro": [
+    "Stop scrolling!",
+    "You need",
+    "to see this"
+   ],
+   "bg": "#0E1A3A",
+   "accent": "#FFB400",
+   "motion": "zoom"
+  },
+  {
+   "key": "pov_found",
+   "name": "POV: Found It",
+   "tagline": "The relatable POV reel",
+   "intro": [
+    "POV:",
+    "you found the best",
+    "in {city}"
+   ],
+   "bg": "#1B1035",
+   "accent": "#FF5C8A",
+   "motion": "pan"
+  },
+  {
+   "key": "wait_for_it",
+   "name": "Wait For It",
+   "tagline": "Builds up, then reveals your products",
+   "intro": [
+    "Wait",
+    "for",
+    "it…"
+   ],
+   "bg": "#111111",
+   "accent": "#36D399",
+   "motion": "zoom"
+  },
+  {
+   "key": "deal_alert",
+   "name": "Deal Alert",
+   "tagline": "Loud and urgent — great for offers",
+   "intro": [
+    "Deal",
+    "alert!",
+    "Today only"
+   ],
+   "bg": "#B3001B",
+   "accent": "#FFE066",
+   "motion": "pan"
+  },
+  {
+   "key": "new_arrivals",
+   "name": "New Arrivals",
+   "tagline": "Fresh stock, quick cuts",
+   "intro": [
+    "Just in",
+    "at {business}"
+   ],
+   "bg": "#063B2E",
+   "accent": "#7CF5C3",
+   "motion": "pan"
+  },
+  {
+   "key": "top_picks",
+   "name": "Top Picks",
+   "tagline": "Your bestsellers, one by one",
+   "intro": [
+    "Our top picks",
+    "this week"
+   ],
+   "bg": "#2A1A5E",
+   "accent": "#C7A6FF",
+   "motion": "zoom"
+  },
+  {
+   "key": "made_for_you",
+   "name": "Made For You",
+   "tagline": "Warm and personal",
+   "intro": [
+    "Made",
+    "for you",
+    "with love"
+   ],
+   "bg": "#5A2A0C",
+   "accent": "#FFC48A",
+   "motion": "zoom"
+  },
+  {
+   "key": "local_favourite",
+   "name": "Local Favourite",
+   "tagline": "Proud local business vibe",
+   "intro": [
+    "{city}'s",
+    "favourite",
+    "{business}"
+   ],
+   "bg": "#0B3D91",
+   "accent": "#FFFFFF",
+   "motion": "pan"
+  }
+ ]
+}

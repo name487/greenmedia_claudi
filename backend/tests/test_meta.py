@@ -67,8 +67,13 @@ class FakeMeta:
             self.posts.append({"path": path, **p})
             n = len(self.posts)
             return j({"id": f"{page}_{n}"} if path.endswith("feed") else {"id": f"photo{n}", "post_id": f"{page}_{n}"})
+        if path == "PAGE1/videos" and req.method == "POST":
+            assert tok == self.page_tokens["PAGE1"] and p["file_url"].startswith("https://")
+            self.posts.append({"path": path, **p})
+            return j({"id": "video1"})
         if path == "IG1/media" and req.method == "POST":
-            assert tok == self.page_tokens["PAGE1"] and p["image_url"].startswith("https://")
+            assert tok == self.page_tokens["PAGE1"]
+            assert (p.get("media_type") == "REELS" and p["video_url"].startswith("https://")) or p["image_url"].startswith("https://")
             self.posts.append({"path": path, **p})
             return j({"id": "container1"})
         if path == "IG1/media_publish" and req.method == "POST":

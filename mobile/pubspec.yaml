@@ -41,6 +41,8 @@ dependencies:
   url_launcher: ^6.3.2
   intl: ^0.20.3
   qr_flutter: ^4.1.0
+  image_picker: ^1.2.4
+  video_player: ^2.14.1
 
 dev_dependencies:
   flutter_test:

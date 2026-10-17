@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../state/session.dart';
 import '../widgets/common.dart';
+import 'ai_post/ai_post_screen.dart';
 import 'content_screen.dart';
 import 'keyword_planner_screen.dart';
 import 'meta_connect_screen.dart';
@@ -58,6 +59,11 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
     if (mounted) _reload();
   }
 
+  Future<void> _openAiPost() async {
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => AiPostScreen(clientId: widget.clientId)));
+    if (mounted) _reload();
+  }
+
   Future<void> _openPlanner() async {
     await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => KeywordPlannerScreen(clientId: widget.clientId)));
     if (mounted) _reload();
@@ -80,6 +86,7 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
         if (me.sees('reviews') && me.isClient) return _openOwnerReviews();
         if (me.sees('reviews')) return _open(ReviewsScreen(clientId: widget.clientId), 'Review Replies');
       case 'content':
+        if (me.sees('content') && me.isClient) return _openAiPost();
         if (me.sees('content')) return _open(const ContentScreen(), 'AI Post');
       case 'keyword_planner':
         return _openPlanner();

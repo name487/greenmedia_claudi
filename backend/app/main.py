@@ -1,16 +1,19 @@
 import asyncio
 import logging
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .ai import ai_enabled
 from .config import settings
 from .routers import ai as ai_router
 from .routers import meta as meta_router
 from .routers import analytics, auth, clients, content, dashboard, google, reports, reviews, score, seo, tasks, users
+from .routers import ai_posts as ai_posts_router
 from .routers import reply_settings
 from .routers import settings as settings_router
 from .seed import init_db
@@ -48,6 +51,11 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_me
 for r in (auth, dashboard, clients, score, reply_settings, reviews, content, seo, analytics, reports, tasks, settings_router, google, users):
     app.include_router(r.router)
 app.include_router(google.client_router)
+app.include_router(ai_posts_router.router)
+app.include_router(ai_posts_router.templates_router)
+# Product photos and generated posters/videos (AI Post). Public so the app and Facebook/Instagram can fetch them.
+Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")
 app.include_router(ai_router.router)
 app.include_router(ai_router.client_router)
 app.include_router(meta_router.router)

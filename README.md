@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 139 tests: owner home, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 145 tests: owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 139 tests: owner home, business score, client
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 17 tests: owner home (carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 20 tests: owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -599,7 +599,7 @@ Staff can still use **Sign in with email**.
 A business owner who signs in to the app lands on a home page modelled on Dhanda AI's (agency staff open the same
 page from a client's screen with **Business score**). Top to bottom:
 
-- **Top bar** with the business, phone and city, and **Help** (WhatsApp or call the account manager).
+- **Top bar** with the business, phone and city, and **Help**: a popup to call or WhatsApp the account manager.
 - **Score carousel** (swipe):
   - **Marketing Score** gauge out of 100. *Improve Marketing Score* lists the points for rating, reviews, replies to
     the last 50 reviews, new reviews, Google posts, profile connection, search visibility and customer actions, each with
@@ -617,8 +617,13 @@ page from a client's screen with **Business score**). Top to bottom:
   address, distance and number of ratings. Staff add real competitors with
   `POST /api/clients/{id}/competitors` (`name`, `rating`, `review_count`, `address`, `distance_km`), which replaces the
   demo list.
-- **Stay active on Social Media** — Facebook / Instagram status; *Connect* asks the account manager (Meta is connected
-  by the agency).
+- **Stay active on Social Media** — Facebook / Instagram status and **Connect**, which the owner does themselves:
+  "Taking you to Facebook/Instagram" → Facebook's login in the in-app browser → back in the app the Page is linked
+  (or the owner picks one if their login manages several). If the login doesn't finish, the app explains why — closed
+  early, a permission switched off, no Page, no Instagram Business account on the Page, Page already used — with
+  *Connect again* and *Show me step by step*. API: `POST /api/clients/{id}/meta/connect` (`{"platform"}` → `auth_url`),
+  `GET …/meta/connect/{attempt}`, `POST …/{attempt}/choose`, `POST …/{attempt}/cancel`. Needs `META_APP_ID`,
+  `META_APP_SECRET` and `META_REDIRECT_URI` like the web dashboard's Meta connection.
 - **Get more Google reviews** — QR of the profile's "write a review" link, WhatsApp share and copy.
 - **Growth Action** — a floating checklist of 10 actions (profile, approve and publish posts, reply to reviews, connect
   Facebook and Instagram, track keywords, get new reviews, reach a score of 70), each opening the right screen.

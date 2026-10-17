@@ -12,6 +12,7 @@ import '../state/session.dart';
 import '../widgets/common.dart';
 import 'content_screen.dart';
 import 'keyword_planner_screen.dart';
+import 'meta_connect_screen.dart';
 import 'reviews_screen.dart';
 
 void openBusinessScore(BuildContext context, int clientId) =>
@@ -42,7 +43,9 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
 
   Future<Map<String, dynamic>> _load() async => await context.read<Session>().api.get('/api/clients/${widget.clientId}/score') as Map<String, dynamic>;
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _open(Widget page, String title) async {
     await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => Scaffold(appBar: AppBar(title: Text(title)), body: SafeArea(top: false, child: page))));
@@ -52,6 +55,15 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
   Future<void> _openPlanner() async {
     await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => KeywordPlannerScreen(clientId: widget.clientId)));
     if (mounted) _reload();
+  }
+
+  Future<void> _connect(String platform) async {
+    final ok = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => MetaConnectScreen(clientId: widget.clientId, platform: platform)));
+    if (!mounted) return;
+    if (ok == true) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${platform == 'facebook' ? 'Facebook' : 'Instagram'} connected')));
+    }
+    _reload();
   }
 
   /// Where a Growth Action / tracker row leads.
@@ -68,6 +80,8 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
         return showScoreBreakdown(context, d['score'] as Map<String, dynamic>, widget.clientId);
       case 'review_qr':
         return showReviewQr(context, d['client'] as Map<String, dynamic>);
+      case 'facebook' || 'instagram':
+        return _connect(target);
     }
     return showHelp(context, d, reason: target == 'social' ? 'connect your social media' : target == 'profile' ? 'complete your profile' : null);
   }
@@ -113,7 +127,7 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
           _CalendarCard(clientId: widget.clientId, onPending: () => go('content', d)),
           _KeywordsCard(tracked: (d['tracked_keywords'] as List).cast<Map<String, dynamic>>(), onPlanner: () => go('keyword_planner', d)),
           _CompetitorCard(groups: d['competitor_groups'] as Map<String, dynamic>),
-          _SocialCard(rows: (d['social'] as List).cast<Map<String, dynamic>>(), onConnect: () => go('social', d)),
+          _SocialCard(rows: (d['social'] as List).cast<Map<String, dynamic>>(), onConnect: (platform) => go(platform, d)),
           _ReviewQrCard(client: d['client'] as Map<String, dynamic>),
         ]),
       ),
@@ -159,7 +173,7 @@ class _BusinessScoreScreenState extends State<BusinessScoreScreen> {
                   : FilledButton.tonal(
                       onPressed: () {
                         Navigator.pop(sheet);
-                        go(a['target'] as String, d);
+                        go(a['target'] == 'social' ? a['key'] as String : a['target'] as String, d);
                       },
                       child: Text(a['action'] as String),
                     ),
@@ -224,44 +238,96 @@ class _TopBar extends StatelessWidget {
 }
 
 /// Contact the account manager (calls, WhatsApp). Connections and profile changes are done by the agency.
+/// Help: a dimmed popup with ways to reach the agency — call or WhatsApp the account manager.
 void showHelp(BuildContext context, Map<String, dynamic> d, {String? reason}) {
   final s = d['support'] as Map<String, dynamic>?;
   final name = s?['name'] as String? ?? 'your account manager';
   final phone = (s?['phone'] as String? ?? '').replaceAll(RegExp(r'[^\d+]'), '');
   final business = (d['client'] as Map)['company_name'];
   final text = reason == null ? 'Hi $name, I need help with $business.' : 'Hi $name, please help me $reason for $business.';
-  showModalBottomSheet<void>(
+  showGeneralDialog<void>(
     context: context,
-    showDragHandle: true,
-    builder: (sheet) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(reason == null ? 'Need help?' : 'We’ll $reason for you',
-              style: Theme.of(sheet).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(s == null ? 'Contact your agency.' : '$name is your account manager.', style: Theme.of(sheet).textTheme.bodyMedium),
-          const SizedBox(height: 14),
-          if (phone.isNotEmpty) ...[
-            FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white, minimumSize: const Size.fromHeight(46)),
-              icon: const Icon(Icons.chat_rounded),
-              label: const Text('WhatsApp'),
-              onPressed: () => launchUrl(Uri.parse('https://wa.me/${phone.replaceAll('+', '')}?text=${Uri.encodeComponent(text)}'),
-                  mode: LaunchMode.externalApplication),
+    barrierDismissible: true,
+    barrierLabel: 'Close help',
+    barrierColor: Colors.black.withValues(alpha: .7),
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (dialog, _, _) => SafeArea(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Stack(children: [
+          Positioned(
+            top: 4,
+            right: 4,
+            child: IconButton(tooltip: 'Close', icon: const Icon(Icons.close, color: Colors.white, size: 28), onPressed: () => Navigator.pop(dialog)),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (reason != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text('We’ll $reason for you', textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+                  ),
+                if (phone.isEmpty)
+                  const _HelpCard(icon: Icons.support_agent, title: 'Contact your agency', subtitle: 'No account manager is assigned yet')
+                else ...[
+                  _HelpCard(
+                    key: const Key('help-call'),
+                    icon: Icons.call_outlined,
+                    title: 'Talk to $name',
+                    subtitle: 'Your account manager — plans, features and results',
+                    onTap: () => launchUrl(Uri.parse('tel:$phone')),
+                  ),
+                  const SizedBox(height: 10),
+                  _HelpCard(
+                    icon: Icons.chat_outlined,
+                    colour: const Color(0xFF25D366),
+                    title: 'Chat on WhatsApp',
+                    subtitle: 'Send a message — we reply during working hours',
+                    onTap: () => launchUrl(Uri.parse('https://wa.me/${phone.replaceAll('+', '')}?text=${Uri.encodeComponent(text)}'),
+                        mode: LaunchMode.externalApplication),
+                  ),
+                ],
+              ]),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(46)),
-              icon: const Icon(Icons.call),
-              label: Text('Call $phone'),
-              onPressed: () => launchUrl(Uri.parse('tel:$phone')),
-            ),
-          ],
+          ),
         ]),
       ),
     ),
   );
+}
+
+class _HelpCard extends StatelessWidget {
+  const _HelpCard({super.key, required this.icon, required this.title, required this.subtitle, this.onTap, this.colour = const Color(0xFF1F63C6)});
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback? onTap;
+  final Color colour;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(children: [
+              Icon(icon, color: colour),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: TextStyle(color: colour, fontWeight: FontWeight.w600, fontSize: 15)),
+                  Text(subtitle, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+      );
 }
 
 // ---------- marketing score carousel ----------
@@ -1078,7 +1144,7 @@ class _CompetitorTable extends StatelessWidget {
 class _SocialCard extends StatelessWidget {
   const _SocialCard({required this.rows, required this.onConnect});
   final List<Map<String, dynamic>> rows;
-  final VoidCallback onConnect;
+  final ValueChanged<String> onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -1099,8 +1165,9 @@ class _SocialCard extends StatelessWidget {
             trailing: r['connected'] == true
                 ? const StatusChip('connected', label: 'Connected')
                 : TextButton(
-                    onPressed: onConnect,
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('Connect'), Icon(Icons.chevron_right, size: 18)]),
+                    key: Key('connect-${r['platform']}'),
+                    onPressed: () => onConnect(r['platform'] as String),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [Text(r['status'] == 'expired' ? 'Reconnect' : 'Connect'), const Icon(Icons.chevron_right, size: 18)]),
                   ),
           ),
       ]),

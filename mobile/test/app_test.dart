@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:greenmedia/api/api_client.dart';
 import 'package:greenmedia/api/models.dart';
 import 'package:greenmedia/main.dart';
+import 'package:greenmedia/screens/meta_connect_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
 import 'package:greenmedia/widgets/common.dart';
@@ -79,6 +80,22 @@ MockClient fakeApi(List<String> calls) {
         return json({'id': 999, 'keyword': b['keyword'], 'location': b['location'], 'volume': b['volume']}, 201);
     }
     if (req.method == 'DELETE' && req.url.path.startsWith('/api/clients/1/keyword-planner/keywords/')) return http.Response('', 204);
+    // Connect Facebook / Instagram from the app
+    const accounts = [{'platform': 'facebook', 'is_live': true}, {'platform': 'instagram', 'is_live': true}];
+    switch ((req.method, req.url.path)) {
+      case ('POST', '/api/clients/1/meta/connect'):
+        return json({'id': 'att1', 'auth_url': 'https://www.facebook.com/dialog/oauth?state=x'}, 201);
+      case ('GET', '/api/clients/1/meta/connect/att1'):
+        return json({'id': 'att1', 'status': 'choose_page', 'reason': '', 'message': '', 'accounts': [], 'candidates': [
+          {'page_id': 'P1', 'name': 'Smile Dental Studio', 'instagram': 'smiledental.pune'},
+          {'page_id': 'P2', 'name': 'Smile Dental Kids', 'instagram': null},
+        ]});
+      case ('POST', '/api/clients/1/meta/connect/att1/choose'):
+        return json({'id': 'att1', 'status': 'connected', 'reason': '', 'message': '', 'candidates': [], 'accounts': accounts});
+      case ('POST', '/api/clients/1/meta/connect/att1/cancel'):
+        return json({'id': 'att1', 'status': 'failed', 'reason': 'cancelled', 'message': 'The Facebook screen closed before the connection was saved.',
+          'candidates': [], 'accounts': []});
+    }
     return json({'detail': 'not found'}, 404);
   });
 }
@@ -309,6 +326,77 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls, contains('POST /api/clients/1/keyword-planner/keywords'));
       expect(find.descendant(of: card, matching: find.text('ADDED')), findsOneWidget);
+    });
+  });
+
+  group('owner home: help and social connect', () {
+    final score = fixture('score_client') as Map<String, dynamic>;
+
+    Future<void> openSocial(WidgetTester tester) async {
+      await tester.scrollUntilVisible(find.text('Stay active on Social Media'), 300,
+          scrollable: find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first);
+      await tester.ensureVisible(find.text('Stay active on Social Media'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Help opens a popup to call or WhatsApp the account manager', (tester) async {
+      await pumpApp(tester, []);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.text('Help'));
+      await tester.pumpAndSettle();
+      expect(find.text('Talk to ${(score['support'] as Map)['name']}'), findsOneWidget);
+      expect(find.text('Chat on WhatsApp'), findsOneWidget);
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chat on WhatsApp'), findsNothing);
+    });
+
+    testWidgets('Connect: Taking you to Facebook → pick the Page → connected', (tester) async {
+      final opened = <Uri>[];
+      MetaConnectScreen.openUrl = (u) async {
+        opened.add(u);
+        return true;
+      };
+      final calls = <String>[];
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await openSocial(tester);
+      final connect = find.byWidgetPredicate((w) => w is TextButton && (w.key as ValueKey?)?.value.toString().startsWith('connect-') == true);
+      expect(connect, findsWidgets);
+      await tester.tap(connect.first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400)); // page transition
+      expect(find.byKey(const Key('meta-intro')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 1)); // opens Facebook's login
+      expect(opened.single.host, 'www.facebook.com');
+      await tester.pump(const Duration(seconds: 2)); // first poll: several Pages
+      await tester.pump();
+      expect(find.text('Which Page is your business?'), findsOneWidget);
+      await tester.tap(find.text('Smile Dental Kids'));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/clients/1/meta/connect/att1/choose'));
+      expect(find.byType(MetaConnectScreen), findsNothing);
+      expect(find.textContaining('connected'), findsWidgets);
+    });
+
+    testWidgets('Connect: login not finished → explains and offers Connect again', (tester) async {
+      MetaConnectScreen.openUrl = (u) async => false; // the phone couldn't open Facebook
+      await pumpApp(tester, []);
+      await signIn(tester, 'anjali@smiledental.in');
+      await openSocial(tester);
+      await tester.tap(find.byWidgetPredicate((w) => w is TextButton && (w.key as ValueKey?)?.value.toString().startsWith('connect-') == true).first);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('login failed'), findsOneWidget);
+      await tester.tap(find.text('Not now'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('meta-failed')), findsOneWidget);
+      expect(find.text('Allow every permission it asks for'), findsOneWidget);
+      expect(find.textContaining('again'), findsWidgets);
+      await tester.tap(find.text('Show me step by step'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('step by step'), findsWidgets);
     });
   });
 

@@ -206,6 +206,27 @@ class MetaConnection(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class MetaConnectAttempt(Base):
+    """One "Connect Facebook / Instagram" tap from the app: the app opens Facebook's login, then polls this row to
+    learn whether the connection finished, failed (and why), or needs the owner to pick one of several Pages."""
+
+    __tablename__ = "meta_connect_attempts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    platform: Mapped[str] = mapped_column(String(20))  # facebook | instagram
+    # pending → connected | choose_page | failed
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    reason: Mapped[str] = mapped_column(String(40), default="")  # cancelled | permissions | no_pages | no_instagram | page_taken | error
+    message: Mapped[str] = mapped_column(Text, default="")
+    candidates: Mapped[list] = mapped_column(JSON, default=list)  # Pages to choose from (no tokens)
+    connection_id: Mapped[int | None] = mapped_column(ForeignKey("meta_connections.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Review(Base):
     __tablename__ = "gmb_reviews"
     id: Mapped[int] = mapped_column(primary_key=True)

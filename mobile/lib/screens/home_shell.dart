@@ -12,6 +12,7 @@ import 'content_screen.dart';
 import 'dashboard_screen.dart';
 import 'google_media_screen.dart';
 import 'google_post_screen.dart';
+import 'my_plan_screen.dart';
 import 'owner_report_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'reports_screen.dart';
@@ -151,6 +152,17 @@ void showMoreMenu(BuildContext context) {
               Navigator.pop(sheet);
               Navigator.push(context, MaterialPageRoute<void>(builder: (c) =>
                   session.me!.isClient && _ownBar.contains(d.section) ? d.builder(c) : _Page(title: label(d, session.me!), child: d.builder(c))));
+            },
+          ),
+        if (session.me!.isClient && session.me!.clientId != null)
+          ListTile(
+            key: const Key('menu-my-plan'),
+            leading: const Icon(Icons.credit_card_outlined),
+            title: const Text('My Plan'),
+            subtitle: const Text('Subscription & billing'),
+            onTap: () {
+              Navigator.pop(sheet);
+              Navigator.push(context, MaterialPageRoute<void>(builder: (_) => MyPlanScreen(clientId: session.me!.clientId!)));
             },
           ),
         ListTile(

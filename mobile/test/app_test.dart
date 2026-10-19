@@ -10,6 +10,7 @@ import 'package:greenmedia/screens/ai_post/items_screen.dart';
 import 'package:greenmedia/screens/google_media_screen.dart';
 import 'package:greenmedia/screens/google_post_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
+import 'package:greenmedia/screens/my_plan_screen.dart';
 import 'package:greenmedia/screens/owner_report_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
@@ -46,6 +47,9 @@ var googleMediaEmpty = false;
 
 /// The fake monthly report has no score history.
 var reportNoScore = false;
+
+/// The fake plan has been paid for.
+var planPaid = false;
 
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
@@ -116,6 +120,24 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // My Plan (fixtures captured from the real API)
+    switch ((req.method, req.url.path)) {
+      case ('GET', '/api/clients/1/plan'):
+        return json(fixture(planPaid ? 'plan_client_active' : 'plan_client'));
+      case ('PUT', '/api/clients/1/plan/billing'):
+        sentBodies['plan-billing'] = jsonDecode(req.body);
+        return json(fixture('plan_billing'));
+      case ('POST', '/api/clients/1/plan/quote'):
+        final b = jsonDecode(req.body) as Map;
+        if ((b['coupon'] as String).toUpperCase() != 'WELCOME10') return json({'detail': "That coupon code isn't valid"}, 422);
+        return json(fixture('plan_quote_coupon'));
+      case ('POST', '/api/clients/1/plan/checkout'):
+        sentBodies['plan-checkout'] = jsonDecode(req.body);
+        return json(fixture('plan_checkout'), 201);
+      case ('GET', '/api/clients/1/plan/payments/1'):
+        planPaid = true;  // Razorpay (here: the practice page) confirmed it
+        return json(fixture('plan_payment_paid'));
+    }
     // Monthly report (fixtures captured from the real API)
     if (req.url.path == '/api/clients/1/monthly-report') {
       sentBodies['report-month'] = req.url.queryParameters['month'];
@@ -1001,6 +1023,85 @@ void main() {
       await tapKey(tester, 'tab-performance');
       expect(find.text('No score history yet'), findsOneWidget);
       expect(find.text('Your Marketing Score is calculated every Monday. The first point lands next week.'), findsOneWidget);
+    });
+  });
+
+  group('owner My Plan', () {
+    Future<void> openPlan(WidgetTester tester, List<String> calls) async {
+      planPaid = false;
+      sentBodies.remove('plan-billing');
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.byKey(const Key('owner-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('menu-my-plan')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('not activated, no mandates, no payments; billing details', (tester) async {
+      final calls = <String>[];
+      await openPlan(tester, calls);
+      expect(calls, contains('GET /api/clients/1/plan'));
+      expect(find.text('Your Pro Plan is'), findsOneWidget);
+      expect(find.text('Not Activated'), findsOneWidget);
+      expect(find.text('Start @ ₹999/-'), findsOneWidget);
+      expect(find.text('No Active Mandates'), findsOneWidget);
+      expect(find.text('No payments yet'), findsOneWidget);
+
+      await tapKey(tester, 'billing-details');
+      expect(find.text('Billing Details'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('gstin')), '27ABCDE1234F1Z5');
+      await tester.enterText(find.byKey(const Key('billing-address')), '12 Baner Rd, Pune 411045');
+      await tapKey(tester, 'billing-save');
+      expect(sentBodies['plan-billing'], {'gstin': '27ABCDE1234F1Z5', 'billing_address': '12 Baner Rd, Pune 411045', 'shipping_same': true, 'shipping_address': ''});
+      expect(find.text('Billing details saved'), findsOneWidget);
+    });
+
+    testWidgets('compare plans, choose 12 months, coupon, pay and come back active', (tester) async {
+      Uri? opened;
+      MyPlanScreen.openUrl = (url) async {
+        opened = url;
+        return true;
+      };
+      final calls = <String>[];
+      await openPlan(tester, calls);
+      await tapKey(tester, 'plan-start');
+      expect(find.byKey(const Key('compare-table')), findsOneWidget);
+      expect(find.text('BESTSELLER'), findsOneWidget);
+      await tapKey(tester, 'go-premium');
+
+      expect(find.text('Choose your plan'), findsOneWidget);
+      expect(find.text('₹16,000'), findsWidgets);
+      expect(tester.widget<Text>(find.byKey(const Key('plan-total'))).data, '₹16,000');
+      expect(find.textContaining('Practice mode'), findsOneWidget);
+      await tapKey(tester, 'coupon-open');
+      await tester.enterText(find.byKey(const Key('coupon')), 'NOPE');
+      await tapKey(tester, 'coupon-apply');
+      expect(find.text("That coupon code isn't valid"), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('coupon')), 'WELCOME10');
+      await tapKey(tester, 'coupon-apply');
+      expect(tester.widget<Text>(find.byKey(const Key('plan-total'))).data, '₹14,400');
+      expect(find.textContaining('you save ₹1,600'), findsOneWidget);
+
+      await tapKey(tester, 'plan-continue');
+      expect(sentBodies['plan-checkout'], {'plan': 'pro_12', 'coupon': 'WELCOME10'});
+      expect(opened.toString(), (fixture('plan_checkout') as Map)['url']);
+      // back from the payment page
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Plan activated'), findsOneWidget);
+      await tapKey(tester, 'plan-done');
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.textContaining('Valid till'), findsOneWidget);
+      expect(find.byKey(const Key('payment-1')), findsOneWidget);
+      expect(find.text('Paid'), findsOneWidget);
     });
   });
 

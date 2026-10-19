@@ -87,6 +87,10 @@ class Client(Base):
     # Google Post (app): {"daily": bool — the Content Agent drafts a text post a day, "auto": bool — post them without
     # asking (a standing approval, approval_rule = "auto_google_post"), "auto_by": user id who turned it on, "time": "HH:MM"}
     google_posts: Mapped[dict] = mapped_column(JSON, default=dict)
+    # My Plan (app): the paid plan and until when it runs (India date), and billing details for invoices
+    plan_key: Mapped[str] = mapped_column(String(30), default="")
+    plan_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    billing: Mapped[dict] = mapped_column(JSON, default=dict)  # {gstin, billing_address, shipping_same, shipping_address}
     notes: Mapped[str] = mapped_column(Text, default="")
 
     # Primary contact first, then in the order they were added.
@@ -387,6 +391,29 @@ class GoogleMedia(Base):
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class PlanPayment(Base):
+    """One plan purchase from the app. Paid only when Razorpay says so (signed callback or webhook) — never on the app's word."""
+
+    __tablename__ = "plan_payments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    plan_key: Mapped[str] = mapped_column(String(30))
+    amount: Mapped[int] = mapped_column(Integer)  # paise, after any coupon
+    list_amount: Mapped[int] = mapped_column(Integer)  # paise, before the coupon
+    coupon: Mapped[str] = mapped_column(String(40), default="")
+    status: Mapped[str] = mapped_column(String(20), default="created", index=True)  # created | paid | failed | expired
+    provider: Mapped[str] = mapped_column(String(20), default="razorpay")  # razorpay | demo
+    link_id: Mapped[str] = mapped_column(String(80), default="", index=True)  # Razorpay payment link id
+    payment_ref: Mapped[str] = mapped_column(String(80), default="")  # Razorpay payment id once paid
+    checkout_url: Mapped[str] = mapped_column(String(500), default="")
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Competitor(Base):

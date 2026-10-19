@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 172 tests: monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 177 tests: My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 172 tests: monthly Report (summary, targets, 
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 36 tests: Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 38 tests: My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -704,7 +704,7 @@ scheduler, and Celery beat (`greenmedia.google_posts`, hourly).
 ## Mobile Google Media (business owners)
 
 The owner's **Google Media** tab, modelled on Dhanda AI. Owners' bottom bar has Dhanda's five tabs, Home / Replies /
-AI Post / Google Post / Google Media; Analytics, Report, Settings and Sign out open from their avatar on Home.
+AI Post / Google Post / Google Media; Analytics, Report, My Plan, Settings and Sign out open from their avatar on Home.
 
 - **Where it will upload? → Click here to know**: a sketch of their Google Maps listing with their photos, and "Fresh
   photos can get you up to 25% more calls".
@@ -752,6 +752,34 @@ The demo seeds 13 months of Google metrics and weekly Business Score points for 
 API: `GET /api/clients/{id}/monthly-report?month=YYYY-MM`, `POST /api/clients/{id}/monthly-report/link?month=` →
 `{url, filename, expires_at}`, `GET /api/clients/{id}/monthly-report.pdf?t=…`.
 
+## Mobile My Plan (business owners)
+
+**My Plan** (from the avatar on an owner's Home), modelled on Dhanda AI:
+
+- **Your Pro Plan is Active / Not Activated / Expired**, with the date it's valid till and the days left.
+- **Unlock Your Growth! Start @ ₹999/-** opens the plan comparison (Starter / Pro / 3 Year Plan, feature by feature),
+  then **Go Premium** opens **Choose your plan**: ₹999 / month, ₹16,000 for 12 months, ₹27,000 for 24 months or ₹36,000
+  for 36 months. A coupon code can be applied, then **Continue** goes to payment.
+- **Billing Details**: VAT/GSTIN (format-checked), billing address, and shipping address or "same as billing".
+- **No Active Mandates**: nothing is debited automatically; every payment is one the owner makes. **Payments** lists
+  each one with its date, period, coupon and status.
+
+**Payment** goes through **Razorpay Payment Links**: the app opens Razorpay's hosted page, so the app needs no payment
+SDK. A plan becomes active only when Razorpay confirms the payment, through any of these:
+- the signed redirect back (`/api/plan/razorpay/callback`)
+- the signed webhook (`POST /api/plan/razorpay/webhook`, event `payment_link.paid`)
+- Razorpay's own answer when the app asks after the owner returns
+
+The app's word alone never activates a plan. Paying again extends the plan from the end of the current one.
+
+Settings: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (set the webhook in the Razorpay
+dashboard to `{PUBLIC_BASE_URL}/api/plan/razorpay/webhook`). `COUPONS` takes the form `CODE:10%,CODE2:500` (a
+percentage, or rupees off). Without keys, `PAYMENTS_DEMO=1` (default when `SEED_DEMO=1`) uses a practice checkout page
+that is clearly marked and moves no money; with `PAYMENTS_DEMO=0` and no keys, the app says online payment isn't set up.
+
+API: `GET /api/clients/{id}/plan`, `PUT …/plan/billing`, `POST …/plan/quote {plan, coupon}`,
+`POST …/plan/checkout {plan, coupon}` → `{id, url, …}`, `GET …/plan/payments/{payment}`.
+
 ## Building the mobile apps
 
 ```bash
@@ -763,7 +791,7 @@ flutter build ipa --release --dart-define=API_URL=https://api.yourdomain       #
 
 Release builds only talk to HTTPS APIs. Plain `http://` is allowed only in Android debug builds and for localhost/LAN on iOS.
 
-**CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK** and an unsigned **iOS build**, which you can download from the run's Artifacts. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
+**CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK**, which you can download from the run's Artifacts. The unsigned **iOS build** runs on a macOS runner, whose minutes cost 10× Linux ones and are the first to stop when the account's spending limit is reached. It is opt-in: run the workflow by hand (Actions → CI → Run workflow), or set the repository variable `IOS_BUILD=true`. Otherwise it shows as skipped. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
 
 ## Deploying
 

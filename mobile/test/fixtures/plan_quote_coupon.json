@@ -1,0 +1,8 @@
+{
+ "plan": "pro_12",
+ "list_amount": 1600000,
+ "discount": 160000,
+ "amount": 1440000,
+ "coupon": "WELCOME10",
+ "message": "WELCOME10 applied — you save ₹1,600"
+}

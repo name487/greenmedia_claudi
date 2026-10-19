@@ -1,0 +1,23 @@
+{
+ "id": 1,
+ "plan": "pro_12",
+ "plan_name": "12 Months",
+ "amount": 1440000,
+ "list_amount": 1600000,
+ "coupon": "WELCOME10",
+ "status": "paid",
+ "demo": true,
+ "created_at": "2026-10-19T06:34:59.644637+00:00",
+ "paid_at": "2026-10-19T06:34:59.669799+00:00",
+ "period_start": "2026-10-19",
+ "period_end": "2027-10-18",
+ "plan_status": {
+  "state": "active",
+  "plan": {
+   "key": "pro_12",
+   "name": "Pro"
+  },
+  "valid_until": "2027-10-18",
+  "days_left": 364
+ }
+}

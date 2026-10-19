@@ -16,6 +16,7 @@ from .routers import analytics, auth, clients, content, dashboard, google, repor
 from .routers import ai_posts as ai_posts_router
 from .routers import google_media as google_media_router
 from .routers import google_posts as google_posts_router
+from .routers import monthly_report as monthly_report_router
 from .routers import reply_settings
 from .routers import settings as settings_router
 from .seed import init_db
@@ -58,6 +59,7 @@ app.include_router(ai_posts_router.templates_router)
 app.include_router(google_posts_router.router)
 app.include_router(google_media_router.router)
 app.include_router(google_media_router.categories_router)
+app.include_router(monthly_report_router.router)
 # Product photos and generated posters/videos (AI Post). Public so the app and Facebook/Instagram can fetch them.
 Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")

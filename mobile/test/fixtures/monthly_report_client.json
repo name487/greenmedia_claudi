@@ -1,0 +1,1084 @@
+{
+ "client": {
+  "id": 1,
+  "company_name": "Smile Dental Studio",
+  "city": "Pune"
+ },
+ "month": "2026-09",
+ "month_label": "Sep 26",
+ "previous_label": "Aug 26",
+ "summary": [
+  {
+   "key": "views",
+   "label": "Profile Views",
+   "value": 14607,
+   "previous": 13364,
+   "change_pct": 9.3,
+   "unit": ""
+  },
+  {
+   "key": "leads",
+   "label": "Leads",
+   "value": 244,
+   "previous": 222,
+   "change_pct": 9.9,
+   "unit": ""
+  },
+  {
+   "key": "calls",
+   "label": "Calls",
+   "value": 480,
+   "previous": 431,
+   "change_pct": 11.4,
+   "unit": ""
+  },
+  {
+   "key": "directions",
+   "label": "Direction Req.",
+   "value": 756,
+   "previous": 679,
+   "change_pct": 11.3,
+   "unit": ""
+  },
+  {
+   "key": "media",
+   "label": "Media Uploaded",
+   "value": 0,
+   "previous": 0,
+   "change_pct": 0.0,
+   "unit": ""
+  },
+  {
+   "key": "engagement",
+   "label": "Engagement",
+   "value": 16.2,
+   "previous": 16.3,
+   "change_pct": -0.6,
+   "unit": "%"
+  },
+  {
+   "key": "replies",
+   "label": "Review Replies",
+   "value": 1,
+   "previous": 0,
+   "change_pct": 100.0,
+   "unit": ""
+  },
+  {
+   "key": "posts",
+   "label": "Google Posts",
+   "value": 0,
+   "previous": 0,
+   "change_pct": 0.0,
+   "unit": ""
+  },
+  {
+   "key": "website",
+   "label": "Website",
+   "value": 1137,
+   "previous": 1067,
+   "change_pct": 6.6,
+   "unit": ""
+  }
+ ],
+ "growth": [
+  {
+   "key": "posts",
+   "label": "SEO Post Published",
+   "weekly_target": 5,
+   "periods": {
+    "last_month": [
+     {
+      "label": "W1",
+      "start": "2026-09-01",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W2",
+      "start": "2026-09-08",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W3",
+      "start": "2026-09-15",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W4",
+      "start": "2026-09-22",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W5",
+      "start": "2026-09-29",
+      "target": 1,
+      "achieved": 0
+     }
+    ],
+    "3m": [
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 0
+     }
+    ],
+    "6m": [
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 0
+     }
+    ],
+    "12m": [
+     {
+      "label": "Oct 25",
+      "start": "2025-10-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Nov 25",
+      "start": "2025-11-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Dec 25",
+      "start": "2025-12-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jan 26",
+      "start": "2026-01-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Feb 26",
+      "start": "2026-02-01",
+      "target": 20,
+      "achieved": 0
+     },
+     {
+      "label": "Mar 26",
+      "start": "2026-03-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 0
+     }
+    ]
+   }
+  },
+  {
+   "key": "media",
+   "label": "Media Uploaded",
+   "weekly_target": 3,
+   "periods": {
+    "last_month": [
+     {
+      "label": "W1",
+      "start": "2026-09-01",
+      "target": 3,
+      "achieved": 0
+     },
+     {
+      "label": "W2",
+      "start": "2026-09-08",
+      "target": 3,
+      "achieved": 0
+     },
+     {
+      "label": "W3",
+      "start": "2026-09-15",
+      "target": 3,
+      "achieved": 0
+     },
+     {
+      "label": "W4",
+      "start": "2026-09-22",
+      "target": 3,
+      "achieved": 0
+     },
+     {
+      "label": "W5",
+      "start": "2026-09-29",
+      "target": 1,
+      "achieved": 0
+     }
+    ],
+    "3m": [
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 13,
+      "achieved": 0
+     }
+    ],
+    "6m": [
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 13,
+      "achieved": 0
+     }
+    ],
+    "12m": [
+     {
+      "label": "Oct 25",
+      "start": "2025-10-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Nov 25",
+      "start": "2025-11-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Dec 25",
+      "start": "2025-12-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Jan 26",
+      "start": "2026-01-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Feb 26",
+      "start": "2026-02-01",
+      "target": 12,
+      "achieved": 0
+     },
+     {
+      "label": "Mar 26",
+      "start": "2026-03-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 13,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 13,
+      "achieved": 0
+     }
+    ]
+   }
+  },
+  {
+   "key": "replies",
+   "label": "Review Replies",
+   "weekly_target": 5,
+   "periods": {
+    "last_month": [
+     {
+      "label": "W1",
+      "start": "2026-09-01",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W2",
+      "start": "2026-09-08",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W3",
+      "start": "2026-09-15",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W4",
+      "start": "2026-09-22",
+      "target": 5,
+      "achieved": 0
+     },
+     {
+      "label": "W5",
+      "start": "2026-09-29",
+      "target": 1,
+      "achieved": 1
+     }
+    ],
+    "3m": [
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 1
+     }
+    ],
+    "6m": [
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 1
+     }
+    ],
+    "12m": [
+     {
+      "label": "Oct 25",
+      "start": "2025-10-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Nov 25",
+      "start": "2025-11-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Dec 25",
+      "start": "2025-12-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jan 26",
+      "start": "2026-01-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Feb 26",
+      "start": "2026-02-01",
+      "target": 20,
+      "achieved": 0
+     },
+     {
+      "label": "Mar 26",
+      "start": "2026-03-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Apr 26",
+      "start": "2026-04-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "May 26",
+      "start": "2026-05-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Jun 26",
+      "start": "2026-06-01",
+      "target": 21,
+      "achieved": 0
+     },
+     {
+      "label": "Jul 26",
+      "start": "2026-07-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Aug 26",
+      "start": "2026-08-01",
+      "target": 22,
+      "achieved": 0
+     },
+     {
+      "label": "Sep 26",
+      "start": "2026-09-01",
+      "target": 21,
+      "achieved": 1
+     }
+    ]
+   }
+  }
+ ],
+ "trends": [
+  {
+   "key": "score",
+   "label": "Growth in Score",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 36
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 42
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 48
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 54
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 52
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 51
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 47
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 48
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 54
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 59
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 64
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 67
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 4.7% rise in Marketing Score in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "views",
+   "label": "Growth in Views",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 9490
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 8069
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 7417
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 6932
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 6592
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 8007
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 8823
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 10149
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 11406
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 12472
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 13364
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 14607
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 9.3% rise in Profile Views in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "engagements",
+   "label": "Growth in Engagement",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 1579
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 1300
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 1209
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 1141
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 1049
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 1328
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 1447
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 1737
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 1816
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 1997
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 2177
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 2373
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 9% rise in Engagements in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "leads",
+   "label": "Growth in Leads",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 163
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 131
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 121
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 122
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 109
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 140
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 149
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 170
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 191
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 209
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 222
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 244
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 9.9% rise in Leads in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "calls",
+   "label": "Growth in Calls",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 327
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 268
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 243
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 237
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 219
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 284
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 291
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 349
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 379
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 420
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 431
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 480
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 11.4% rise in Calls in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "directions",
+   "label": "Direction Requests",
+   "unit": "",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 478
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 393
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 379
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 345
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 321
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 407
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 461
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 546
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 554
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 608
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 679
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 756
+    }
+   ],
+   "has_data": true,
+   "insight": "Smile Dental Studio saw a 11.3% rise in Direction Requests in Sep 26 compared to Aug 26. Great work, keep the momentum going."
+  },
+  {
+   "key": "conversion",
+   "label": "Views v/s Engagements Conversion",
+   "unit": "%",
+   "points": [
+    {
+     "label": "Oct 25",
+     "month": "2025-10",
+     "value": 16.6
+    },
+    {
+     "label": "Nov 25",
+     "month": "2025-11",
+     "value": 16.1
+    },
+    {
+     "label": "Dec 25",
+     "month": "2025-12",
+     "value": 16.3
+    },
+    {
+     "label": "Jan 26",
+     "month": "2026-01",
+     "value": 16.5
+    },
+    {
+     "label": "Feb 26",
+     "month": "2026-02",
+     "value": 15.9
+    },
+    {
+     "label": "Mar 26",
+     "month": "2026-03",
+     "value": 16.6
+    },
+    {
+     "label": "Apr 26",
+     "month": "2026-04",
+     "value": 16.4
+    },
+    {
+     "label": "May 26",
+     "month": "2026-05",
+     "value": 17.1
+    },
+    {
+     "label": "Jun 26",
+     "month": "2026-06",
+     "value": 15.9
+    },
+    {
+     "label": "Jul 26",
+     "month": "2026-07",
+     "value": 16.0
+    },
+    {
+     "label": "Aug 26",
+     "month": "2026-08",
+     "value": 16.3
+    },
+    {
+     "label": "Sep 26",
+     "month": "2026-09",
+     "value": 16.2
+    }
+   ],
+   "has_data": true,
+   "insight": "Views vs Engagement Conversion held steady in Sep 26 compared to Aug 26. Fresh posts and photos help push it up."
+  }
+ ]
+}

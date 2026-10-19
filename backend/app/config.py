@@ -77,6 +77,7 @@ class Settings:
     keyword_search_monthly_limit: int = int(os.getenv("KEYWORD_SEARCH_MONTHLY_LIMIT", "20"))
     weekly_post_target: int = int(os.getenv("WEEKLY_POST_TARGET", "5"))
     weekly_reply_target: int = int(os.getenv("WEEKLY_REPLY_TARGET", "5"))
+    weekly_media_target: int = int(os.getenv("WEEKLY_MEDIA_TARGET", "3"))  # Google profile photos/videos (monthly report)
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
     #   celery -A app.celery_app worker -B -l info
     # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.

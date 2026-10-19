@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 167 tests: Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 172 tests: monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 167 tests: Google Media (validation, one a da
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 33 tests: Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 36 tests: Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -704,7 +704,7 @@ scheduler, and Celery beat (`greenmedia.google_posts`, hourly).
 ## Mobile Google Media (business owners)
 
 The owner's **Google Media** tab, modelled on Dhanda AI. Owners' bottom bar has Dhanda's five tabs, Home / Replies /
-AI Post / Google Post / Google Media; Analytics, Reports, Settings and Sign out open from their avatar on Home.
+AI Post / Google Post / Google Media; Analytics, Report, Settings and Sign out open from their avatar on Home.
 
 - **Where it will upload? → Click here to know**: a sketch of their Google Maps listing with their photos, and "Fresh
   photos can get you up to 25% more calls".
@@ -726,6 +726,31 @@ AI Post / Google Post / Google Media; Analytics, Reports, Settings and Sign out 
 API: `GET /api/google-media/categories`, `GET /api/clients/{id}/google-media?tab=scheduled|uploaded|not_posted`,
 `POST /api/clients/{id}/google-media` (multipart `file`, `category`, `when=now|spread`), `POST …/google-media/{m}/approve`,
 `POST …/google-media/{m}/retry`, `DELETE …/google-media/{m}`.
+
+## Mobile Report (business owners)
+
+**Report** (from the avatar on an owner's Home), modelled on Dhanda AI. It shows the last full month by default; tap the
+title to pick any of the last 12 months.
+
+- **Sep 26 Performance Summary (vs Aug 26)**: Profile Views, Leads, Calls, Direction Req., Media Uploaded, Engagement
+  (calls + directions + website clicks as a share of views), Review Replies, Google Posts and Website. Each tile shows the
+  month's number and the change against the month before; the tiles scroll sideways.
+- **Growth Action Report**: what was done against the targets (target vs achieved bars) for SEO posts published on
+  Google, media uploaded and review replies. Filters: **Last Month** (by week, W1–W5), or Last 3, 6 or 12 Months (by
+  month). Weekly targets: `WEEKLY_POST_TARGET` (5), `WEEKLY_MEDIA_TARGET` (3), `WEEKLY_REPLY_TARGET` (5).
+- **Performance Report**: 6 or 12-month line charts for Score, Views, Engagement, Leads, Calls, Direction Requests and
+  Views v/s Engagements Conversion, each with a one-line insight ("… saw a 38% drop in Profile Views in Sep 26 compared
+  to Aug 26, but with ongoing improvements, growth is expected in coming months.").
+- **Download**: a PDF opened through a 15-minute signed link (the phone's browser can't send our login token). Pages:
+  Performance Summary, Growth Action Report, Performance Report, the agents' status (review replies waiting, media
+  queued) and **What You Should Do Now?** from the Growth Action checklist. The pages are drawn with Pillow, so there is
+  no extra dependency.
+
+The demo seeds 13 months of Google metrics and weekly Business Score points for its first three businesses, so the
+12-month charts have history.
+
+API: `GET /api/clients/{id}/monthly-report?month=YYYY-MM`, `POST /api/clients/{id}/monthly-report/link?month=` →
+`{url, filename, expires_at}`, `GET /api/clients/{id}/monthly-report.pdf?t=…`.
 
 ## Building the mobile apps
 

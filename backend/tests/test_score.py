@@ -110,7 +110,7 @@ def test_home_extras(client, portal):
 def test_performance_and_calendar(client, portal, admin):
     p30 = client.get("/api/clients/1/performance", headers=portal).json()
     p120 = client.get("/api/clients/1/performance", headers=portal, params={"days": 120}).json()
-    assert len(p30["series"]) == 30 and len(p120["series"]) == 90  # the demo has 90 days of metrics
+    assert len(p30["series"]) == 30 and len(p120["series"]) == 120  # the first demo businesses have 13 months of metrics
     assert p30["totals"]["views"] == sum(x["views"] for x in p30["series"]) and set(p30["totals"]) == {"views", "leads", "calls", "directions", "website"}
     assert client.get("/api/clients/1/performance", headers=portal, params={"days": 45}).status_code == 422
     body = {"client_id": 1, "topic": "Diwali offer", "master_copy": "x", "status": "draft", "variants": [{"platform": "gmb", "copy": "x", "format": "4:3"}]}

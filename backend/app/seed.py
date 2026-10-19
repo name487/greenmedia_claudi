@@ -1,6 +1,7 @@
 """Deterministic demo data: 1 agency tenant, 6 users (one per role), 24 clients, reviews, keywords,
 90 days of metrics, tasks and content. Run directly with `python -m app.seed --reset`."""
 
+import math
 import random
 import re
 import sys
@@ -171,6 +172,22 @@ def seed(db: Session) -> None:
             v = lambda base: round(base * scale * trend * wk * (0.8 + r.random() * 0.4))  # noqa: E731
             db.add(MetricDaily(tenant_id=tenant.id, client_id=c.id, date=day, gmb_views=v(180), gmb_calls=v(6), gmb_directions=v(9), web_clicks=v(14),
                                organic_sessions=v(120), social_reach=v(900), engagement=v(60), leads=v(3)))
+        if i < 3:
+            # a year more for the first businesses, so the app's 6 / 12-month report charts have history; its own random
+            # stream keeps everything seeded after it unchanged
+            rh = random.Random(1000 + i)
+            for d in range(90, 395):
+                day = today - timedelta(days=d)
+                season = 0.75 + 0.2 * math.sin(d / 58)
+                wk = [1, 1.05, 1.1, 1.05, 1.2, 0.9, 0.8][day.weekday()]
+                v = lambda base: round(base * scale * season * wk * (0.8 + rh.random() * 0.4))  # noqa: E731
+                db.add(MetricDaily(tenant_id=tenant.id, client_id=c.id, date=day, gmb_views=v(180), gmb_calls=v(6), gmb_directions=v(9),
+                                   web_clicks=v(14), organic_sessions=v(120), social_reach=v(900), engagement=v(60), leads=v(3)))
+            # weekly Business Score points (Mondays before this week) for the "Growth in Score" chart
+            monday = today - timedelta(days=today.weekday())
+            for w in range(3, 55):  # the last two weeks get daily points elsewhere in the seed
+                db.add(ScoreSnapshot(tenant_id=tenant.id, client_id=c.id, date=monday - timedelta(weeks=w),
+                                     value=max(20, min(95, round(62 - w * 0.35 + 6 * math.sin(w / 5) + rh.randint(-3, 3))))))
 
         if i < 12:
             titles = [("Publish weekly GMB offer post", "content"), ("Fix missing meta descriptions", "seo"), ("Design Diwali campaign creative", "designer"),

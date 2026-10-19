@@ -12,6 +12,7 @@ import 'content_screen.dart';
 import 'dashboard_screen.dart';
 import 'google_media_screen.dart';
 import 'google_post_screen.dart';
+import 'owner_report_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'reports_screen.dart';
 import 'reviews_screen.dart';
@@ -53,12 +54,16 @@ final destinations = <Destination>[
   Destination('clients', 'Clients', Icons.groups_outlined, (_) => const ClientsScreen()),
   Destination('analytics', 'Analytics', Icons.insights_outlined, (_) => const AnalyticsScreen()),
   Destination('seo', 'SEO', Icons.travel_explore_outlined, (_) => const SeoScreen()),
-  Destination('reports', 'Reports', Icons.description_outlined, (_) => const ReportsScreen()),
+  // Owners get Dhanda-style Report (Performance Summary, Growth Action / Performance Report, PDF); staff keep the reports list.
+  Destination('reports', 'Reports', Icons.description_outlined, (c) {
+    final me = c.read<Session>().me!;
+    return me.isClient ? OwnerReportScreen(clientId: me.clientId!) : const ReportsScreen();
+  }, ownerLabel: 'Report'),
   Destination('tasks', 'Tasks', Icons.task_alt_outlined, (_) => const TasksScreen()),
 ];
 
 /// Owner tabs that draw their own top bar
-const _ownBar = {'dashboard', 'reviews', 'content', 'google_post', 'google_media'};
+const _ownBar = {'dashboard', 'reviews', 'content', 'google_post', 'google_media', 'reports'};
 
 /// Business owners get Dhanda's five tabs; the rest (Analytics, Reports, Settings) opens from their avatar on Home.
 int _tabCount(Me me) => me.isClient ? 5 : 4;
@@ -144,7 +149,8 @@ void showMoreMenu(BuildContext context) {
             title: Text(label(d, session.me!)),
             onTap: () {
               Navigator.pop(sheet);
-              Navigator.push(context, MaterialPageRoute<void>(builder: (c) => _Page(title: label(d, session.me!), child: d.builder(c))));
+              Navigator.push(context, MaterialPageRoute<void>(builder: (c) =>
+                  session.me!.isClient && _ownBar.contains(d.section) ? d.builder(c) : _Page(title: label(d, session.me!), child: d.builder(c))));
             },
           ),
         ListTile(

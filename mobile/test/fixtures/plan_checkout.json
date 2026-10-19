@@ -1,0 +1,15 @@
+{
+ "id": 1,
+ "plan": "pro_12",
+ "plan_name": "12 Months",
+ "amount": 1440000,
+ "list_amount": 1600000,
+ "coupon": "WELCOME10",
+ "status": "created",
+ "demo": true,
+ "created_at": "2026-10-19T06:34:59.644637+00:00",
+ "paid_at": null,
+ "period_start": null,
+ "period_end": null,
+ "url": "https://api.test/api/plan/demo-checkout/1?t=token"
+}

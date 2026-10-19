@@ -1,0 +1,213 @@
+{
+ "status": {
+  "state": "not_activated",
+  "plan": null,
+  "valid_until": null,
+  "days_left": 0
+ },
+ "offer": {
+  "headline": "Unlock Your Growth!",
+  "sub": "Activate AI-powered marketing",
+  "start_amount": 99900,
+  "was_amount": 199900,
+  "line": "per month"
+ },
+ "plans": [
+  {
+   "key": "social_monthly",
+   "name": "Social Media",
+   "tag": "",
+   "amount": 99900,
+   "months": 1,
+   "per": "/ month",
+   "note": "Pay for a month at a time. Nothing renews automatically."
+  },
+  {
+   "key": "pro_12",
+   "name": "12 Months",
+   "tag": "Guaranteed Growth + Savings",
+   "amount": 1600000,
+   "months": 12,
+   "per": "for 12 months",
+   "note": "One payment. Nothing renews automatically."
+  },
+  {
+   "key": "pro_24",
+   "name": "24 Months",
+   "tag": "",
+   "amount": 2700000,
+   "months": 24,
+   "per": "for 24 months",
+   "note": "One payment. Nothing renews automatically."
+  },
+  {
+   "key": "pro_36",
+   "name": "36 Months",
+   "tag": "Best value",
+   "amount": 3600000,
+   "months": 36,
+   "per": "for 36 months",
+   "note": "One payment. Nothing renews automatically."
+  }
+ ],
+ "default_plan": "pro_12",
+ "compare": {
+  "columns": [
+   {
+    "key": "starter",
+    "name": "Starter",
+    "price": "Rs. 999 / month"
+   },
+   {
+    "key": "pro",
+    "name": "Pro",
+    "price": "Rs. 16,000 / year",
+    "badge": "Bestseller"
+   },
+   {
+    "key": "three_year",
+    "name": "3 Year Plan",
+    "price": "Rs. 36,000 / 3 years"
+   }
+  ],
+  "sections": [
+   {
+    "title": "Growth",
+    "rows": [
+     [
+      "Growth",
+      "-",
+      "2x Growth",
+      "10x Growth"
+     ]
+    ]
+   },
+   {
+    "title": "Content & Posts",
+    "rows": [
+     [
+      "Keywords",
+      "Up to 20",
+      "Unlimited",
+      "Unlimited"
+     ],
+     [
+      "Posts per month",
+      "10 posts",
+      "25+ posts",
+      "25+ posts"
+     ],
+     [
+      "Photo uploads",
+      "20 / month",
+      "Unlimited",
+      "Unlimited"
+     ],
+     [
+      "Video uploads",
+      "5 / month",
+      "Unlimited",
+      "Unlimited"
+     ],
+     [
+      "Website creation",
+      "no",
+      "Included",
+      "Included"
+     ]
+    ]
+   },
+   {
+    "title": "Platform",
+    "rows": [
+     [
+      "Instagram & Facebook",
+      "no",
+      "yes",
+      "yes"
+     ],
+     [
+      "AI mode",
+      "Basic",
+      "Advanced",
+      "Advanced"
+     ]
+    ]
+   },
+   {
+    "title": "Account & Verification",
+    "rows": [
+     [
+      "Account verification",
+      "no",
+      "yes",
+      "yes"
+     ],
+     [
+      "New account creation",
+      "no",
+      "yes",
+      "yes"
+     ]
+    ]
+   },
+   {
+    "title": "Analytics",
+    "rows": [
+     [
+      "Keyword analysis",
+      "Basic",
+      "Unlimited",
+      "Unlimited"
+     ],
+     [
+      "Growth",
+      "-",
+      "2x Growth",
+      "10x Growth"
+     ],
+     [
+      "Reports",
+      "-",
+      "Monthly",
+      "Monthly and Yearly"
+     ]
+    ]
+   },
+   {
+    "title": "Support",
+    "rows": [
+     [
+      "Expert support",
+      "Email, 5 tickets / month",
+      "Unlimited",
+      "Unlimited"
+     ],
+     [
+      "Onboarding team",
+      "no",
+      "Dedicated",
+      "Dedicated"
+     ],
+     [
+      "Review reply",
+      "Within 24 hours",
+      "Real-time",
+      "Real-time"
+     ]
+    ]
+   }
+  ],
+  "footnote": "Prices in Indian Rupees. All features subject to change."
+ },
+ "billing": {
+  "gstin": "",
+  "billing_address": "",
+  "shipping_same": true,
+  "shipping_address": ""
+ },
+ "payments": [],
+ "mandates": [],
+ "payments_mode": "demo",
+ "can_buy": true
+}

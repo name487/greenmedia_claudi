@@ -77,6 +77,16 @@ class Settings:
     keyword_search_monthly_limit: int = int(os.getenv("KEYWORD_SEARCH_MONTHLY_LIMIT", "20"))
     weekly_post_target: int = int(os.getenv("WEEKLY_POST_TARGET", "5"))
     weekly_reply_target: int = int(os.getenv("WEEKLY_REPLY_TARGET", "5"))
+    weekly_media_target: int = int(os.getenv("WEEKLY_MEDIA_TARGET", "3"))  # Google profile photos/videos (monthly report)
+
+    # My Plan (app): payments through Razorpay Payment Links (a hosted Razorpay page; the app needs no payment SDK).
+    # Without keys, PAYMENTS_DEMO=1 (default when SEED_DEMO=1) offers a clearly marked practice checkout instead.
+    razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
+    razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    razorpay_webhook_secret: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+    payments_demo: bool = os.getenv("PAYMENTS_DEMO", os.getenv("SEED_DEMO", "1")) == "1"
+    # COUPONS="WELCOME10:10%,FESTIVE500:500" — a percentage, or rupees off
+    coupons: str = os.getenv("COUPONS", "WELCOME10:10%" if os.getenv("SEED_DEMO", "1") == "1" else "")
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
     #   celery -A app.celery_app worker -B -l info
     # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.

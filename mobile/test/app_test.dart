@@ -10,11 +10,14 @@ import 'package:greenmedia/screens/ai_post/items_screen.dart';
 import 'package:greenmedia/screens/google_media_screen.dart';
 import 'package:greenmedia/screens/google_post_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
+import 'package:greenmedia/screens/my_plan_screen.dart';
+import 'package:greenmedia/screens/owner_report_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
 import 'package:greenmedia/widgets/common.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
@@ -41,6 +44,12 @@ var googlePostsFixture = 'google_posts_client';
 
 /// The fake backend has no Google Media yet.
 var googleMediaEmpty = false;
+
+/// The fake monthly report has no score history.
+var reportNoScore = false;
+
+/// The fake plan has been paid for.
+var planPaid = false;
 
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
@@ -111,6 +120,38 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // My Plan (fixtures captured from the real API)
+    switch ((req.method, req.url.path)) {
+      case ('GET', '/api/clients/1/plan'):
+        return json(fixture(planPaid ? 'plan_client_active' : 'plan_client'));
+      case ('PUT', '/api/clients/1/plan/billing'):
+        sentBodies['plan-billing'] = jsonDecode(req.body);
+        return json(fixture('plan_billing'));
+      case ('POST', '/api/clients/1/plan/quote'):
+        final b = jsonDecode(req.body) as Map;
+        if ((b['coupon'] as String).toUpperCase() != 'WELCOME10') return json({'detail': "That coupon code isn't valid"}, 422);
+        return json(fixture('plan_quote_coupon'));
+      case ('POST', '/api/clients/1/plan/checkout'):
+        sentBodies['plan-checkout'] = jsonDecode(req.body);
+        return json(fixture('plan_checkout'), 201);
+      case ('GET', '/api/clients/1/plan/payments/1'):
+        planPaid = true;  // Razorpay (here: the practice page) confirmed it
+        return json(fixture('plan_payment_paid'));
+    }
+    // Monthly report (fixtures captured from the real API)
+    if (req.url.path == '/api/clients/1/monthly-report') {
+      sentBodies['report-month'] = req.url.queryParameters['month'];
+      final r = fixture('monthly_report_client') as Map<String, dynamic>;
+      if (reportNoScore) {
+        for (final t in (r['trends'] as List).cast<Map<String, dynamic>>().where((t) => t['key'] == 'score')) {
+          for (final p in (t['points'] as List).cast<Map<String, dynamic>>()) {
+            p['value'] = null;
+          }
+        }
+      }
+      return json(r);
+    }
+    if (req.url.path == '/api/clients/1/monthly-report/link') return json(fixture('monthly_report_link'));
     // Google Media (fixtures captured from the real API)
     if (req.url.path == '/api/google-media/categories') return json(fixture('google_media_categories'));
     if (req.url.path == '/api/clients/1/google-media') {
@@ -321,7 +362,7 @@ void main() {
     expect(find.descendant(of: nav, matching: find.text('More')), findsNothing);
     await tester.tap(find.byKey(const Key('owner-menu')));
     await tester.pumpAndSettle();
-    for (final item in ['Analytics', 'Reports', 'Settings', 'Sign out']) {
+    for (final item in ['Analytics', 'Report', 'Settings', 'Sign out']) {
       expect(find.text(item), findsOneWidget);
     }
   });
@@ -899,6 +940,168 @@ void main() {
       expect(find.text('0 Media scheduled'), findsOneWidget);
       expect(find.text('No Media Scheduled'), findsOneWidget);
       expect(find.text('Upload now to attract more customers'), findsOneWidget);
+    });
+  });
+
+  group('owner Report', () {
+    final report = fixture('monthly_report_client') as Map<String, dynamic>;
+
+    Future<void> openReport(WidgetTester tester, List<String> calls) async {
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.byKey(const Key('owner-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('summary against last month, growth actions and the performance trends', (tester) async {
+      final calls = <String>[];
+      await openReport(tester, calls);
+      expect(calls, contains('GET /api/clients/1/monthly-report'));
+      expect(find.textContaining('${report['month_label']} Performance Summary', findRichText: true), findsOneWidget);
+      expect(find.textContaining('(vs ${report['previous_label']})', findRichText: true), findsOneWidget);
+      final views = (report['summary'] as List).cast<Map<String, dynamic>>().first;
+      expect(find.descendant(of: find.byKey(const Key('tile-views')), matching: find.text(NumberFormat.decimalPattern('en_IN').format(views['value']))),
+          findsOneWidget);
+      expect(find.byKey(const Key('tile-website')), findsOneWidget);
+
+      // Growth Action Report: weeks of last month, then 6 months
+      expect(find.text('SEO Post Published'), findsOneWidget);
+      expect(find.text('Last Month'), findsWidgets);
+      await tapKey(tester, 'filter-posts');
+      expect(find.text('Date Filters'), findsOneWidget);
+      await tester.tap(find.text('Last 6 Months').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Last 6 Months'), findsOneWidget);
+
+      // Performance Report
+      await tester.dragUntilVisible(find.byKey(const Key('tab-performance')), find.byKey(const Key('report-list')), const Offset(0, 300));
+      await tapKey(tester, 'tab-performance');
+      expect(find.text('Growth in Score'), findsOneWidget);
+      final views12 = (report['trends'] as List).cast<Map<String, dynamic>>().firstWhere((t) => t['key'] == 'views');
+      await tester.dragUntilVisible(find.byKey(const Key('insight-views')), find.byKey(const Key('report-list')), const Offset(0, -300));
+      expect(find.text(views12['insight'] as String), findsOneWidget);
+      await tapKey(tester, 'filter-views');
+      await tester.tap(find.text('Last 12 Months').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Last 12 Months'), findsOneWidget);
+    });
+
+    testWidgets('download the PDF and pick another month', (tester) async {
+      Uri? opened;
+      OwnerReportScreen.openUrl = (url) async {
+        opened = url;
+        return true;
+      };
+      final calls = <String>[];
+      await openReport(tester, calls);
+      await tester.tap(find.byKey(const Key('report-download')));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/clients/1/monthly-report/link'));
+      expect(opened.toString(), (fixture('monthly_report_link') as Map)['url']);
+      expect(find.textContaining('Report downloaded'), findsOneWidget);
+
+      await tapKey(tester, 'report-month');
+      final now = DateTime.now();
+      final key = DateFormat('yyyy-MM').format(DateTime(now.year, now.month - 3));
+      await tapKey(tester, 'month-$key');
+      expect(sentBodies['report-month'], key);
+    });
+
+    testWidgets('no score history yet', (tester) async {
+      reportNoScore = true;
+      addTearDown(() => reportNoScore = false);
+      await openReport(tester, []);
+      await tapKey(tester, 'tab-performance');
+      expect(find.text('No score history yet'), findsOneWidget);
+      expect(find.text('Your Marketing Score is calculated every Monday. The first point lands next week.'), findsOneWidget);
+    });
+  });
+
+  group('owner My Plan', () {
+    Future<void> openPlan(WidgetTester tester, List<String> calls) async {
+      planPaid = false;
+      sentBodies.remove('plan-billing');
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.byKey(const Key('owner-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('menu-my-plan')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('not activated, no mandates, no payments; billing details', (tester) async {
+      final calls = <String>[];
+      await openPlan(tester, calls);
+      expect(calls, contains('GET /api/clients/1/plan'));
+      expect(find.text('Your Pro Plan is'), findsOneWidget);
+      expect(find.text('Not Activated'), findsOneWidget);
+      expect(find.text('Start @ ₹999/-'), findsOneWidget);
+      expect(find.text('No Active Mandates'), findsOneWidget);
+      expect(find.text('No payments yet'), findsOneWidget);
+
+      await tapKey(tester, 'billing-details');
+      expect(find.text('Billing Details'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('gstin')), '27ABCDE1234F1Z5');
+      await tester.enterText(find.byKey(const Key('billing-address')), '12 Baner Rd, Pune 411045');
+      await tapKey(tester, 'billing-save');
+      expect(sentBodies['plan-billing'], {'gstin': '27ABCDE1234F1Z5', 'billing_address': '12 Baner Rd, Pune 411045', 'shipping_same': true, 'shipping_address': ''});
+      expect(find.text('Billing details saved'), findsOneWidget);
+    });
+
+    testWidgets('compare plans, choose 12 months, coupon, pay and come back active', (tester) async {
+      Uri? opened;
+      MyPlanScreen.openUrl = (url) async {
+        opened = url;
+        return true;
+      };
+      final calls = <String>[];
+      await openPlan(tester, calls);
+      await tapKey(tester, 'plan-start');
+      expect(find.byKey(const Key('compare-table')), findsOneWidget);
+      expect(find.text('BESTSELLER'), findsOneWidget);
+      await tapKey(tester, 'go-premium');
+
+      expect(find.text('Choose your plan'), findsOneWidget);
+      expect(find.text('₹16,000'), findsWidgets);
+      expect(tester.widget<Text>(find.byKey(const Key('plan-total'))).data, '₹16,000');
+      expect(find.textContaining('Practice mode'), findsOneWidget);
+      await tapKey(tester, 'coupon-open');
+      await tester.enterText(find.byKey(const Key('coupon')), 'NOPE');
+      await tapKey(tester, 'coupon-apply');
+      expect(find.text("That coupon code isn't valid"), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('coupon')), 'WELCOME10');
+      await tapKey(tester, 'coupon-apply');
+      expect(tester.widget<Text>(find.byKey(const Key('plan-total'))).data, '₹14,400');
+      expect(find.textContaining('you save ₹1,600'), findsOneWidget);
+
+      await tapKey(tester, 'plan-continue');
+      expect(sentBodies['plan-checkout'], {'plan': 'pro_12', 'coupon': 'WELCOME10'});
+      expect(opened.toString(), (fixture('plan_checkout') as Map)['url']);
+      // back from the payment page
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Plan activated'), findsOneWidget);
+      await tapKey(tester, 'plan-done');
+      expect(find.text('Active'), findsOneWidget);
+      expect(find.textContaining('Valid till'), findsOneWidget);
+      expect(find.byKey(const Key('payment-1')), findsOneWidget);
+      expect(find.text('Paid'), findsOneWidget);
     });
   });
 

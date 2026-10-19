@@ -12,6 +12,7 @@ import '../state/session.dart';
 import '../widgets/common.dart';
 import 'ai_post/ai_post_screen.dart';
 import 'content_screen.dart';
+import 'home_shell.dart' show showMoreMenu;
 import 'keyword_planner_screen.dart';
 import 'meta_connect_screen.dart';
 import 'owner_reviews_screen.dart';
@@ -219,10 +220,16 @@ class _TopBar extends StatelessWidget {
           child: Row(children: [
             if (canPop) IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), tooltip: 'Back', onPressed: () => Navigator.pop(context)),
             if (!canPop) const SizedBox(width: 6),
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: Colors.white,
-              child: Text(name.isEmpty ? '·' : name[0].toUpperCase(), style: const TextStyle(color: navy, fontWeight: FontWeight.w800)),
+            // Analytics, Reports, Settings and Sign out live behind the avatar (owners' bottom bar has Dhanda's five tabs)
+            InkWell(
+              key: const Key('owner-menu'),
+              customBorder: const CircleBorder(),
+              onTap: canPop ? null : () => showMoreMenu(context),
+              child: CircleAvatar(
+                radius: 19,
+                backgroundColor: Colors.white,
+                child: Text(name.isEmpty ? '·' : name[0].toUpperCase(), style: const TextStyle(color: navy, fontWeight: FontWeight.w800)),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(

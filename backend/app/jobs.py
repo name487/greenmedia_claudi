@@ -1,4 +1,5 @@
-"""Background jobs: sync live Google profiles, write tomorrow's Google posts, and publish due scheduled content.
+"""Background jobs: sync live Google profiles, write tomorrow's Google posts, publish due scheduled content
+and upload due Google profile photos/videos.
 
 With Redis: Celery beat runs these (app/celery_app.py). Without Redis: inside the API
 (SCHEDULER_INTERVAL_MINUTES > 0) or from cron:
@@ -52,9 +53,15 @@ def google_posts(db: Session) -> dict:
     return gp.run_daily(db)
 
 
+def google_media(db: Session) -> dict:
+    """Upload approved Google profile photos/videos whose time has come (see google_media)."""
+    from . import google_media as gm
+    return gm.upload_due(db)
+
+
 def run_once() -> dict:
     with SessionLocal() as db:
-        return {"google": sync_google(db), "google_posts": google_posts(db), "content": publish_due(db)}
+        return {"google": sync_google(db), "google_posts": google_posts(db), "content": publish_due(db), "google_media": google_media(db)}
 
 
 if __name__ == "__main__":

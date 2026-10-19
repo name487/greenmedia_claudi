@@ -62,11 +62,11 @@ def render_video_task(content_id: int) -> None:
 
 @celery.task(name="greenmedia.dispatch_due")
 def dispatch_due() -> dict:
-    """Beat, every minute: recover stuck rows and queue one publish task per due post."""
-    from . import content_service
+    """Beat, every minute: recover stuck rows and queue one publish task per due post; upload due Google media."""
+    from . import content_service, google_media
 
     with _db() as db:
-        return content_service.publish_due(db)
+        return {**content_service.publish_due(db), "google_media": google_media.upload_due(db)}
 
 
 @celery.task(name="greenmedia.sync_google")

@@ -1,0 +1,28 @@
+{
+ "tab": "not_posted",
+ "counts": {
+  "scheduled": 2,
+  "uploaded": 1,
+  "not_posted": 1
+ },
+ "items": [
+  {
+   "id": 2,
+   "kind": "photo",
+   "category": "INTERIOR",
+   "category_label": "Interior Photos",
+   "url": "https://api.test/media/c1/4ed8c30d3fee41c5891d4f74609e3dfd.jpg",
+   "thumb_url": "https://api.test/media/c1/4ed8c30d3fee41c5891d4f74609e3dfd.jpg",
+   "status": "failed",
+   "group": "not_posted",
+   "needs_approval": false,
+   "scheduled_at": "2026-10-19T05:00:48.797635+00:00",
+   "uploaded_at": null,
+   "created_at": "2026-10-19T05:00:48.797942+00:00",
+   "error": "Google rejected the photo: Image too blurry"
+  }
+ ],
+ "can_approve": true,
+ "can_upload": true,
+ "connected": true
+}

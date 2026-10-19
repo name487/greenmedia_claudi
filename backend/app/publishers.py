@@ -49,6 +49,21 @@ def publish_review_reply(client: Client, external_review_id: str, reply: str) ->
     return None
 
 
+def upload_profile_media(client: Client, source_url: str, video: bool, category: str) -> str:
+    """Add a photo or video to the Google profile. Live: `POST …/media` (Google downloads it from our public URL);
+    demo: simulated. Raises PublishError (transient or not)."""
+    if not client.gmb or client.gmb.status != "connected":
+        raise PublishError("Google Business Profile is not connected")
+    if not client.gmb.is_live:
+        return f"demo-media-{uuid.uuid4().hex[:10]}"
+    if not source_url.startswith("https://"):
+        raise PublishError("Google can only fetch media from a public https:// address — set PUBLIC_BASE_URL")
+    try:
+        return google.upload_media(client, source_url, video, category)
+    except google_api.GoogleApiError as e:
+        raise _google_error(e) from e
+
+
 def publish_post(client: Client, platform: str, copy: str, image_url: str = "", link: str = "", video_url: str = "") -> str:
     """Post one platform version. Live accounts go to the real API (Google Business Profile, Meta Graph for
     Facebook/Instagram); demo accounts are simulated with a fake id. Raises PublishError (transient or not)."""

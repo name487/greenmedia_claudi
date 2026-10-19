@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 160 tests: Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 167 tests: Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 160 tests: Google Post (daily keyword posts, 
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 29 tests: Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 33 tests: Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -679,8 +679,7 @@ API: `GET|POST /api/clients/{id}/items` (multipart `image`, `name`, `description
 
 ## Mobile Google Post (business owners)
 
-The owner's **Google Post** tab, modelled on Dhanda AI. The bottom bar for owners is now Home / Replies / AI Post /
-Google Post / More (Analytics, Reports).
+The owner's **Google Post** tab, modelled on Dhanda AI.
 
 - **Google works best with keywords**: the card shows the business's keywords; **Optimise keywords** opens the Keyword
   Planner to add or remove them.
@@ -701,6 +700,32 @@ API: `GET /api/clients/{id}/google-posts`, `PUT …/google-posts/settings {daily
 `POST …/google-posts/generate {keyword?}`, `PATCH …/google-posts/{post} {text}`; approve / reject use
 `POST …/ai-posts/{post}/approve {scheduled_at}` and `…/reject`. The daily job runs in `python -m app.jobs`, the in-process
 scheduler, and Celery beat (`greenmedia.google_posts`, hourly).
+
+## Mobile Google Media (business owners)
+
+The owner's **Google Media** tab, modelled on Dhanda AI. Owners' bottom bar has Dhanda's five tabs, Home / Replies /
+AI Post / Google Post / Google Media; Analytics, Reports, Settings and Sign out open from their avatar on Home.
+
+- **Where it will upload? → Click here to know**: a sketch of their Google Maps listing with their photos, and "Fresh
+  photos can get you up to 25% more calls".
+- **Scheduled / Uploaded / Not Posted** with counts ("3 Media scheduled") and a grid of photos and videos. Tap one to see
+  it large, plus **Approve** (added by someone who can't approve), **Retry** (not posted) or **Remove** (not uploaded yet).
+- **Upload Media → Open Gallery** (several at once) or **Open Camera** (photo, or video up to 30 s).
+  **What to Upload?** swipes through Google's photo kinds: Exterior, Interior, Product, Staff in Action, Food and Drink,
+  Common Area, Team, Something Else.
+  Then pick the kind and **Now** or **One a day** (one per day from tomorrow at 11:00 AM India time, skipping days that
+  already have one).
+- The scheduler uploads approved items when due. Live profiles use the Business Profile media API
+  (`POST …/locations/{id}/media` with `sourceUrl` and `locationAssociation.category`); demo profiles are simulated.
+  Temporary Google errors retry up to 5 times; other errors land in Not Posted with Google's message. An upload cut
+  off half-way isn't retried blindly, since Google may already have it.
+- Google's rules are checked on upload: photos at least 250 × 250 px (re-encoded as JPEG, location data dropped);
+  videos MP4/MOV, up to 75 MB and 30 seconds, with a thumbnail from the first frame. Google downloads the file, so
+  `PUBLIC_BASE_URL` must be the API's public **https** address.
+
+API: `GET /api/google-media/categories`, `GET /api/clients/{id}/google-media?tab=scheduled|uploaded|not_posted`,
+`POST /api/clients/{id}/google-media` (multipart `file`, `category`, `when=now|spread`), `POST …/google-media/{m}/approve`,
+`POST …/google-media/{m}/retry`, `DELETE …/google-media/{m}`.
 
 ## Building the mobile apps
 

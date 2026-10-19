@@ -58,6 +58,50 @@ def save_photo(client_id: int, data: bytes) -> str:
     return rel
 
 
+MAX_VIDEO = 75 * 1024 * 1024  # Google Business Profile: videos up to 75 MB and 30 seconds
+VIDEO_EXTS = {"mp4", "mov", "m4v", "webm", "3gp"}
+
+
+def save_profile_photo(client_id: int, data: bytes) -> str:
+    """A photo for the Google profile: Google wants at least 250 x 250 px."""
+    rel = save_photo(client_id, data)
+    with Image.open(path_of(rel)) as img:
+        if min(img.size) < 250:
+            path_of(rel).unlink(missing_ok=True)
+            raise MediaError("Photo is too small for Google — at least 250 × 250 pixels")
+    return rel
+
+
+def save_video(client_id: int, data: bytes, filename: str) -> tuple[str, str, float]:
+    """Store an uploaded video as is and grab its first frame as the thumbnail. Returns (video_rel, thumb_rel, seconds)."""
+    import re
+    import subprocess
+
+    from imageio_ffmpeg import get_ffmpeg_exe
+
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in VIDEO_EXTS:
+        raise MediaError("Use an MP4 or MOV video")
+    if len(data) > MAX_VIDEO:
+        raise MediaError("Video is too large — 75 MB at most")
+    rel, p = _new(client_id, ext)
+    p.write_bytes(data)
+    thumb, tp = _new(client_id, "jpg")
+    r = subprocess.run([get_ffmpeg_exe(), "-y", "-loglevel", "info", "-i", str(p), "-frames:v", "1", "-vf", "scale='min(720,iw)':-2", str(tp)],
+                       capture_output=True, text=True, timeout=60)
+    m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", r.stderr)
+    if r.returncode != 0 or not tp.exists() or not m:
+        p.unlink(missing_ok=True)
+        tp.unlink(missing_ok=True)
+        raise MediaError("That file isn't a video we can read")
+    seconds = int(m[1]) * 3600 + int(m[2]) * 60 + float(m[3])
+    if seconds > 30.5:
+        p.unlink(missing_ok=True)
+        tp.unlink(missing_ok=True)
+        raise MediaError(f"Video is {round(seconds)} seconds — Google takes videos up to 30 seconds")
+    return rel, thumb, seconds
+
+
 def price_label(price: str) -> str:
     """"1499" → "Rs 1,499" (Indian grouping). The built-in font has no ₹ glyph, so ₹ becomes "Rs"."""
     raw = price.replace("₹", "").replace("Rs.", "").replace("Rs", "").replace(",", "").strip()

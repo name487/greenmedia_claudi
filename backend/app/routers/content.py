@@ -114,11 +114,11 @@ class ContentIn(BaseModel):
 
 
 def _approve(item: ContentItem, user: User) -> None:
-    item.approved_by, item.approved_at = user.id, content_service.utcnow()
+    item.approved_by, item.approved_at, item.approval_rule = user.id, content_service.utcnow(), ""
 
 
 def _unapprove(item: ContentItem) -> None:
-    item.approved_by, item.approved_at = None, None
+    item.approved_by, item.approved_at, item.approval_rule = None, None, ""
 
 
 def _publishable(item: ContentItem) -> None:

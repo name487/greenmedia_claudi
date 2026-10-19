@@ -1,0 +1,52 @@
+{
+ "categories": [
+  {
+   "key": "EXTERIOR",
+   "label": "Exterior Photos",
+   "tip": "Make it easy for customers to find and recognise your business.",
+   "icon": "storefront"
+  },
+  {
+   "key": "INTERIOR",
+   "label": "Interior Photos",
+   "tip": "Show your clean, comfortable space so customers feel confident before they visit.",
+   "icon": "chair"
+  },
+  {
+   "key": "PRODUCT",
+   "label": "Product Photos",
+   "tip": "Help customers see your best items and decide what they want.",
+   "icon": "shopping_bag"
+  },
+  {
+   "key": "AT_WORK",
+   "label": "Staff in Action",
+   "tip": "Show real service in progress and make your business feel trustworthy.",
+   "icon": "handyman"
+  },
+  {
+   "key": "FOOD_AND_DRINK",
+   "label": "Food and Drink",
+   "tip": "Attract customers with your best dishes and drinks.",
+   "icon": "restaurant"
+  },
+  {
+   "key": "COMMON_AREA",
+   "label": "Common Area Photo",
+   "tip": "Show waiting, seating, or lobby areas so customers feel prepared.",
+   "icon": "weekend"
+  },
+  {
+   "key": "TEAMS",
+   "label": "Team Photos",
+   "tip": "Put faces to your name — people trust businesses they can see.",
+   "icon": "groups"
+  },
+  {
+   "key": "ADDITIONAL",
+   "label": "Something Else",
+   "tip": "Anything else that shows what makes you special — events, awards, happy customers.",
+   "icon": "add_photo_alternate"
+  }
+ ]
+}

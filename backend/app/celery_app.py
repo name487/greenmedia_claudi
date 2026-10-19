@@ -29,6 +29,7 @@ celery.conf.update(
     beat_schedule={
         "dispatch-due-content": {"task": "greenmedia.dispatch_due", "schedule": 60.0},
         "sync-google": {"task": "greenmedia.sync_google", "schedule": settings.google_sync_minutes * 60.0},
+        "google-daily-posts": {"task": "greenmedia.google_posts", "schedule": 3600.0},
     },
 )
 
@@ -61,16 +62,25 @@ def render_video_task(content_id: int) -> None:
 
 @celery.task(name="greenmedia.dispatch_due")
 def dispatch_due() -> dict:
-    """Beat, every minute: recover stuck rows and queue one publish task per due post."""
-    from . import content_service
+    """Beat, every minute: recover stuck rows and queue one publish task per due post; upload due Google media."""
+    from . import content_service, google_media
 
     with _db() as db:
-        return content_service.publish_due(db)
+        return {**content_service.publish_due(db), "google_media": google_media.upload_due(db)}
 
 
 @celery.task(name="greenmedia.sync_google")
 def sync_google() -> dict:
     from .jobs import sync_google as run
+
+    with _db() as db:
+        return run(db)
+
+
+@celery.task(name="greenmedia.google_posts")
+def google_posts_task() -> dict:
+    """Beat, hourly: the Content Agent writes tomorrow's Google post where daily posts are on."""
+    from .jobs import google_posts as run
 
     with _db() as db:
         return run(db)

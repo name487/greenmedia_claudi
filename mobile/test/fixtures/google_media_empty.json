@@ -1,0 +1,12 @@
+{
+ "tab": "scheduled",
+ "counts": {
+  "scheduled": 0,
+  "uploaded": 0,
+  "not_posted": 0
+ },
+ "items": [],
+ "can_approve": true,
+ "can_upload": true,
+ "connected": true
+}

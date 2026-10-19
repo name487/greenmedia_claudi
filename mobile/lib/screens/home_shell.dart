@@ -10,6 +10,8 @@ import 'clients_screen.dart';
 import 'ai_post/ai_post_screen.dart';
 import 'content_screen.dart';
 import 'dashboard_screen.dart';
+import 'google_media_screen.dart';
+import 'google_post_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'reports_screen.dart';
 import 'reviews_screen.dart';
@@ -18,9 +20,11 @@ import 'settings_screen.dart';
 import 'tasks_screen.dart';
 
 class Destination {
-  const Destination(this.section, this.label, this.icon, this.builder, {this.ownerLabel});
+  const Destination(this.section, this.label, this.icon, this.builder, {this.ownerLabel, this.needs, this.ownerOnly = false});
   final String section, label;
   final String? ownerLabel; // wording for business owners (client role)
+  final String? needs; // the role section that unlocks it, when it isn't [section]
+  final bool ownerOnly;
   final IconData icon;
   final WidgetBuilder builder;
 }
@@ -41,6 +45,10 @@ final destinations = <Destination>[
     final me = c.read<Session>().me!;
     return me.isClient ? AiPostScreen(clientId: me.clientId!) : const ContentScreen();
   }, ownerLabel: 'AI Post'),
+  Destination('google_post', 'Google Post', Icons.article_outlined, (c) => GooglePostScreen(clientId: c.read<Session>().me!.clientId!),
+      needs: 'content', ownerOnly: true),
+  Destination('google_media', 'Google Media', Icons.photo_library_outlined, (c) => GoogleMediaScreen(clientId: c.read<Session>().me!.clientId!),
+      needs: 'content', ownerOnly: true),
   Destination('social', 'Calendar', Icons.calendar_month_outlined, (_) => const CalendarScreen()),
   Destination('clients', 'Clients', Icons.groups_outlined, (_) => const ClientsScreen()),
   Destination('analytics', 'Analytics', Icons.insights_outlined, (_) => const AnalyticsScreen()),
@@ -48,6 +56,14 @@ final destinations = <Destination>[
   Destination('reports', 'Reports', Icons.description_outlined, (_) => const ReportsScreen()),
   Destination('tasks', 'Tasks', Icons.task_alt_outlined, (_) => const TasksScreen()),
 ];
+
+/// Owner tabs that draw their own top bar
+const _ownBar = {'dashboard', 'reviews', 'content', 'google_post', 'google_media'};
+
+/// Business owners get Dhanda's five tabs; the rest (Analytics, Reports, Settings) opens from their avatar on Home.
+int _tabCount(Me me) => me.isClient ? 5 : 4;
+
+List<Destination> _allowed(Me me) => destinations.where((d) => me.sees(d.needs ?? d.section) && (!d.ownerOnly || me.isClient)).toList();
 
 String label(Destination d, Me me) => me.isClient ? d.ownerLabel ?? d.label : d.label;
 
@@ -76,9 +92,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final me = context.watch<Session>().me!;
-    final allowed = destinations.where((d) => me.sees(d.section)).toList();
-    final tabs = allowed.take(4).toList();
-    final more = allowed.skip(4).toList();
+    final tabs = _allowed(me).take(_tabCount(me)).toList();
 
     return Scaffold(
       body: IndexedStack(index: _index, children: [
@@ -86,7 +100,7 @@ class _HomeShellState extends State<HomeShell> {
           PrimaryScrollController(
             controller: _scrollers.putIfAbsent(t.section, ScrollController.new),
             // The owner's home and Review Replies draw their own top bar
-            child: me.isClient && (t.section == 'dashboard' || t.section == 'reviews' || t.section == 'content')
+            child: me.isClient && _ownBar.contains(t.section)
                 ? t.builder(context)
                 : _Page(title: label(t, me), child: t.builder(context)),
           ),
@@ -95,61 +109,63 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) {
           if (i == tabs.length) {
-            _openMore(context, more);
+            showMoreMenu(context);
           } else {
             setState(() => _index = i);
           }
         },
         destinations: [
           for (final t in tabs) NavigationDestination(icon: Icon(t.icon), label: label(t, me)),
-          const NavigationDestination(icon: Icon(Icons.menu_rounded), label: 'More'),
+          if (!me.isClient) const NavigationDestination(icon: Icon(Icons.menu_rounded), label: 'More'),
         ],
       ),
     );
   }
+}
 
-  void _openMore(BuildContext context, List<Destination> more) {
-    final session = context.read<Session>();
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+/// Everything that isn't a tab, plus Settings and Sign out ("More" for staff; the avatar on an owner's Home).
+void showMoreMenu(BuildContext context) {
+  final session = context.read<Session>();
+  final more = _allowed(session.me!).skip(_tabCount(session.me!)).toList();
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheet) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          leading: CircleAvatar(child: Text(session.me!.name[0])),
+          title: Text(session.me!.name),
+          subtitle: Text(session.me!.clientName ?? session.me!.roleLabel),
+        ),
+        const Divider(),
+        for (final d in more)
           ListTile(
-            leading: CircleAvatar(child: Text(session.me!.name[0])),
-            title: Text(session.me!.name),
-            subtitle: Text(session.me!.clientName ?? session.me!.roleLabel),
-          ),
-          const Divider(),
-          for (final d in more)
-            ListTile(
-              leading: Icon(d.icon),
-              title: Text(label(d, session.me!)),
-              onTap: () {
-                Navigator.pop(sheet);
-                Navigator.push(context, MaterialPageRoute<void>(builder: (c) => _Page(title: label(d, session.me!), child: d.builder(c))));
-              },
-            ),
-          ListTile(
-            leading: const Icon(Icons.settings_outlined),
-            title: const Text('Settings'),
+            leading: Icon(d.icon),
+            title: Text(label(d, session.me!)),
             onTap: () {
               Navigator.pop(sheet);
-              Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _Page(title: 'Settings', child: SettingsScreen())));
+              Navigator.push(context, MaterialPageRoute<void>(builder: (c) => _Page(title: label(d, session.me!), child: d.builder(c))));
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Sign out'),
-            onTap: () {
-              Navigator.pop(sheet);
-              session.logout();
-            },
-          ),
-        ]),
-      ),
-    );
-  }
+        ListTile(
+          leading: const Icon(Icons.settings_outlined),
+          title: const Text('Settings'),
+          onTap: () {
+            Navigator.pop(sheet);
+            Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _Page(title: 'Settings', child: SettingsScreen())));
+          },
+        ),
+        ListTile(
+          leading: const Icon(Icons.logout),
+          title: const Text('Sign out'),
+          onTap: () {
+            Navigator.pop(sheet);
+            session.logout();
+          },
+        ),
+      ]),
+    ),
+  );
 }
 
 class _Page extends StatelessWidget {

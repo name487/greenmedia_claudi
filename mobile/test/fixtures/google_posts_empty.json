@@ -1,0 +1,63 @@
+{
+ "settings": {
+  "daily": true,
+  "auto": false,
+  "time": "10:00",
+  "auto_by": ""
+ },
+ "can_approve": true,
+ "can_create": true,
+ "connected": true,
+ "keywords": [
+  {
+   "keyword": "affordable dental clinic",
+   "volume": 5507
+  },
+  {
+   "keyword": "dental clinic near me",
+   "volume": 3190
+  },
+  {
+   "keyword": "best dental clinic in pune",
+   "volume": 2491
+  },
+  {
+   "keyword": "top rated dental clinic",
+   "volume": 2460
+  },
+  {
+   "keyword": "dental clinic open now",
+   "volume": 1997
+  },
+  {
+   "keyword": "dental clinic pune",
+   "volume": 1665
+  },
+  {
+   "keyword": "dental clinic in pune",
+   "volume": 342
+  },
+  {
+   "keyword": "dental clinic",
+   "volume": 233
+  },
+  {
+   "keyword": "top dental clinic near me",
+   "volume": 152
+  },
+  {
+   "keyword": "smile dental studio",
+   "volume": 146
+  }
+ ],
+ "keyword_count": 17,
+ "next_keyword": "affordable dental clinic",
+ "counts": {
+  "pending": 0,
+  "approved": 0,
+  "posted": 0,
+  "not_posted": 0,
+  "rejected": 0
+ },
+ "items": []
+}

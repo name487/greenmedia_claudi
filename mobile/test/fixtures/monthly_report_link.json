@@ -1,0 +1,5 @@
+{
+ "url": "http://api.test/api/clients/1/monthly-report.pdf?t=token",
+ "expires_at": "2026-10-19T06:14:01.713904+00:00",
+ "filename": "report_smile_dental_studio_2026-09.pdf"
+}

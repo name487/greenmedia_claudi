@@ -10,11 +10,13 @@ import 'package:greenmedia/screens/ai_post/items_screen.dart';
 import 'package:greenmedia/screens/google_media_screen.dart';
 import 'package:greenmedia/screens/google_post_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
+import 'package:greenmedia/screens/owner_report_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
 import 'package:greenmedia/widgets/common.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
@@ -41,6 +43,9 @@ var googlePostsFixture = 'google_posts_client';
 
 /// The fake backend has no Google Media yet.
 var googleMediaEmpty = false;
+
+/// The fake monthly report has no score history.
+var reportNoScore = false;
 
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
@@ -111,6 +116,20 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // Monthly report (fixtures captured from the real API)
+    if (req.url.path == '/api/clients/1/monthly-report') {
+      sentBodies['report-month'] = req.url.queryParameters['month'];
+      final r = fixture('monthly_report_client') as Map<String, dynamic>;
+      if (reportNoScore) {
+        for (final t in (r['trends'] as List).cast<Map<String, dynamic>>().where((t) => t['key'] == 'score')) {
+          for (final p in (t['points'] as List).cast<Map<String, dynamic>>()) {
+            p['value'] = null;
+          }
+        }
+      }
+      return json(r);
+    }
+    if (req.url.path == '/api/clients/1/monthly-report/link') return json(fixture('monthly_report_link'));
     // Google Media (fixtures captured from the real API)
     if (req.url.path == '/api/google-media/categories') return json(fixture('google_media_categories'));
     if (req.url.path == '/api/clients/1/google-media') {
@@ -321,7 +340,7 @@ void main() {
     expect(find.descendant(of: nav, matching: find.text('More')), findsNothing);
     await tester.tap(find.byKey(const Key('owner-menu')));
     await tester.pumpAndSettle();
-    for (final item in ['Analytics', 'Reports', 'Settings', 'Sign out']) {
+    for (final item in ['Analytics', 'Report', 'Settings', 'Sign out']) {
       expect(find.text(item), findsOneWidget);
     }
   });
@@ -899,6 +918,89 @@ void main() {
       expect(find.text('0 Media scheduled'), findsOneWidget);
       expect(find.text('No Media Scheduled'), findsOneWidget);
       expect(find.text('Upload now to attract more customers'), findsOneWidget);
+    });
+  });
+
+  group('owner Report', () {
+    final report = fixture('monthly_report_client') as Map<String, dynamic>;
+
+    Future<void> openReport(WidgetTester tester, List<String> calls) async {
+      await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.byKey(const Key('owner-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Report'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('summary against last month, growth actions and the performance trends', (tester) async {
+      final calls = <String>[];
+      await openReport(tester, calls);
+      expect(calls, contains('GET /api/clients/1/monthly-report'));
+      expect(find.textContaining('${report['month_label']} Performance Summary', findRichText: true), findsOneWidget);
+      expect(find.textContaining('(vs ${report['previous_label']})', findRichText: true), findsOneWidget);
+      final views = (report['summary'] as List).cast<Map<String, dynamic>>().first;
+      expect(find.descendant(of: find.byKey(const Key('tile-views')), matching: find.text(NumberFormat.decimalPattern('en_IN').format(views['value']))),
+          findsOneWidget);
+      expect(find.byKey(const Key('tile-website')), findsOneWidget);
+
+      // Growth Action Report: weeks of last month, then 6 months
+      expect(find.text('SEO Post Published'), findsOneWidget);
+      expect(find.text('Last Month'), findsWidgets);
+      await tapKey(tester, 'filter-posts');
+      expect(find.text('Date Filters'), findsOneWidget);
+      await tester.tap(find.text('Last 6 Months').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Last 6 Months'), findsOneWidget);
+
+      // Performance Report
+      await tester.dragUntilVisible(find.byKey(const Key('tab-performance')), find.byKey(const Key('report-list')), const Offset(0, 300));
+      await tapKey(tester, 'tab-performance');
+      expect(find.text('Growth in Score'), findsOneWidget);
+      final views12 = (report['trends'] as List).cast<Map<String, dynamic>>().firstWhere((t) => t['key'] == 'views');
+      await tester.dragUntilVisible(find.byKey(const Key('insight-views')), find.byKey(const Key('report-list')), const Offset(0, -300));
+      expect(find.text(views12['insight'] as String), findsOneWidget);
+      await tapKey(tester, 'filter-views');
+      await tester.tap(find.text('Last 12 Months').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Last 12 Months'), findsOneWidget);
+    });
+
+    testWidgets('download the PDF and pick another month', (tester) async {
+      Uri? opened;
+      OwnerReportScreen.openUrl = (url) async {
+        opened = url;
+        return true;
+      };
+      final calls = <String>[];
+      await openReport(tester, calls);
+      await tester.tap(find.byKey(const Key('report-download')));
+      await tester.pumpAndSettle();
+      expect(calls, contains('POST /api/clients/1/monthly-report/link'));
+      expect(opened.toString(), (fixture('monthly_report_link') as Map)['url']);
+      expect(find.textContaining('Report downloaded'), findsOneWidget);
+
+      await tapKey(tester, 'report-month');
+      final now = DateTime.now();
+      final key = DateFormat('yyyy-MM').format(DateTime(now.year, now.month - 3));
+      await tapKey(tester, 'month-$key');
+      expect(sentBodies['report-month'], key);
+    });
+
+    testWidgets('no score history yet', (tester) async {
+      reportNoScore = true;
+      addTearDown(() => reportNoScore = false);
+      await openReport(tester, []);
+      await tapKey(tester, 'tab-performance');
+      expect(find.text('No score history yet'), findsOneWidget);
+      expect(find.text('Your Marketing Score is calculated every Monday. The first point lands next week.'), findsOneWidget);
     });
   });
 

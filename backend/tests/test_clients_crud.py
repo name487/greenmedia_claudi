@@ -79,7 +79,7 @@ def test_delete_client_removes_everything_and_disables_portal(client, admin, por
     name = client.get(f"/api/clients/{cid}", headers=admin).json()["company_name"]
     assert client.delete(f"/api/clients/{cid}", headers=admin, params={"confirm_name": "wrong"}).status_code == 422
     out = client.delete(f"/api/clients/{cid}", headers=admin, params={"confirm_name": name.upper()}).json()
-    assert out["deleted"] and out["removed"]["reviews"] > 0 and out["removed"]["metric_days"] == 90
+    assert out["deleted"] and out["removed"]["reviews"] > 0 and out["removed"]["metric_days"] == 395  # the first demo businesses have 13 months
     assert out["disabled_portal_users"] == ["anjali@smiledental.in"]
     assert client.get(f"/api/clients/{cid}", headers=admin).status_code == 404
     with SessionLocal() as db:

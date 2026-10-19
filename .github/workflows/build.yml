@@ -141,6 +141,9 @@ jobs:
   ios:
     name: iOS build (unsigned)
     needs: flutter
+    # macOS minutes cost 10x Linux ones and stop first when the account's spending limit is reached, so this build is
+    # opt-in: run the workflow by hand (Actions -> CI -> Run workflow), or set the repository variable IOS_BUILD=true.
+    if: github.event_name == 'workflow_dispatch' || vars.IOS_BUILD == 'true'
     runs-on: macos-latest
     defaults: { run: { working-directory: mobile } }
     steps:

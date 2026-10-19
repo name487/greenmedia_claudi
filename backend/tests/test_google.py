@@ -19,6 +19,7 @@ class FakeGoogle:
         self.refresh_ok = True
         self.replies: dict[str, str] = {}
         self.posts: list[dict] = []
+        self.media: list[dict] = []
         yday = date.today() - timedelta(days=1)
         self.reviews = [
             {"reviewId": "r-new", "reviewer": {"displayName": "Meena K"}, "starRating": "TWO", "comment": "Waited an hour, staff were rude.",
@@ -87,6 +88,9 @@ class FakeGoogle:
         if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/localPosts") and m == "POST":
             self.posts.append(json.loads(body))
             return j({"name": f"{ACCOUNT}/{LOCATION}/localPosts/p{len(self.posts)}", "state": "LIVE"})
+        if url.startswith(f"{api.V4_BASE}/{ACCOUNT}/{LOCATION}/media") and m == "POST":
+            self.media.append(json.loads(body))
+            return j({"name": f"{ACCOUNT}/{LOCATION}/media/m{len(self.media)}", "mediaFormat": self.media[-1]["mediaFormat"]})
         if url.split("?")[0].endswith(f"{LOCATION}/searchkeywords/impressions/monthly"):
             q = parse_qs(urlparse(url).query)
             assert q["monthlyRange.start_month.year"] and q["monthlyRange.end_month.month"]

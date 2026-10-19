@@ -242,3 +242,8 @@ def publish_post(client: Client, summary: str) -> str:
     gmb = client.gmb
     post = client_for(source(gmb)).create_post(gmb.google_account, gmb.location_id, summary, client.website or None)
     return post.get("name", "")
+
+
+def upload_media(client: Client, source_url: str, video: bool, category: str) -> str:
+    gmb = client.gmb
+    return client_for(source(gmb)).upload_media(gmb.google_account, gmb.location_id, source_url, video, category).get("name", "")

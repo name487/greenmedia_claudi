@@ -188,6 +188,11 @@ class Gbp:
             body["callToAction"] = {"actionType": "LEARN_MORE", "url": url}
         return self._send("POST", f"{V4_BASE}/{account}/{location}/localPosts", json=body).json()
 
+    def upload_media(self, account: str, location: str, source_url: str, video: bool, category: str) -> dict:
+        """Add a photo or video to the profile from a public URL (Google fetches it)."""
+        body = {"mediaFormat": "VIDEO" if video else "PHOTO", "locationAssociation": {"category": category}, "sourceUrl": source_url}
+        return self._send("POST", f"{V4_BASE}/{account}/{location}/media", json=body).json()
+
     def daily_metrics(self, location: str, start: date, end: date) -> dict[str, dict[date, int]]:
         metrics = ["BUSINESS_IMPRESSIONS_DESKTOP_MAPS", "BUSINESS_IMPRESSIONS_DESKTOP_SEARCH", "BUSINESS_IMPRESSIONS_MOBILE_MAPS",
                    "BUSINESS_IMPRESSIONS_MOBILE_SEARCH", "CALL_CLICKS", "WEBSITE_CLICKS", "BUSINESS_DIRECTION_REQUESTS"]

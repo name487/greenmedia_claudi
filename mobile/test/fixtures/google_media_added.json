@@ -1,0 +1,15 @@
+{
+ "id": 3,
+ "kind": "photo",
+ "category": "PRODUCT",
+ "category_label": "Product Photos",
+ "url": "https://api.test/media/c1/da21023660954a7e86301133fc80e393.jpg",
+ "thumb_url": "https://api.test/media/c1/da21023660954a7e86301133fc80e393.jpg",
+ "status": "scheduled",
+ "group": "scheduled",
+ "needs_approval": false,
+ "scheduled_at": "2026-10-20T05:30:00+00:00",
+ "uploaded_at": null,
+ "created_at": "2026-10-19T05:00:48.827920+00:00",
+ "error": ""
+}

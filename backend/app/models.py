@@ -364,6 +364,31 @@ class ProductItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class GoogleMedia(Base):
+    """A photo or video the owner adds to their Google profile from the app (Google Media). Uploaded on its day by the
+    scheduler; like posts, only once approved (approved_at set — by the uploader when they may approve)."""
+
+    __tablename__ = "google_media"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(10), default="photo")  # photo | video
+    category: Mapped[str] = mapped_column(String(30), default="ADDITIONAL")  # Google's locationAssociation.category
+    path: Mapped[str] = mapped_column(String(300))  # relative to MEDIA_DIR
+    thumb_path: Mapped[str] = mapped_column(String(300), default="")
+    # pending (needs approval) | scheduled | publishing | uploaded | failed
+    status: Mapped[str] = mapped_column(String(20), default="scheduled", index=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    external_name: Mapped[str] = mapped_column(String(300), default="")
+    error: Mapped[str] = mapped_column(String(500), default="")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class Competitor(Base):
     """A nearby business the client is compared against on the Business Score screen."""
 

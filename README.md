@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 177 tests: My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 183 tests: Settings (preference, QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 177 tests: My Plan (billing, coupons, practic
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 38 tests: My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 43 tests: Settings (privacy choice, legal, preference, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -779,6 +779,39 @@ that is clearly marked and moves no money; with `PAYMENTS_DEMO=0` and no keys, t
 
 API: `GET /api/clients/{id}/plan`, `PUT …/plan/billing`, `POST …/plan/quote {plan, coupon}`,
 `POST …/plan/checkout {plan, coupon}` → `{id, url, …}`, `GET …/plan/payments/{payment}`.
+
+## Mobile Settings (business owners)
+
+**Settings** (from the avatar on an owner's Home), modelled on Dhanda AI. Agency staff keep the server/AI settings page.
+
+- **Business card**: name, phone and business code; **My Plan** (Upgrade to Pro, or the plan and its end date) → Manage.
+- **Tools**:
+  - **Preference**: website, business phone and brand voice (tone, call to action, phrases to use, claims never to
+    make). AI replies, posts and captions use them. Google connection status is shown here too.
+  - **Configure QR Standee**: scan a pre-printed standee with the camera (or type its code) to link it to the
+    business. The agency makes standee codes with `POST /api/qr-standees {count}`; each prints `{PUBLIC_BASE_URL}/q/{code}`
+    (PNG at `/q/{code}.png`).
+  - **My QRs**: generate up to 50 trackable "review us on Google" QR codes. `/q/{code}` counts the scan and opens the
+    business's Google review form. Each shows its scans and last scan, and **Download** gives a printable standee PNG
+    ("Loved your visit? Review us on Google", business name, QR, stars).
+  - **Keyword Planner**.
+- **Account**:
+  - **Change Profile**: switch to another business on the same mobile number, with no new OTP.
+  - **Logout**.
+  - **Delete Account**: type DELETE to confirm. The login stops working at once, the phone and email are removed, and
+    the account manager gets a task to delete the business's data within 30 days.
+- **Privacy**: **Analytics & Personalisation**, off unless the person turns it on. It is stored per person
+  (`prefs.analytics`); the app has no tracking SDKs yet.
+- **Legal**: **Privacy Policy** and **Terms of Service**, served by the API (`/api/legal/privacy|terms`, also as web pages
+  at `/legal/privacy|terms` for store listings), and **Refund Request**: the refund policy per plan, and **Request Refund**
+  for a payment within `REFUND_DAYS` (7). It creates a refund request and a task for the account manager. Monthly plans
+  aren't refundable.
+- The legal text describes what this product actually does (Google/Meta access, AI drafting, Razorpay, DPDP Act 2023
+  rights). **Have a lawyer review it** and set `LEGAL_COMPANY`, `LEGAL_EMAIL`, `LEGAL_ADDRESS` and `LEGAL_UPDATED`.
+
+API: `GET /api/clients/{id}/settings`, `GET|PUT …/preference`, `GET|POST …/qrs`, `POST …/qrs/claim {code}`,
+`POST …/qrs/{qr}/link` → standee PNG, `GET|POST …/refunds`, `GET /api/auth/profiles`, `POST /api/auth/switch {user_id}`,
+`PUT /api/auth/prefs {analytics}`, `POST /api/auth/delete-account {confirm: "DELETE"}`, `GET /api/legal/{privacy|terms|refund}`.
 
 ## Building the mobile apps
 

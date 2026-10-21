@@ -14,6 +14,7 @@ import 'google_media_screen.dart';
 import 'google_post_screen.dart';
 import 'my_plan_screen.dart';
 import 'owner_report_screen.dart';
+import 'owner_settings_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'reports_screen.dart';
 import 'reviews_screen.dart';
@@ -166,11 +167,16 @@ void showMoreMenu(BuildContext context) {
             },
           ),
         ListTile(
+          key: const Key('menu-settings'),
           leading: const Icon(Icons.settings_outlined),
           title: const Text('Settings'),
+          subtitle: session.me!.isClient ? const Text('Preference, My QRs, Keyword Planner') : null,
           onTap: () {
             Navigator.pop(sheet);
-            Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const _Page(title: 'Settings', child: SettingsScreen())));
+            final me = session.me!;
+            Navigator.push(context, MaterialPageRoute<void>(builder: (_) => me.isClient && me.clientId != null
+                ? OwnerSettingsScreen(clientId: me.clientId!)
+                : const _Page(title: 'Settings', child: SettingsScreen())));
           },
         ),
         ListTile(

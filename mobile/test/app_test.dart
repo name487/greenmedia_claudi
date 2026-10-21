@@ -11,6 +11,7 @@ import 'package:greenmedia/screens/google_media_screen.dart';
 import 'package:greenmedia/screens/google_post_screen.dart';
 import 'package:greenmedia/screens/meta_connect_screen.dart';
 import 'package:greenmedia/screens/my_plan_screen.dart';
+import 'package:greenmedia/screens/owner_settings_screen.dart';
 import 'package:greenmedia/screens/owner_report_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
 import 'package:greenmedia/screens/reviews_screen.dart';
@@ -50,6 +51,9 @@ var reportNoScore = false;
 
 /// The fake plan has been paid for.
 var planPaid = false;
+
+/// The person's Analytics & Personalisation choice on the fake backend.
+var analyticsOn = false;
 
 /// Fake backend: `who` is decided by the login email.
 MockClient fakeApi(List<String> calls) {
@@ -120,6 +124,47 @@ MockClient fakeApi(List<String> calls) {
         'message': wasPublished ? 'Reply updated successfully' : 'Reply posted'});
     }
     if (req.method == 'DELETE' && RegExp(r'^/api/reviews/\d+/reply$').hasMatch(req.url.path)) return json({'reply_status': 'new'});
+    // Settings (fixtures captured from the real API)
+    switch ((req.method, req.url.path)) {
+      case ('GET', '/api/auth/me'):
+        final u = (fixture('login_$who') as Map)['user'] as Map<String, dynamic>;
+        return json({...u, 'prefs': {'analytics': analyticsOn}});
+      case ('PUT', '/api/auth/prefs'):
+        analyticsOn = (jsonDecode(req.body) as Map)['analytics'] == true;
+        return json({'prefs': {'analytics': analyticsOn}});
+      case ('GET', '/api/auth/profiles'):
+        return json(fixture('profiles_client'));
+      case ('POST', '/api/auth/switch'):
+        sentBodies['switch'] = jsonDecode(req.body);
+        return json(fixture('switch_client'));
+      case ('POST', '/api/auth/delete-account'):
+        sentBodies['delete-account'] = jsonDecode(req.body);
+        return json({'deleted': true});
+      case ('GET', '/api/clients/1/settings'):
+        return json(fixture('settings_client'));
+      case ('GET', '/api/clients/1/preference'):
+        return json(fixture('preference_client'));
+      case ('PUT', '/api/clients/1/preference'):
+        sentBodies['preference'] = jsonDecode(req.body);
+        return json(fixture('preference_client'));
+      case ('GET', '/api/clients/1/qrs'):
+        return json(fixture('qrs_client'));
+      case ('POST', '/api/clients/1/qrs'):
+        return json(fixture('qr_created'), 201);
+      case ('POST', '/api/clients/1/qrs/claim'):
+        sentBodies['claim'] = jsonDecode(req.body);
+        return json(fixture('qr_claimed'));
+      case ('GET', '/api/clients/1/refunds'):
+        return json(fixture('refunds_client'));
+      case ('POST', '/api/clients/1/refunds'):
+        sentBodies['refund'] = jsonDecode(req.body);
+        return json({'id': 1, 'payment_id': (jsonDecode(req.body) as Map)['payment_id'], 'status': 'open'}, 201);
+      case ('GET', '/api/legal/privacy'):
+        return json(fixture('legal_privacy'));
+      case ('GET', '/api/legal/terms'):
+        return json(fixture('legal_terms'));
+    }
+    if (req.method == 'POST' && RegExp(r'^/api/clients/1/qrs/\d+/link$').hasMatch(req.url.path)) return json(fixture('qr_link'));
     // My Plan (fixtures captured from the real API)
     switch ((req.method, req.url.path)) {
       case ('GET', '/api/clients/1/plan'):
@@ -1102,6 +1147,147 @@ void main() {
       expect(find.textContaining('Valid till'), findsOneWidget);
       expect(find.byKey(const Key('payment-1')), findsOneWidget);
       expect(find.text('Paid'), findsOneWidget);
+    });
+  });
+
+  group('owner Settings', () {
+    Future<Session> openSettings(WidgetTester tester, List<String> calls) async {
+      analyticsOn = false;
+      sentBodies.clear();
+      final session = await pumpApp(tester, calls);
+      await signIn(tester, 'anjali@smiledental.in');
+      await tester.tap(find.byKey(const Key('owner-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('menu-settings')));
+      await tester.pumpAndSettle();
+      return session;
+    }
+
+    Future<void> tapKey(WidgetTester tester, String key) async {
+      if (find.byKey(Key(key)).evaluate().isEmpty) {
+        // not built yet: it's further down — or back up, after scrolling to the footer
+        await tester.dragUntilVisible(find.byKey(Key(key)), find.byType(Scrollable).last, const Offset(0, 300), maxIteration: 20)
+            .catchError((Object _) => tester.dragUntilVisible(find.byKey(Key(key)), find.byType(Scrollable).last, const Offset(0, -300)));
+      }
+      await tester.ensureVisible(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> back(WidgetTester tester) async {
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('plan card, sections, privacy choice, legal pages and footer', (tester) async {
+      final calls = <String>[];
+      final session = await openSettings(tester, calls);
+      expect(calls, contains('GET /api/clients/1/settings'));
+      expect(find.text('Smile Dental Studio'), findsWidgets);
+      expect(find.text('Upgrade to Pro'), findsOneWidget);
+      for (final h in ['TOOLS', 'ACCOUNT', 'PRIVACY', 'LEGAL']) {
+        await tester.scrollUntilVisible(find.text(h), 200, scrollable: find.byType(Scrollable).last);
+        expect(find.text(h), findsOneWidget);
+      }
+      await tester.scrollUntilVisible(find.byKey(const Key('set-footer')), 200, scrollable: find.byType(Scrollable).last);
+      expect(find.text('Green Media · #0001 · v1.0.0'), findsOneWidget);
+
+      // Analytics & Personalisation is opt-in
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('set-analytics'))).value, isFalse);
+      await tapKey(tester, 'set-analytics');
+      expect(analyticsOn, isTrue);
+      expect(session.me!.analytics, isTrue);
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('set-analytics'))).value, isTrue);
+
+      await tapKey(tester, 'set-privacy');
+      expect(find.text('Privacy Policy'), findsOneWidget);
+      await tester.scrollUntilVisible(find.textContaining('Digital Personal Data Protection Act'), 300, scrollable: find.byType(Scrollable).last);
+      expect(find.textContaining('Digital Personal Data Protection Act'), findsOneWidget);
+      await back(tester);
+      await tapKey(tester, 'set-terms');
+      expect(find.text('Terms of Service'), findsWidgets);
+      await back(tester);
+
+      await tapKey(tester, 'plan-manage');
+      expect(find.text('Your Pro Plan is'), findsOneWidget);
+    });
+
+    testWidgets('preference, my QRs and a QR standee', (tester) async {
+      Uri? opened;
+      OwnerSettingsScreen.openUrl = (url) async {
+        opened = url;
+        return true;
+      };
+      ConfigureStandeeScreen.scanner = (onCode) => Center(
+            child: TextButton(key: const Key('fake-scan'), onPressed: () => onCode('https://api.test/q/abcd123'), child: const Text('scan')),
+          );
+      final calls = <String>[];
+      await openSettings(tester, calls);
+
+      await tapKey(tester, 'set-preference');
+      await tester.enterText(find.byKey(const Key('pref-tone')), 'Warm and caring');
+      await tapKey(tester, 'pref-save');
+      expect((sentBodies['preference'] as Map)['tone'], 'Warm and caring');
+
+      await tapKey(tester, 'set-qrs');
+      final qrs = fixture('qrs_client') as Map<String, dynamic>;
+      expect(find.text('${qrs['used']} / ${qrs['limit']}'), findsOneWidget);
+      expect(find.text('1 SCAN'), findsOneWidget);
+      await tapKey(tester, 'qr-generate');
+      expect(calls, contains('POST /api/clients/1/qrs'));
+      expect(find.byKey(const Key('qr-image')), findsOneWidget);
+      await tapKey(tester, 'qr-download');
+      expect(opened.toString(), (fixture('qr_link') as Map)['url']);
+      expect(find.textContaining('QR standee downloaded'), findsOneWidget);
+      await back(tester);
+
+      await tapKey(tester, 'set-standee');
+      expect(find.text('Align QR code within the frame'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('fake-scan')));
+      await tester.pumpAndSettle();
+      expect(sentBodies['claim'], {'code': 'https://api.test/q/abcd123'});
+      expect(find.text('Standee set up'), findsOneWidget);
+      await tapKey(tester, 'standee-done');
+      expect(find.byKey(const Key('set-standee')), findsOneWidget);
+    });
+
+    testWidgets('change profile switches business', (tester) async {
+      final calls = <String>[];
+      final session = await openSettings(tester, calls);
+      await tapKey(tester, 'set-profile');
+      expect(find.text('Select profile'), findsOneWidget);
+      final other = ((fixture('profiles_client') as Map)['profiles'] as List).cast<Map<String, dynamic>>().last;
+      expect(find.text(other['title'] as String), findsOneWidget);
+      expect(find.text('Current'), findsOneWidget);
+      await tapKey(tester, 'profile-${other['user_id']}');
+      expect(sentBodies['switch'], {'user_id': other['user_id']});
+      expect(session.me!.clientName, other['title']);
+    });
+
+    testWidgets('refund request', (tester) async {
+      await openSettings(tester, []);
+      await tapKey(tester, 'set-refund');
+      await tapKey(tester, 'refund-plan-pro_12');
+      expect(find.textContaining('Eligible for a refund request within 7 days'), findsOneWidget);
+      await tapKey(tester, 'refund-request-pro_12');
+      await tester.enterText(find.byKey(const Key('refund-reason')), 'Not for us');
+      await tapKey(tester, 'refund-send');
+      final paid = ((fixture('refunds_client') as Map)['payments'] as List).first as Map;
+      expect(sentBodies['refund'], {'payment_id': paid['id'], 'reason': 'Not for us'});
+      expect(find.textContaining('Refund requested'), findsOneWidget);
+    });
+
+    testWidgets('delete account needs DELETE typed, then signs out', (tester) async {
+      final session = await openSettings(tester, []);
+      await tapKey(tester, 'set-delete');
+      expect(tester.widget<FilledButton>(find.byKey(const Key('delete-confirm'))).onPressed, isNull);
+      await tester.enterText(find.byKey(const Key('delete-confirm-text')), 'delete');
+      await tester.pump();
+      await tapKey(tester, 'delete-confirm');
+      expect(sentBodies['delete-account'], {'confirm': 'delete'});
+      expect(session.signedIn, isFalse);
+      expect(find.text('Get OTP'), findsOneWidget);
     });
   });
 

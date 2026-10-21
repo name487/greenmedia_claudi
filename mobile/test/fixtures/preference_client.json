@@ -1,0 +1,23 @@
+{
+ "company_name": "Smile Dental Studio",
+ "industry": "Dental Clinic",
+ "city": "Pune",
+ "website": "https://www.smiledentalstudio.in",
+ "phone": "+91 9339670711",
+ "tone": "Warm and professional",
+ "cta_style": "Call us",
+ "preferred_phrases": [
+  "Thank you for choosing us",
+  "your trusted dental clinic in Pune"
+ ],
+ "prohibited_claims": [
+  "guaranteed results",
+  "best in the world",
+  "cheapest"
+ ],
+ "google": {
+  "connected": true,
+  "title": "",
+  "address": ""
+ }
+}

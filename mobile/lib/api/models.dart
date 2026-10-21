@@ -12,10 +12,12 @@ class Me {
         clientId = j['client_id'] as int?,
         clientName = j['client_name'] as String?,
         sections = List<String>.from(j['sections'] as List),
-        permissions = List<String>.from(j['permissions'] as List);
+        permissions = List<String>.from(j['permissions'] as List),
+        analytics = (j['prefs'] as Map?)?['analytics'] == true;
 
   final int id;
   final String name, email, role, roleLabel;
+  final bool analytics; // the person's Analytics & Personalisation choice (opt-in)
   final int? clientId;
   final String? clientName;
   final List<String> sections, permissions;

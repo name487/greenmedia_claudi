@@ -23,7 +23,8 @@ def user_out(u: User) -> dict:
 
 def me_out(u: User, client_name: str | None) -> dict:
     # u must have been through security.load_role (sections/permissions come from the roles table)
-    return {**user_out(u), "client_name": client_name, "sections": u.sections, "permissions": u.permissions}
+    return {**user_out(u), "client_name": client_name, "sections": u.sections, "permissions": u.permissions,
+            "prefs": {"analytics": False, **(u.prefs or {})}}  # consent is opt-in
 
 
 def client_brief(c: Client) -> dict:

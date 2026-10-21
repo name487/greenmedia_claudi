@@ -1,0 +1,19 @@
+{
+ "client": {
+  "id": 1,
+  "company_name": "Smile Dental Studio",
+  "city": "Pune",
+  "phone": "+91 9339670711",
+  "code": "#0001"
+ },
+ "plan": {
+  "state": "not_activated",
+  "plan": null,
+  "valid_until": null,
+  "days_left": 0
+ },
+ "google_connected": true,
+ "qrs": 0,
+ "support_email": "support@greenmedia.in",
+ "company": "Green Media"
+}

@@ -1,0 +1,63 @@
+{
+ "title": "Privacy Policy",
+ "updated": "2026-10-21",
+ "intro": "This Privacy Policy explains how Green Media (\"we\", \"us\") collects, uses and protects personal information when you use the Green Media app and website (the \"Services\") to manage your business's Google, Facebook and Instagram presence.",
+ "notice": "Please read this Privacy Policy carefully. By using the Services you agree to the collection and use of information as described here. If you do not agree, please do not use the Services.",
+ "sections": [
+  {
+   "heading": "Information we collect",
+   "paragraphs": [
+    "Account details: your name, mobile number and email address, and the business profiles linked to them.",
+    "Business details: business name, address, phone, website, brand voice, keywords, products and the photos and videos you add.",
+    "Connected accounts: with your permission (Google and Meta sign-in), your Google Business Profile reviews, posts, photos and performance numbers, and your Facebook Page / Instagram account so we can post for you. We never see your Google or Meta password.",
+    "Payments: plan, amount and status. Card, UPI and bank details are handled by our payment partner (Razorpay); we don't store them.",
+    "Usage data: only if you turn on Analytics & Personalisation in Settings."
+   ]
+  },
+  {
+   "heading": "How we use it",
+   "paragraphs": [
+    "To provide the Services: draft and publish review replies and posts you approve, upload your photos, and build your reports.",
+    "To draft text with AI: the review, post topic and your brand details are sent to our AI provider to write a draft. Nothing is published without your approval, except where you turn on automatic posting.",
+    "To bill you, give support, keep the Services secure, and meet legal obligations."
+   ]
+  },
+  {
+   "heading": "Sharing",
+   "paragraphs": [
+    "We share information only with providers that run the Services for us (hosting, AI drafting, SMS, payments), with Google and Meta when we post for you, and when the law requires it. We don't sell personal information."
+   ]
+  },
+  {
+   "heading": "Keeping and deleting",
+   "paragraphs": [
+    "We keep information while your account is active. Settings → Delete Account closes your login at once; your business's data is deleted within 30 days unless the law requires us to keep it (for example invoices). You can also write to support@greenmedia.in.",
+    "You can disconnect Google or Meta at any time; we then stop using that access."
+   ]
+  },
+  {
+   "heading": "Your rights",
+   "paragraphs": [
+    "Under India's Digital Personal Data Protection Act, 2023 you can ask to see, correct or erase your personal data, withdraw consent, and raise a grievance. Write to our Grievance Officer at support@greenmedia.in; we reply within 30 days."
+   ]
+  },
+  {
+   "heading": "Security",
+   "paragraphs": [
+    "Data travels over HTTPS; Google and Meta tokens are stored encrypted. No system is perfectly secure, and we tell you promptly if a breach affects you."
+   ]
+  },
+  {
+   "heading": "Changes",
+   "paragraphs": [
+    "We update this policy when the Services change and show the date above. Material changes are announced in the app."
+   ]
+  },
+  {
+   "heading": "Contact",
+   "paragraphs": [
+    "Green Media, Pune, Maharashtra, India. Email: support@greenmedia.in."
+   ]
+  }
+ ]
+}

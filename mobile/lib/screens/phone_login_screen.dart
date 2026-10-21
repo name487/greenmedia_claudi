@@ -320,13 +320,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                   )
                 : ListView(padding: const EdgeInsets.all(16), children: [
                     for (final g in groups.entries) ...[
-                      _GroupHeader(label: g.key, profiles: g.value),
-                      for (final p in g.value) _ProfileCard(profile: p, onTap: _busy ? null : () => _open(p)),
+                      ProfileGroupHeader(label: g.key, profiles: g.value),
+                      for (final p in g.value) ProfileCard(profile: p, onTap: _busy ? null : () => _open(p)),
                       const SizedBox(height: 10),
                     ],
                     if (_error != null) _ErrorText(_error!),
                     const SizedBox(height: 8),
-                    const _TrustCard(),
+                    const ProfileTrustCard(),
                   ]),
       ),
     ]);
@@ -483,8 +483,8 @@ class _ErrorText extends StatelessWidget {
       );
 }
 
-class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.label, required this.profiles});
+class ProfileGroupHeader extends StatelessWidget {
+  const ProfileGroupHeader({super.key, required this.label, required this.profiles});
   final String label;
   final List<LoginProfile> profiles;
 
@@ -514,8 +514,8 @@ class _GroupHeader extends StatelessWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.profile, required this.onTap});
+class ProfileCard extends StatelessWidget {
+  const ProfileCard({super.key, required this.profile, required this.onTap});
   final LoginProfile profile;
   final VoidCallback? onTap;
 
@@ -543,8 +543,8 @@ class _ProfileCard extends StatelessWidget {
   }
 }
 
-class _TrustCard extends StatelessWidget {
-  const _TrustCard();
+class ProfileTrustCard extends StatelessWidget {
+  const ProfileTrustCard({super.key});
 
   @override
   Widget build(BuildContext context) {

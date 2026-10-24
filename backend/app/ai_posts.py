@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import ai, media, reply_keywords
+from . import ai, media, preference, reply_keywords
 from .config import settings
 from .models import Client, ContentItem, ContentVariant, ProductItem
 
@@ -47,8 +47,10 @@ def _aware(dt):
 
 
 def business(c: Client) -> dict:
+    """Name, phone, address (and logo) for posters and video end cards — the owner's Preference wins."""
     contact = c.contacts[0] if c.contacts else None
-    return {"name": c.company_name, "phone": contact.phone if contact else "", "address": (c.gmb.address if c.gmb else "") or c.city, "city": c.city}
+    base = {"name": c.company_name, "phone": contact.phone if contact else "", "address": (c.gmb.address if c.gmb else "") or c.city, "city": c.city}
+    return preference.poster_business(c, base)
 
 
 def month_start() -> datetime:
@@ -106,13 +108,20 @@ def _session(c: Client):
 
 
 def platforms(c: Client) -> list[str]:
-    return ["gmb"] + [a.platform for a in c.social_accounts if a.platform in ("facebook", "instagram") and a.status == "connected"]
+    """Where AI posts go: connected platforms the owner hasn't switched off in Preference → Publish Post on (Google at least)."""
+    out = [p for p in ["gmb"] + [a.platform for a in c.social_accounts if a.platform in ("facebook", "instagram") and a.status == "connected"]
+           if preference.publishes_on(c, p)]
+    return out or ["gmb"]
 
 
 def new_post(c: Client, user_id: int, topic: str, media_type: str, products: list[ProductItem], notes: str) -> tuple[ContentItem, dict]:
     data, meta = _caption(c, topic, platforms(c), notes)
+    tags = preference.custom_hashtags(c, data.get("hashtags", []))
+    for v in data["variants"]:
+        if v["platform"] in ("facebook", "instagram") and tags != data.get("hashtags", []):
+            v["copy"] = preference.with_hashtags(v["copy"], tags)
     item = ContentItem(tenant_id=c.tenant_id, client_id=c.id, topic=topic[:300], content_type="post", master_copy=data["master_copy"],
-                       hashtags=data.get("hashtags", []), creative_brief=data.get("creative_brief", ""), status="in_review", created_by=user_id,
+                       hashtags=tags, creative_brief=data.get("creative_brief", ""), status="in_review", created_by=user_id,
                        updated_at=datetime.now(timezone.utc), ai_source=meta["source"],
                        ai_model=f"{meta['provider']}/{meta['model']}" if meta["source"] == "ai" else "", media_type=media_type,
                        product_ids=[p.id for p in products],

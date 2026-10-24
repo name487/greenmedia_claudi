@@ -12,6 +12,7 @@ import 'ai_post/shared.dart';
 import 'keyword_planner_screen.dart';
 import 'my_plan_screen.dart';
 import 'phone_login_screen.dart' show ProfileCard, ProfileGroupHeader, ProfileTrustCard;
+import 'preference_screen.dart';
 
 const _appVersion = '1.0.0';
 
@@ -431,127 +432,6 @@ class _Row extends StatelessWidget {
       ],
     ),
   );
-}
-
-// ---------- Preference ----------
-
-class PreferenceScreen extends StatefulWidget {
-  const PreferenceScreen({super.key, required this.clientId});
-  final int clientId;
-
-  @override
-  State<PreferenceScreen> createState() => _PreferenceScreenState();
-}
-
-class _PreferenceScreenState extends State<PreferenceScreen> {
-  Map<String, dynamic>? _d;
-  final _website = TextEditingController(), _phone = TextEditingController(), _tone = TextEditingController(), _cta = TextEditingController();
-  final _phrases = TextEditingController(), _avoid = TextEditingController();
-  bool _busy = false;
-
-  String get _url => '/api/clients/${widget.clientId}/preference';
-
-  @override
-  void initState() {
-    super.initState();
-    context.read<Session>().api.get(_url).then((d) {
-      if (!mounted) return;
-      final m = d as Map<String, dynamic>;
-      _website.text = m['website'] as String? ?? '';
-      _phone.text = m['phone'] as String? ?? '';
-      _tone.text = m['tone'] as String? ?? '';
-      _cta.text = m['cta_style'] as String? ?? '';
-      _phrases.text = (m['preferred_phrases'] as List).join(', ');
-      _avoid.text = (m['prohibited_claims'] as List).join(', ');
-      setState(() => _d = m);
-    });
-  }
-
-  @override
-  void dispose() {
-    for (final c in [_website, _phone, _tone, _cta, _phrases, _avoid]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  List<String> _list(TextEditingController c) => c.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-
-  Future<void> _save() async {
-    setState(() => _busy = true);
-    try {
-      await context.read<Session>().api.put(_url, {
-        'website': _website.text,
-        'phone': _phone.text,
-        'tone': _tone.text,
-        'cta_style': _cta.text,
-        'preferred_phrases': _list(_phrases),
-        'prohibited_claims': _list(_avoid),
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preferences saved')));
-      Navigator.pop(context);
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red.shade700));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final d = _d;
-    InputDecoration dec(String label, [String? hint]) => InputDecoration(labelText: label, hintText: hint, border: const OutlineInputBorder());
-    return Scaffold(
-      appBar: navyBar('Preference', subtitle: context.read<Session>().me!.clientName),
-      body: d == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(14),
-              children: [
-                Card(
-                  child: ListTile(
-                    leading: Icon(Icons.storefront, color: (d['google'] as Map)['connected'] == true ? green : Colors.orange),
-                    title: Text(d['company_name'] as String, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(
-                      (d['google'] as Map)['connected'] == true
-                          ? 'Google Business Profile connected${((d['google'] as Map)['address'] as String).isEmpty ? '' : ' · ${(d['google'] as Map)['address']}'}'
-                          : 'Google Business Profile not connected — ask your account manager',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text('Business details', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 10),
-                TextField(
-                  key: const Key('pref-website'),
-                  controller: _website,
-                  keyboardType: TextInputType.url,
-                  decoration: dec('Website', 'yourbusiness.in'),
-                ),
-                const SizedBox(height: 10),
-                TextField(key: const Key('pref-phone'), controller: _phone, keyboardType: TextInputType.phone, decoration: dec('Business phone')),
-                const SizedBox(height: 18),
-                const Text('Brand voice', style: TextStyle(fontWeight: FontWeight.w700)),
-                const Text('Used for AI replies, posts and captions', style: TextStyle(fontSize: 12, color: Colors.black54)),
-                const SizedBox(height: 10),
-                TextField(key: const Key('pref-tone'), controller: _tone, decoration: dec('Tone', 'Warm, friendly and professional')),
-                const SizedBox(height: 10),
-                TextField(key: const Key('pref-cta'), controller: _cta, decoration: dec('Call to action', 'Book a visit')),
-                const SizedBox(height: 10),
-                TextField(controller: _phrases, decoration: dec('Phrases to use', 'Comma separated')),
-                const SizedBox(height: 10),
-                TextField(controller: _avoid, decoration: dec('Never claim', 'e.g. painless, guaranteed results')),
-              ],
-            ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
-          child: GradientButton(key: const Key('pref-save'), label: 'Save', busy: _busy, onPressed: d == null ? null : _save),
-        ),
-      ),
-    );
-  }
 }
 
 // ---------- My QRs ----------

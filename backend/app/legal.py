@@ -113,4 +113,21 @@ def refund_policy() -> dict:
     return {"title": "Refund Policy", "updated": settings.legal_updated, "days": days, "plans": plans}
 
 
-DOCS = {"privacy": privacy, "terms": terms}
+def ai_usage() -> dict:
+    co = settings.legal_company
+    return _doc(
+        "Terms of AI usage",
+        f"{co} uses AI to draft review replies, captions, Google posts and video text for your business.",
+        [
+            ("What the AI sees", ["The review or topic, your business details, and what you entered in Preference (brand name, story, "
+                                  "audience, hashtags). It never sees your passwords or payment details."]),
+            ("You stay in control", ["Every draft waits for your approval, except where you turn on automatic posting. You can edit any "
+                                     "draft before it goes out, and you're responsible for what you publish."]),
+            ("Accuracy", ["AI can make mistakes. It's told to use only facts you gave and never invent prices, offers or claims; check "
+                          "drafts before approving. Tell us if something looks wrong and we'll fix the prompt."]),
+            ("Providers", ["Drafts are written through our AI provider's business API (OpenAI or Anthropic), only to make the draft you asked for."]),
+        ],
+    )
+
+
+DOCS = {"privacy": privacy, "terms": terms, "ai": ai_usage}

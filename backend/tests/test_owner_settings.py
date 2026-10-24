@@ -12,18 +12,12 @@ from app.models import PlanPayment, ReviewQr, Task, User
 from .conftest import login
 
 
-def test_summary_and_preference(client, portal):
+def test_summary(client, portal):
     s = client.get("/api/clients/1/settings", headers=portal).json()
     assert s["client"]["company_name"] == "Smile Dental Studio" and s["client"]["code"] == "#0001"
     assert s["plan"]["state"] == "not_activated" and s["google_connected"] and s["qrs"] == 0
-    p = client.put("/api/clients/1/preference", headers=portal, json={
-        "website": "smiledental.in", "phone": "+91 98765 43210", "tone": "Friendly and caring", "cta_style": "Book a visit",
-        "preferred_phrases": ["gentle care", " "], "prohibited_claims": ["painless"]}).json()
-    assert p["website"] == "https://smiledental.in" and p["phone"] == "+91 98765 43210" and p["tone"] == "Friendly and caring"
-    assert p["preferred_phrases"] == ["gentle care"] and p["prohibited_claims"] == ["painless"] and p["google"]["connected"]
-    assert client.get("/api/clients/1/preference", headers=portal).json()["cta_style"] == "Book a visit"
     seo = login(client, "kabir@greenmedia.in")
-    assert client.put("/api/clients/1/preference", headers=seo, json={}).status_code == 403
+    assert client.patch("/api/clients/1/preference", headers=seo, json={}).status_code == 403  # Preference: see test_preference
 
 
 def test_my_qrs_count_scans_and_download(client, portal):

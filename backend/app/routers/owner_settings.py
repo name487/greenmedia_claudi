@@ -3,28 +3,28 @@ standees (trackable "review us on Google" codes), Refund Request, and the legal 
 
 import io
 import math
-import re
 import secrets
 import string
 from datetime import datetime, timedelta, timezone
 from html import escape
+from typing import Annotated, Literal
 from urllib.parse import quote_plus
 
 import jwt
 import segno
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from PIL import Image, ImageDraw
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import legal, plans
+from .. import legal, media, plans, preference
 from ..ai_posts import _iso
 from ..config import settings
 from ..db import get_db
 from ..media import font
-from ..models import Client, ClientContact, PlanPayment, RefundRequest, ReviewQr, Task, User
+from ..models import Client, PlanPayment, RefundRequest, ReviewQr, Task, User
 from ..security import audit, can, get_client, require, require_section
 
 router = APIRouter(prefix="/api/clients", tags=["settings"])
@@ -66,51 +66,69 @@ def summary(client_id: int, user: User = Depends(require_section("dashboard")), 
 
 # ---------- Preference ----------
 
-class PreferenceIn(BaseModel):
-    website: str = Field("", max_length=300)
-    phone: str = Field("", max_length=40)
-    tone: str = Field("", max_length=200)
-    cta_style: str = Field("", max_length=200)
-    preferred_phrases: list[str] = Field(default_factory=list, max_length=10)
-    prohibited_claims: list[str] = Field(default_factory=list, max_length=10)
+def _patch_model():
+    """Every Preference field is optional (each one is edited and saved on its own in the app); "" clears a choice."""
+    fields: dict = {k: (str | None, Field(None, max_length=n)) for k, (_, n) in preference.TEXT.items()}
+    for k, opts in preference.CHOICES.items():
+        fields[k] = (Literal[tuple(opts + [""])] | None, None)
+    fields |= {"brand_color": (str | None, Field(None, pattern=r"^(#[0-9A-Fa-f]{6})?$")), "founder_in_promos": (bool | None, None),
+               "hashtags": (list[Annotated[str, Field(max_length=60)]] | None, Field(None, max_length=30)),
+               "publish": (dict[Literal[tuple(preference.PUBLISH)], bool] | None, None),
+               "religious": (dict[Literal[tuple(preference.RELIGIONS)], bool] | None, None),
+               "preferred_phrases": (list[str] | None, Field(None, max_length=10)), "prohibited_claims": (list[str] | None, Field(None, max_length=10))}
+    return create_model("PreferencePatch", __config__=ConfigDict(extra="forbid"), **fields)
 
 
-def _preference(c: Client) -> dict:
-    bv = c.brand_voice or {}
-    contact = c.contacts[0] if c.contacts else None
-    g = c.gmb
-    return {"company_name": c.company_name, "industry": c.industry, "city": c.city, "website": c.website,
-            "phone": contact.phone if contact else "", "tone": bv.get("tone", ""), "cta_style": bv.get("cta_style", ""),
-            "preferred_phrases": bv.get("preferred_phrases", []), "prohibited_claims": bv.get("prohibited_claims", []),
-            "google": {"connected": bool(g and g.status == "connected"), "title": g.title if g else "", "address": g.address if g else ""}}
+PreferencePatch = _patch_model()
 
 
 @router.get("/{client_id}/preference")
 def get_preference(client_id: int, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
-    return _preference(get_client(db, user, client_id))
+    return preference.view(db, get_client(db, user, client_id))
 
 
-@router.put("/{client_id}/preference")
-def save_preference(client_id: int, body: PreferenceIn, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+@router.patch("/{client_id}/preference")
+def save_preference(client_id: int, body: PreferencePatch, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
     c = get_client(db, user, client_id)
     _owner(user, c)
-    site = body.website.strip()
-    if site and not re.match(r"^https?://", site):
-        site = "https://" + site
-    c.website = site
-    clean = lambda xs: [x.strip()[:120] for x in xs if x.strip()]  # noqa: E731
-    c.brand_voice = {**(c.brand_voice or {}), "tone": body.tone.strip(), "cta_style": body.cta_style.strip(),
-                     "preferred_phrases": clean(body.preferred_phrases), "prohibited_claims": clean(body.prohibited_claims)}
-    if body.phone.strip():
-        contact = c.contacts[0] if c.contacts else None
-        if contact:
-            contact.phone = body.phone.strip()
-        else:
-            db.add(ClientContact(tenant_id=c.tenant_id, client_id=c.id, name=user.name, phone=body.phone.strip(), is_primary=True))
-    audit(db, user, "updated business preferences", client_id=c.id, entity_type="client", entity_id=c.id)
+    changes = body.model_dump(exclude_none=True)
+    if len(preference.hashtags(changes.get("hashtags", []), limit=None)) > preference.MAX_HASHTAGS:
+        raise HTTPException(422, f"Up to {preference.MAX_HASHTAGS} hashtags")
+    preference.update(c, changes)
+    audit(db, user, "updated preference: " + ", ".join(sorted(changes)), client_id=c.id, entity_type="client", entity_id=c.id)
     db.commit()
     db.refresh(c)
-    return _preference(c)
+    return preference.view(db, c)
+
+
+@router.post("/{client_id}/preference/photos/{slot}")
+async def add_preference_photo(client_id: int, slot: str, image: UploadFile = File(...), user: User = Depends(require_section("dashboard")),
+                               db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    _owner(user, c)
+    if slot not in preference.PHOTO_SLOTS:
+        raise HTTPException(404, "Unknown photo")
+    try:
+        rel = media.save_photo(c.id, await image.read(media.MAX_UPLOAD + 1))
+    except media.MediaError as e:
+        raise HTTPException(422, str(e))
+    preference.set_photo(c, slot, rel)
+    audit(db, user, f"preference photo added: {preference.PHOTO_SLOTS[slot]}", client_id=c.id, entity_type="client", entity_id=c.id)
+    db.commit()
+    db.refresh(c)
+    return preference.view(db, c)
+
+
+@router.delete("/{client_id}/preference/photos/{slot}")
+def remove_preference_photo(client_id: int, slot: str, user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    c = get_client(db, user, client_id)
+    _owner(user, c)
+    if slot not in preference.PHOTO_SLOTS:
+        raise HTTPException(404, "Unknown photo")
+    preference.set_photo(c, slot, None)
+    db.commit()
+    db.refresh(c)
+    return preference.view(db, c)
 
 
 # ---------- My QRs and QR standees ----------

@@ -7,15 +7,13 @@ import 'package:provider/provider.dart';
 import '../api/api_client.dart';
 import '../api/models.dart';
 import '../state/session.dart';
-import 'login_screen.dart';
-import 'settings_screen.dart';
 
 const _ink = Color(0xFF0B1A12);
 const _headerTop = Color(0xFF0B1A12);
 const _headerBottom = Color(0xFF123524);
 const _gradient = LinearGradient(colors: [Color(0xFF0F7A45), Color(0xFF1FAE6B)]);
 
-/// Mobile sign-in: phone number → one-time code → choose a profile. Email + password stays available for staff.
+/// Mobile sign-in: phone number → one-time code → choose a profile. Staff sign in with their mobile number too.
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
 
@@ -23,7 +21,7 @@ class PhoneLoginScreen extends StatefulWidget {
   State<PhoneLoginScreen> createState() => _PhoneLoginScreenState();
 }
 
-enum _Step { phone, code, profiles, email }
+enum _Step { phone, code, profiles }
 
 class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   _Step _step = _Step.phone;
@@ -109,7 +107,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_step == _Step.email) return LoginScreen(onUsePhone: () => setState(() => _step = _Step.phone));
     return PopScope(
       canPop: _step == _Step.phone,
       onPopInvokedWithResult: (didPop, _) {
@@ -214,15 +211,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       GradientButton(label: _busy ? 'Sending…' : 'Get OTP', onPressed: valid && !_busy ? _requestCode : null),
       const SizedBox(height: 10),
       const _SafeNote(),
-      const SizedBox(height: 28),
-      const Divider(),
-      const SizedBox(height: 8),
-      TextButton(onPressed: () => setState(() => _step = _Step.email), child: const Text('Agency team? Sign in with email')),
-      TextButton.icon(
-        icon: const Icon(Icons.dns_outlined, size: 16),
-        label: Text('Server: ${context.watch<Session>().api.baseUrl}', overflow: TextOverflow.ellipsis, style: t.bodySmall),
-        onPressed: () => showServerDialog(context),
-      ),
     ];
   }
 
@@ -312,10 +300,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                       const SizedBox(height: 12),
                       Text('No account uses this number yet', style: t.titleMedium, textAlign: TextAlign.center),
                       const SizedBox(height: 6),
-                      Text('Ask your Green Media account manager to add ${v.phone} to your profile, or sign in with email.',
+                      Text('Ask your Green Media account manager to add ${v.phone} to your profile.',
                           style: t.bodyMedium, textAlign: TextAlign.center),
-                      const SizedBox(height: 12),
-                      TextButton(onPressed: () => setState(() => _step = _Step.email), child: const Text('Sign in with email')),
                     ]),
                   )
                 : ListView(padding: const EdgeInsets.all(16), children: [

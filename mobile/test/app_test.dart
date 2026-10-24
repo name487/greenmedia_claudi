@@ -66,11 +66,6 @@ MockClient fakeApi(List<String> calls) {
     http.Response json(Object body, [int status = 200]) =>
         http.Response.bytes(utf8.encode(jsonEncode(body)), status, headers: {'content-type': 'application/json'});
     switch (req.url.path) {
-      case '/api/auth/login':
-        final email = (jsonDecode(req.body) as Map)['email'] as String;
-        if ((jsonDecode(req.body) as Map)['password'] != 'demo1234') return json({'detail': 'Incorrect email or password'}, 401);
-        who = email.startsWith('anjali') ? 'client' : 'admin';
-        return json(fixture('login_$who'));
       case '/api/auth/otp/request':
         final digits = ((jsonDecode(req.body) as Map)['phone'] as String).replaceAll(RegExp(r'\D'), '');
         final phone = '+91$digits';
@@ -306,24 +301,23 @@ Future<Session> pumpApp(WidgetTester tester, List<String> calls) async {
   return session;
 }
 
-Future<void> signIn(WidgetTester tester, String email, [String password = 'demo1234']) async {
-  // The app opens on mobile-number sign-in; staff use the email form behind this link.
-  final emailLink = find.text('Agency team? Sign in with email');
-  if (emailLink.evaluate().isNotEmpty) {
-    await tester.tap(emailLink);
-    await tester.pumpAndSettle();
-  }
-  await tester.enterText(find.widgetWithText(TextField, 'Email'), email);
-  await tester.enterText(find.widgetWithText(TextField, 'Password'), password);
-  await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
-  await tester.pumpAndSettle();
-}
-
 Future<void> requestCode(WidgetTester tester, String phone) async {
   await tester.enterText(find.byKey(const Key('phone')), phone);
   await tester.pump();
   await tester.tap(find.text('Get OTP'));
   await tester.pumpAndSettle();
+}
+
+/// Everyone signs in with their mobile number: the demo owner (two businesses, opens Smile Dental) or the agency admin.
+Future<void> signIn(WidgetTester tester, String who) async {
+  final owner = who.startsWith('anjali');
+  await requestCode(tester, owner ? '9876543210' : '9000000001');
+  await tester.enterText(find.byKey(const Key('otp')), '1234');
+  await tester.pumpAndSettle();
+  if (owner) {
+    await tester.tap(find.text('Smile Dental Studio'));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -368,6 +362,12 @@ void main() {
       expect(calls, containsAllInOrder(['POST /api/auth/otp/request', 'POST /api/auth/otp/verify', 'POST /api/auth/otp/select', 'GET /api/clients/1/score']));
     });
 
+    testWidgets('the number screen has no email sign-in or server line', (tester) async {
+      await pumpApp(tester, []);
+      expect(find.textContaining('Sign in with email'), findsNothing);
+      expect(find.textContaining('Server:'), findsNothing);
+    });
+
     testWidgets('a single profile opens straight away; demo code chip fills the code', (tester) async {
       final session = await pumpApp(tester, []);
       await requestCode(tester, '9000000001');
@@ -386,18 +386,12 @@ void main() {
     });
   });
 
-  testWidgets('wrong password shows the server message', (tester) async {
-    await pumpApp(tester, []);
-    await signIn(tester, 'admin@greenmedia.in', 'nope');
-    expect(find.text('Incorrect email or password'), findsOneWidget);
-  });
-
   testWidgets('admin signs in and sees the agency dashboard', (tester) async {
     final calls = <String>[];
     final session = await pumpApp(tester, calls);
     await signIn(tester, 'admin@greenmedia.in');
     expect(session.me!.role, 'admin');
-    expect(calls, containsAllInOrder(['POST /api/auth/login', 'GET /api/dashboard']));
+    expect(calls, containsAllInOrder(['POST /api/auth/otp/verify', 'GET /api/dashboard']));
     expect(find.textContaining('Good '), findsOneWidget);
     expect(find.text('Active clients'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Client performance'), 300, scrollable: find.byType(Scrollable).first);

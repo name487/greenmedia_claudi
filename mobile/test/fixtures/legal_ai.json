@@ -1,0 +1,32 @@
+{
+ "title": "Terms of AI usage",
+ "updated": "2026-10-21",
+ "intro": "Green Media uses AI to draft review replies, captions, Google posts and video text for your business.",
+ "notice": "",
+ "sections": [
+  {
+   "heading": "What the AI sees",
+   "paragraphs": [
+    "The review or topic, your business details, and what you entered in Preference (brand name, story, audience, hashtags). It never sees your passwords or payment details."
+   ]
+  },
+  {
+   "heading": "You stay in control",
+   "paragraphs": [
+    "Every draft waits for your approval, except where you turn on automatic posting. You can edit any draft before it goes out, and you're responsible for what you publish."
+   ]
+  },
+  {
+   "heading": "Accuracy",
+   "paragraphs": [
+    "AI can make mistakes. It's told to use only facts you gave and never invent prices, offers or claims; check drafts before approving. Tell us if something looks wrong and we'll fix the prompt."
+   ]
+  },
+  {
+   "heading": "Providers",
+   "paragraphs": [
+    "Drafts are written through our AI provider's business API (OpenAI or Anthropic), only to make the draft you asked for."
+   ]
+  }
+ ]
+}

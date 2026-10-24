@@ -168,6 +168,21 @@ def _centered(draw, lines: list[str], f, cx: int, top: int, fill, gap: int = 8) 
     return y
 
 
+def _logo(business: dict, size: int) -> Image.Image | None:
+    """The owner's logo (Preference) as a round RGBA image, or None."""
+    if not business.get("logo"):
+        return None
+    try:
+        img = _cover(Image.open(path_of(business["logo"])).convert("RGB"), size, size)
+    except (OSError, MediaError):
+        return None
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+    out = img.convert("RGBA")
+    out.putalpha(mask)
+    return out
+
+
 def end_card(w: int, h: int, business: dict, colours: tuple[str, str]) -> Image.Image:
     """The branded last frame: name, phone and address on a white card."""
     bg, accent = _hex(colours[0]), _hex(colours[1])
@@ -180,8 +195,12 @@ def end_card(w: int, h: int, business: dict, colours: tuple[str, str]) -> Image.
     r = int(w * 0.13)
     cx, cy = w // 2, int(h * 0.3)
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=bg)
-    f = font(int(r * 0.9))
-    d.text((cx - d.textlength(initials, font=f) / 2, cy - f.size * 0.62), initials, font=f, fill=accent)
+    logo = _logo(business, 2 * r)
+    if logo:
+        img.paste(logo, (cx - r, cy - r), logo)
+    else:
+        f = font(int(r * 0.9))
+        d.text((cx - d.textlength(initials, font=f) / 2, cy - f.size * 0.62), initials, font=f, fill=accent)
     y = _centered(d, _wrap(d, business["name"], font(int(w * 0.075)), w - 3 * m), font(int(w * 0.075)), cx, int(h * 0.42), (20, 30, 40))
     if business.get("phone"):
         fp = font(int(w * 0.045))
@@ -199,7 +218,7 @@ def end_card(w: int, h: int, business: dict, colours: tuple[str, str]) -> Image.
 def render_poster(client_id: int, photo_rel: str, item: dict, business: dict, colours: tuple[str, str] = ("#0E1A3A", "#FFB400")) -> str:
     """1080×1350 poster: the product photo, its name and price, and the business's name and phone."""
     w, h = 1080, 1350
-    bg, accent = _hex(colours[0]), _hex(colours[1])
+    bg, accent = _hex(business.get("color") or colours[0]), _hex(colours[1])  # the brand colour from Preference, if set
     img = Image.new("RGB", (w, h), (255, 255, 255))
     photo = Image.open(path_of(photo_rel)).convert("RGB")
     img.paste(_cover(photo, w, int(h * 0.68)), (0, 0))
@@ -216,6 +235,10 @@ def render_poster(client_id: int, photo_rel: str, item: dict, business: dict, co
         y = _centered(d, _wrap(d, item["description"], font(36), w - 200)[:2], font(36), w // 2, y + 6, (210, 220, 235))
     line = " · ".join(x for x in (business["name"], business.get("phone", "")) if x)
     _centered(d, [line], font(38), w // 2, h - 90, accent)
+    logo = _logo(business, 150)
+    if logo:  # top-right, on a white ring
+        d.ellipse((w - 200, 30, w - 30, 200), fill=(255, 255, 255))
+        img.paste(logo, (w - 190, 40), logo)
     rel, p = _new(client_id, "jpg")
     img.save(p, "JPEG", quality=90)
     return rel

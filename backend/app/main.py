@@ -17,6 +17,7 @@ from .routers import ai_posts as ai_posts_router
 from .routers import google_media as google_media_router
 from .routers import google_posts as google_posts_router
 from .routers import monthly_report as monthly_report_router
+from .routers import owner_settings as owner_settings_router
 from .routers import plans as plans_router
 from .routers import reply_settings
 from .routers import settings as settings_router
@@ -63,6 +64,8 @@ app.include_router(google_media_router.categories_router)
 app.include_router(monthly_report_router.router)
 app.include_router(plans_router.router)
 app.include_router(plans_router.public)
+for r in (owner_settings_router.router, owner_settings_router.public, owner_settings_router.staff, owner_settings_router.legal_router):
+    app.include_router(r)
 # Product photos and generated posters/videos (AI Post). Public so the app and Facebook/Instagram can fetch them.
 Path(settings.media_dir).mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=settings.media_dir), name="media")

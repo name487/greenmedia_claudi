@@ -1,0 +1,29 @@
+{
+ "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3IiwidGlkIjoxLCJyb2xlIjoiY2xpZW50IiwiZXhwIjoxNzkyNjA5ODU3fQ.COCcyENFQ43DlHh4QijhxHgs16RQbi7cPcbcA8i3hQs",
+ "token_type": "bearer",
+ "user": {
+  "id": 7,
+  "name": "Dr. Anjali Rao",
+  "email": "anjali@glowupsalon.in",
+  "role": "client",
+  "role_label": "Client",
+  "client_id": 5,
+  "status": "active",
+  "phone": "+919876543210",
+  "client_name": "GlowUp Salon & Spa",
+  "sections": [
+   "dashboard",
+   "reviews",
+   "content",
+   "analytics",
+   "reports"
+  ],
+  "permissions": [
+   "review.approve",
+   "content.approve"
+  ],
+  "prefs": {
+   "analytics": false
+  }
+ }
+}

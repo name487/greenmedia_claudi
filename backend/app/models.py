@@ -54,6 +54,8 @@ class User(Base):
     # Mobile number in E.164 (+919876543210) for OTP sign-in. Several accounts may share one number — e.g. an owner of
     # two businesses — and the app then asks which profile to open.
     phone: Mapped[str] = mapped_column(String(20), default="", index=True)
+    # The person's own choices in the app's Settings, e.g. {"analytics": true}
+    prefs: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class OtpChallenge(Base):
@@ -414,6 +416,38 @@ class PlanPayment(Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ReviewQr(Base):
+    """A trackable "review us on Google" QR code: /q/{code} counts the scan and sends the customer to the business's
+    Google review form. Made in the app (My QRs), or pre-printed on a standee and claimed by scanning it
+    (Configure QR Standee) — an unclaimed standee code has no client yet."""
+
+    __tablename__ = "review_qrs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True, index=True)
+    code: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+    kind: Mapped[str] = mapped_column(String(10), default="app")  # app | standee
+    label: Mapped[str] = mapped_column(String(80), default="")
+    scans: Mapped[int] = mapped_column(Integer, default=0)
+    last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class RefundRequest(Base):
+    """An owner's refund request for a plan payment (Settings → Refund Request); the account manager handles it."""
+
+    __tablename__ = "refund_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id"), index=True)
+    client_id: Mapped[int] = mapped_column(ForeignKey("clients.id"), index=True)
+    payment_id: Mapped[int] = mapped_column(ForeignKey("plan_payments.id"), index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="open")  # open | approved | rejected
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 class Competitor(Base):

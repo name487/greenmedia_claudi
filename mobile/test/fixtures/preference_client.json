@@ -1,0 +1,237 @@
+{
+ "values": {
+  "brand_name": "Smile Dental Studio",
+  "phone_on_poster": "+91 9339670711",
+  "address_on_poster": "Pune",
+  "additional_info": "",
+  "founder_name": "",
+  "different": "",
+  "why_visit": "",
+  "low_standards": "",
+  "solutions_low_standards": "",
+  "solutions_malpractices": "",
+  "common_mistakes": "",
+  "guidelines": "",
+  "landmark": "",
+  "tagline": "",
+  "description": "",
+  "website": "https://www.smiledentalstudio.in",
+  "tone": "Warm and professional",
+  "founder_gender": "",
+  "target_gender": "Unisex",
+  "target_age": "",
+  "region": "",
+  "model_ethnicity": "",
+  "audience": "",
+  "cta": "",
+  "hashtag_mode": "additional",
+  "founder_in_promos": true,
+  "brand_color": "",
+  "hashtags": [],
+  "publish": {
+   "gmb": true,
+   "facebook": true,
+   "instagram": true
+  },
+  "religious": {
+   "hindu": true,
+   "muslim": true,
+   "christian": true,
+   "sikh": true,
+   "jain": true,
+   "buddhist": true
+  },
+  "preferred_phrases": [
+   "Thank you for choosing us",
+   "your trusted dental clinic in Pune"
+  ],
+  "prohibited_claims": [
+   "guaranteed results",
+   "best in the world",
+   "cheapest"
+  ]
+ },
+ "photos": {
+  "logo": {
+   "label": "Brand Logo",
+   "url": null
+  },
+  "founder": {
+   "label": "Founder Photo",
+   "url": null
+  },
+  "interior_1": {
+   "label": "Interior Photo - 1 (Entrance)",
+   "url": null
+  },
+  "interior_2": {
+   "label": "Interior Photo - 2 (Seating / Counter)",
+   "url": null
+  },
+  "interior_3": {
+   "label": "Interior Photo - 3 (Peak time rush photo)",
+   "url": null
+  },
+  "interior_4": {
+   "label": "Interior Photo - 4 (Additional)",
+   "url": null
+  },
+  "interior_5": {
+   "label": "Interior Photo - 5 (Additional)",
+   "url": null
+  },
+  "team_1": {
+   "label": "Team Photo - 1 (With Owner)",
+   "url": null
+  },
+  "team_2": {
+   "label": "Team Photo - 2 (Working)",
+   "url": null
+  },
+  "team_3": {
+   "label": "Team Photo - 3 (At Entrance)",
+   "url": null
+  },
+  "team_4": {
+   "label": "Team Photo - 4 (Additional)",
+   "url": null
+  },
+  "team_5": {
+   "label": "Team Photo - 5 (Additional)",
+   "url": null
+  }
+ },
+ "socials": [
+  {
+   "platform": "google",
+   "connected": true,
+   "account": ""
+  },
+  {
+   "platform": "facebook",
+   "connected": true,
+   "account": "@smiledentalstudio"
+  },
+  {
+   "platform": "instagram",
+   "connected": false,
+   "account": ""
+  }
+ ],
+ "products": [],
+ "progress": {
+  "done": 2,
+  "total": 6,
+  "next": {
+   "key": "product",
+   "label": "Add a Top Selling Item"
+  },
+  "steps": [
+   {
+    "key": "google",
+    "label": "Connect Google",
+    "done": true
+   },
+   {
+    "key": "social",
+    "label": "Connect Facebook or Instagram",
+    "done": true
+   },
+   {
+    "key": "product",
+    "label": "Add a Top Selling Item",
+    "done": false
+   },
+   {
+    "key": "logo",
+    "label": "Add Business Logo",
+    "done": false
+   },
+   {
+    "key": "interior",
+    "label": "Add an Interior Photo",
+    "done": false
+   },
+   {
+    "key": "team",
+    "label": "Add a Team Photo",
+    "done": false
+   }
+  ]
+ },
+ "labels": {
+  "brand_name": "Brand Name",
+  "phone_on_poster": "Phone on Poster",
+  "address_on_poster": "Address on Poster",
+  "additional_info": "Additional Info on Post",
+  "founder_name": "Founder Name",
+  "different": "How you are different than competition",
+  "why_visit": "Why customer should visit you",
+  "low_standards": "Low standards of industry",
+  "solutions_low_standards": "Your solutions for low standards",
+  "solutions_malpractices": "Your solutions for malpractices",
+  "common_mistakes": "Common Mistakes by customers",
+  "guidelines": "Guidelines to customer",
+  "landmark": "Nearest Landmark / directions to reach",
+  "tagline": "Business Tagline",
+  "description": "Business Description",
+  "website": "Website",
+  "tone": "Tone of voice"
+ },
+ "choices": {
+  "founder_gender": [
+   "Male",
+   "Female",
+   "Other",
+   "Prefer not to say"
+  ],
+  "target_gender": [
+   "Unisex",
+   "Men",
+   "Women"
+  ],
+  "target_age": [
+   "All ages",
+   "Under 18",
+   "18-24",
+   "25-34",
+   "35-44",
+   "45-54",
+   "55+"
+  ],
+  "region": [
+   "Local (my city)",
+   "My state",
+   "All India",
+   "International"
+  ],
+  "model_ethnicity": [
+   "Indian",
+   "South Asian",
+   "Any"
+  ],
+  "audience": [
+   "Everyone",
+   "Families",
+   "Students",
+   "Young professionals",
+   "Business owners",
+   "Seniors",
+   "Tourists"
+  ],
+  "cta": [
+   "Call now",
+   "Book now",
+   "Visit us",
+   "Order online",
+   "WhatsApp us",
+   "Learn more"
+  ],
+  "hashtag_mode": [
+   "exact",
+   "additional"
+  ]
+ },
+ "company_name": "Smile Dental Studio",
+ "maps_uri": ""
+}

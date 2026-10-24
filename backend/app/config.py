@@ -87,6 +87,13 @@ class Settings:
     payments_demo: bool = os.getenv("PAYMENTS_DEMO", os.getenv("SEED_DEMO", "1")) == "1"
     # COUPONS="WELCOME10:10%,FESTIVE500:500" — a percentage, or rupees off
     coupons: str = os.getenv("COUPONS", "WELCOME10:10%" if os.getenv("SEED_DEMO", "1") == "1" else "")
+
+    # Legal pages in the app (Settings → Privacy Policy / Terms of Service / Refund Request). Have a lawyer review them.
+    legal_company: str = os.getenv("LEGAL_COMPANY", "Green Media")
+    legal_email: str = os.getenv("LEGAL_EMAIL", "support@greenmedia.in")
+    legal_address: str = os.getenv("LEGAL_ADDRESS", "Pune, Maharashtra, India")
+    legal_updated: str = os.getenv("LEGAL_UPDATED", "2026-10-21")
+    refund_days: int = int(os.getenv("REFUND_DAYS", "7"))
     # Redis + Celery for scheduled publishing. Set REDIS_URL (e.g. redis://127.0.0.1:6379/0) and run a worker + beat:
     #   celery -A app.celery_app worker -B -l info
     # Empty: no Celery; "publish now" runs inline and due posts go out via SCHEDULER_INTERVAL_MINUTES or cron.

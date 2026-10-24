@@ -1,0 +1,39 @@
+{
+ "profiles": [
+  {
+   "user_id": 6,
+   "name": "Dr. Anjali Rao",
+   "role": "client",
+   "role_label": "Client",
+   "kind": "business",
+   "tenant_name": "Green Media Technology",
+   "title": "Smile Dental Studio",
+   "subtitle": "Dental Clinic · Pune",
+   "client_id": 1,
+   "google": {
+    "state": "needs_google",
+    "email": "",
+    "title": ""
+   },
+   "group": "Not connected to Google"
+  },
+  {
+   "user_id": 7,
+   "name": "Dr. Anjali Rao",
+   "role": "client",
+   "role_label": "Client",
+   "kind": "business",
+   "tenant_name": "Green Media Technology",
+   "title": "GlowUp Salon & Spa",
+   "subtitle": "Beauty · Delhi",
+   "client_id": 5,
+   "google": {
+    "state": "needs_google",
+    "email": "",
+    "title": ""
+   },
+   "group": "Not connected to Google"
+  }
+ ],
+ "current": 6
+}

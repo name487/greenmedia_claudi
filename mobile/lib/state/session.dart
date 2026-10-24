@@ -88,6 +88,17 @@ class Session extends ChangeNotifier {
     await _signIn(await api.post('/api/auth/otp/select', {'otp_token': otpToken, 'user_id': userId}) as Map<String, dynamic>);
   }
 
+  /// Settings → Change Profile: open another profile on the same mobile number.
+  Future<void> switchProfile(int userId) async {
+    await _signIn(await api.post('/api/auth/switch', {'user_id': userId}) as Map<String, dynamic>);
+  }
+
+  /// Re-read the signed-in person (e.g. after changing a preference).
+  Future<void> refreshMe() async {
+    me = Me.fromJson(await api.get('/api/auth/me') as Map<String, dynamic>);
+    notifyListeners();
+  }
+
   Future<void> _signIn(Map<String, dynamic> out) async {
     api.token = out['access_token'] as String;
     await store.writeToken(api.token);

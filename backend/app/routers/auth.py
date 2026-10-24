@@ -184,3 +184,66 @@ def otp_select(body: OtpSelectIn, db: Session = Depends(get_db)):
     audit(db, user, "signed in (phone OTP)", entity_type="user", entity_id=user.id, details={"phone": phones.masked(user.phone)})
     db.commit()
     return {"access_token": create_token(user), "token_type": "bearer", "user": _me(db, user)}
+
+
+# ---------- the app's Settings: Change Profile, privacy choice, Delete Account ----------
+
+@router.get("/profiles")
+def my_profiles(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Every profile linked to the signed-in person's mobile number (Change Profile), without a new code."""
+    if not user.phone:
+        return {"profiles": [], "current": user.id}
+    return {"profiles": _profiles(db, user.phone), "current": user.id}
+
+
+class SwitchIn(BaseModel):
+    user_id: int
+
+
+@router.post("/switch")
+def switch_profile(body: SwitchIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Open another profile on the same verified number (the person proved the number when signing in)."""
+    other = db.get(User, body.user_id)
+    if not user.phone or not other or other.phone != user.phone or other.status != "active":
+        raise HTTPException(403, "That profile isn't linked to your number")
+    load_role(db, other)
+    if not other.sections:
+        raise HTTPException(403, f"Your role “{other.role}” has no access. Ask an admin to fix it.")
+    audit(db, other, "switched profile in the app", entity_type="user", entity_id=other.id, details={"from_user": user.id})
+    db.commit()
+    return {"access_token": create_token(other), "token_type": "bearer", "user": _me(db, other)}
+
+
+class PrefsIn(BaseModel):
+    analytics: bool | None = None
+
+
+@router.put("/prefs")
+def save_prefs(body: PrefsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    user.prefs = {**(user.prefs or {}), **body.model_dump(exclude_none=True)}
+    db.commit()
+    return {"prefs": user.prefs}
+
+
+class DeleteAccountIn(BaseModel):
+    confirm: str
+
+
+@router.post("/delete-account")
+def delete_account(body: DeleteAccountIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """The person closes their own login at once (it stops working everywhere). For a business owner, deleting the
+    business's data is a task for the account manager — done within 30 days, as the Privacy Policy says."""
+    if body.confirm.strip().upper() != "DELETE":
+        raise HTTPException(422, 'Type DELETE to confirm')
+    from ..models import Task
+
+    c = db.get(Client, user.client_id) if user.client_id else None
+    audit(db, user, "deleted their own account in the app", entity_type="user", entity_id=user.id, client_id=c.id if c else None)
+    if c:
+        db.add(Task(tenant_id=user.tenant_id, client_id=c.id, assigned_to=c.account_manager_id, priority="high",
+                    title=f"Account deleted in the app by {user.name} — delete {c.company_name}'s data within 30 days (or confirm they keep it)",
+                    due_date=(datetime.now(timezone.utc) + timedelta(days=30)).date()))
+    user.status, user.phone, user.prefs = "deleted", "", {}
+    user.email = f"deleted-{user.id}@deleted.invalid"
+    db.commit()
+    return {"deleted": True}

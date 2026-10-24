@@ -157,6 +157,17 @@ def _voice(bv: dict) -> str:
         parts.append(f"Never claim or imply: {'; '.join(bv['prohibited_claims'])}.")
     if bv.get("cta_style"):
         parts.append(f"Call-to-action style: {bv['cta_style']}.")
+    # the owner's own words from the app's Preference page
+    about = bv.get("about") or {}
+    labels = {"tagline": "Tagline", "description": "About the business", "different": "What makes it different", "why_visit": "Why customers visit",
+              "solutions_low_standards": "How it beats the industry's low standards", "solutions_malpractices": "How it avoids malpractices",
+              "guidelines": "Guidance it gives customers", "landmark": "How to find it", "additional_info": "Also mention when relevant"}
+    facts = [f"{labels[k]}: {v}" for k, v in about.items() if k in labels and v]
+    if facts:
+        parts.append("Facts from the owner (use where they fit, never invent others):\n- " + "\n- ".join(facts))
+    aud = bv.get("audience") or {}
+    if aud:
+        parts.append("Write for: " + ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in aud.items()) + ".")
     return "\n".join(parts)
 
 

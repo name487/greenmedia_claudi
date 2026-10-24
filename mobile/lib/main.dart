@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -41,6 +42,8 @@ class GreenMediaApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
+        // sideways lists (report tiles, charts, carousels) slide with a mouse drag too, on Windows, macOS and the web
+        scrollBehavior: const MaterialScrollBehavior().copyWith(dragDevices: PointerDeviceKind.values.toSet()),
         home: Consumer<Session>(
           builder: (context, s, _) {
             if (s.restoring) return const Scaffold(body: Center(child: CircularProgressIndicator()));

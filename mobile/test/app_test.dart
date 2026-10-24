@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:greenmedia/api/api_client.dart';
@@ -1028,6 +1029,11 @@ void main() {
       expect(find.descendant(of: find.byKey(const Key('tile-views')), matching: find.text(NumberFormat.decimalPattern('en_IN').format(views['value']))),
           findsOneWidget);
       expect(find.byKey(const Key('tile-website')), findsOneWidget);
+      // the tiles slide sideways with a mouse drag too (desktop and web)
+      final before = tester.getTopLeft(find.byKey(const Key('tile-views'))).dx;
+      await tester.drag(find.byKey(const Key('summary-scroll')), const Offset(-150, 0), kind: PointerDeviceKind.mouse);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.byKey(const Key('tile-views'))).dx, lessThan(before - 100));
 
       // Growth Action Report: weeks of last month, then 6 months
       expect(find.text('SEO Post Published'), findsOneWidget);

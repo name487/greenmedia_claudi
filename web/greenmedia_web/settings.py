@@ -29,7 +29,7 @@ def _url(value: str) -> str:
     return value if "://" in value else f"https://{value}"
 
 
-API_URL = _url(os.getenv("API_URL", "http://127.0.0.1:8001"))
+API_URL = _url(os.getenv("API_URL", "http://localhost:8001"))
 API_TIMEOUT = float(os.getenv("API_TIMEOUT", "90"))
 
 INSTALLED_APPS = [

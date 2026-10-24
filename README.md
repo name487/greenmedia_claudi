@@ -554,7 +554,7 @@ cd backend && pytest -q          # 188 tests: Preference (fields, validation, ph
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 47 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in, email login, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 47 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in (owners and staff), no email or server option on the sign-in screen, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -566,7 +566,7 @@ The Flutter app opens on **mobile-number sign-in**, built for business owners:
 2. **Verify your mobile number.** Enter the 4-digit code; it checks itself once the last digit is in. A 30-second timer runs before *Resend code*, and SMS autofill and paste work.
 3. **Select profile.** Every account linked to that number is listed. A business owner with two businesses sees both. Businesses not yet linked to Google show **Needs Google**, and agency staff appear under *Agency team*. With a single profile the app opens straight away.
 
-Staff can still use **Sign in with email**.
+Agency staff sign in the same way, with their mobile number. The sign-in screen has no email form or server field; the app's API address comes from `--dart-define=API_URL=…` at build time (staff can still change it under Settings → API server after signing in).
 
 **Who can sign in.** Only existing accounts whose **Mobile number** is set: *Settings → Team members*, or `phone` on `POST/PATCH /api/users`. Several accounts may share a number; that's what profile selection is for.
 

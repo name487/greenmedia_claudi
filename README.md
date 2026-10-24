@@ -849,7 +849,7 @@ flutter build ipa --release --dart-define=API_URL=https://api.yourdomain       #
 
 Release builds only talk to HTTPS APIs. Plain `http://` is allowed only in Android debug builds and for localhost/LAN on iOS.
 
-**CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK**, which you can download from the run's Artifacts. The unsigned **iOS build** runs on a macOS runner, whose minutes cost 10× Linux ones and are the first to stop when the account's spending limit is reached. It is opt-in: run the workflow by hand (Actions → CI → Run workflow), or set the repository variable `IOS_BUILD=true`. Otherwise it shows as skipped. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
+**CI** (`.github/workflows/build.yml`) runs the API tests, Django checks with a live smoke test of every page, and Flutter analyze and tests. It also builds a release **Android APK**, which you can download from the run's Artifacts. The unsigned **iOS build** runs on a macOS runner, whose minutes cost 10× Linux ones and are the first to stop when the account's spending limit is reached. So it lives in its own workflow (`.github/workflows/ios.yml`) that runs only by hand (Actions → iOS build → Run workflow), and pull requests show no skipped iOS check. Set the repository variable `API_URL` to bake your API address into those builds. Store releases need your Android keystore and Apple signing.
 
 ## Deploying
 

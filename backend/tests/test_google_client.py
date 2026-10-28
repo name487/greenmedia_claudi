@@ -177,7 +177,7 @@ def test_diagnostics_project_number_and_links(client, admin, monkeypatch):
     monkeypatch.setattr(settings, "google_client_id", "437254480587-abc.apps.googleusercontent.com")
     d = client.get("/api/google/diagnostics", headers=admin).json()
     assert d["project_number"] == "437254480587"
-    assert d["apis"][2]["enable_url"] == "https://console.cloud.google.com/apis/library/mybusiness.googleapis.com?project=437254480587"
+    assert d["apis"][2]["enable_url"] == "https://console.cloud.google.com/apis/api/mybusiness.googleapis.com/overview?project=437254480587"
 
 
 @pytest.mark.parametrize("failure,expect", [
@@ -196,6 +196,9 @@ def test_diagnostics_live(client, admin, google, failure, expect):
     assert d["live"]["status"] == "ok" and d["live"]["email"] == "greenmediaseoteam2@gmail.com"
     assert status["mybusinessaccountmanagement.googleapis.com"] == "ok" and status["mybusinessbusinessinformation.googleapis.com"] == "ok"
     assert status["mybusiness.googleapis.com"] == expect and status["businessprofileperformance.googleapis.com"] == "ok"
+    if expect == "disabled":  # the v4 API isn't in the public Library: say where to enable it and what "not found" means
+        v4 = next(a for a in d["apis"] if a["api"] == "mybusiness.googleapis.com")
+        assert "owns project" in v4["detail"] and "Request Business Profile API access" in v4["detail"]
 
 
 def test_new_client_without_profile_row_gets_one_on_connect(client, admin, google):

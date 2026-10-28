@@ -435,7 +435,9 @@ def diagnostics(live: bool = False, user: User = Depends(require("client.edit"))
         "Publish the app (In production), or add every Google account that will connect as a Test user — otherwise Google shows “Access blocked”.",
         f"https://console.cloud.google.com/apis/credentials/consent{proj}")
 
-    apis = [{"api": a, "name": n, "used_for": u, "status": "unknown", "detail": "", "enable_url": f"https://console.cloud.google.com/apis/library/{a}{proj}",
+    # The API's own overview page has the Enable button. The Library page can't be used: the Google My Business API (v4)
+    # isn't listed there publicly, so its Library page fails to load.
+    apis = [{"api": a, "name": n, "used_for": u, "status": "unknown", "detail": "", "enable_url": f"https://console.cloud.google.com/apis/api/{a}/overview{proj}",
              "quota_url": f"https://console.cloud.google.com/apis/api/{a}/quotas{proj}"} for a, n, u in APIS]
     probe = None
     if live and settings.google_configured:
@@ -457,6 +459,10 @@ def diagnostics(live: bool = False, user: User = Depends(require("client.edit"))
                     return True
                 except api.GoogleApiError as e:
                     by[key]["status"], by[key]["detail"] = _classify(e)
+                    if key == "mybusiness.googleapis.com" and by[key]["status"] == "disabled":
+                        by[key]["detail"] += (" Open Enable while signed in to Google Cloud with the account that owns project "
+                                              f"{num}. If the page says the API can't be found, Google hasn't approved Business "
+                                              "Profile API access for this project yet — use “Request Business Profile API access”.")
                     by[key]["detail"] += f" ({e})"
                     return False
 

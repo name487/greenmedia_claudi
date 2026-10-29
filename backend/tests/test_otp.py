@@ -196,3 +196,11 @@ def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
     monkeypatch.setattr(settings, "sms_text", "")
     r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
     assert r.status_code == 502 and "missing SMS_TEXT" in r.json()["detail"] and not calls
+
+
+def test_sms_provider_choice():
+    from app.config import sms_provider_from
+    assert sms_provider_from({}) == "console"
+    assert sms_provider_from({"SMS_PROVIDER": "", "SMS_AUTHKEY": "ak"}) == "nimbusit"  # the .env.example line left empty
+    assert sms_provider_from({"SMS_PROVIDER": " ", "SMS_AUTHKEY": ""}) == "console"
+    assert sms_provider_from({"SMS_PROVIDER": "MSG91", "SMS_AUTHKEY": "ak"}) == "msg91"

@@ -19,6 +19,12 @@ def _url(value: str) -> str:
     return value if "://" in value else f"https://{value}"
 
 
+
+def sms_provider_from(env) -> str:
+    """SMS_PROVIDER, or nimbusit when only SMS_AUTHKEY is filled. An empty `SMS_PROVIDER=` line counts as not set."""
+    chosen = (env.get("SMS_PROVIDER") or "").strip().lower()
+    return chosen or ("nimbusit" if (env.get("SMS_AUTHKEY") or "").strip() else "console")
+
 class Settings:
     database_url: str = _db_url(os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}"))
     jwt_secret: str = os.getenv("JWT_SECRET", "dev-only-change-me")
@@ -56,7 +62,7 @@ class Settings:
     # SMS_TEXT exactly as the approved template and {otp} where the code goes), msg91 (MSG91_AUTH_KEY +
     # MSG91_TEMPLATE_ID with an ##OTP## variable) or twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM).
     # Without SMS_PROVIDER, setting SMS_AUTHKEY picks nimbusit.
-    sms_provider: str = os.getenv("SMS_PROVIDER", "nimbusit" if os.getenv("SMS_AUTHKEY") else "console").lower()
+    sms_provider: str = sms_provider_from(os.environ)
     sms_host: str = os.getenv("SMS_HOST", "nimbusit.net")
     sms_user: str = os.getenv("SMS_USER", "")
     sms_authkey: str = os.getenv("SMS_AUTHKEY", "")

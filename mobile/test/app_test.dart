@@ -70,6 +70,11 @@ MockClient fakeApi(List<String> calls) {
       case '/api/auth/otp/request':
         final digits = ((jsonDecode(req.body) as Map)['phone'] as String).replaceAll(RegExp(r'\D'), '');
         final phone = '+91$digits';
+        // 9111111111: the SMS gateway refuses; 9222222222: a real SMS went out (no demo code in the answer)
+        if (digits == '9111111111') return json({'detail': "Couldn't send the SMS: NimbusIT: Invalid Template"}, 502);
+        if (digits == '9222222222') {
+          return json({...(fixture('otp_request') as Map)..remove('dev_code'), 'phone': phone, 'masked': '+919222••••22'});
+        }
         return json({...fixture('otp_request') as Map, 'phone': phone, 'masked': '${phone.substring(0, phone.length - 6)}••••${phone.substring(phone.length - 2)}'});
       case '/api/auth/otp/verify':
         final b = jsonDecode(req.body) as Map;
@@ -376,6 +381,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(session.signedIn, isTrue);
       expect(session.me!.role, 'admin');
+    });
+
+    testWidgets('code sent by SMS: no demo chip; a refused SMS shows why', (tester) async {
+      await pumpApp(tester, []);
+      await requestCode(tester, '9111111111');
+      expect(find.text("Couldn't send the SMS: NimbusIT: Invalid Template"), findsOneWidget);
+      expect(find.text('Enter your\nphone number'), findsOneWidget);
+      await requestCode(tester, '9222222222');
+      expect(find.text('Code sent to +919222••••22'), findsOneWidget);
+      expect(find.textContaining('Demo server'), findsNothing);
+      expect(tester.widget<TextField>(find.byKey(const Key('otp'))).autofillHints, contains(AutofillHints.oneTimeCode));
     });
 
     testWidgets('back from the code step returns to the number', (tester) async {

@@ -156,3 +156,43 @@ def test_provider_failure_is_reported(client, monkeypatch):
     monkeypatch.setattr(settings, "sms_provider", "msg91")
     r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
     assert r.status_code == 502 and "Invalid authkey" in r.json()["detail"]
+
+
+def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        return httpx.Response(200, json={"STATUS": "OK", "RESPONSE": {"CODE": "100", "INFO": "msg-1"}})
+
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
+    for k, v in {"sms_provider": "nimbusit", "sms_host": "nimbusit.net", "sms_user": "u1", "sms_authkey": "ak", "sms_sender": "SNDRID",
+                 "sms_entityid": "ent1", "sms_templateid": "tpl1", "sms_rpt": "1",
+                 "sms_text": "Your OTP is {otp}. Valid for {minutes} minutes."}.items():
+        monkeypatch.setattr(settings, k, v)
+    out = _code(client)
+    assert "dev_code" not in out
+    q = calls[0].url.params
+    assert calls[0].url.scheme == "https" and calls[0].url.host == "nimbusit.net" and calls[0].url.path == "/api/pushsms"
+    assert (q["user"], q["authkey"], q["sender"], q["mobile"], q["entityid"], q["templateid"], q["rpt"]) == \
+        ("u1", "ak", "SNDRID", "9876543210", "ent1", "tpl1", "1")
+    otp = q["text"].removeprefix("Your OTP is ").split(".")[0]
+    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 4 and otp.isdigit()
+    # the code in the SMS signs in
+    assert _verify(client, otp).status_code == 200
+
+    # the gateway's refusal reaches the app
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={"STATUS": "ERROR", "RESPONSE": {"CODE": "105", "INFO": "Invalid Template"}}))))
+    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
+    assert r.status_code == 502 and "Invalid Template" in r.json()["detail"]
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="ERROR: Invalid authkey"))))
+    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
+    assert r.status_code == 502 and "Invalid authkey" in r.json()["detail"]
+
+    # without the template text nothing is sent, and the app is told what's missing
+    calls.clear()
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
+    monkeypatch.setattr(settings, "sms_text", "")
+    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
+    assert r.status_code == 502 and "missing SMS_TEXT" in r.json()["detail"] and not calls

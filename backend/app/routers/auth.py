@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -16,6 +17,8 @@ from ..db import get_db
 from ..models import Client, OtpChallenge, Tenant, User
 from ..security import ROLE_LABELS, audit, create_token, current_user, load_role, verify_password
 from ..serializers import me_out, user_out
+
+log = logging.getLogger("greenmedia.auth")
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -97,10 +100,13 @@ def otp_request(body: OtpRequestIn, db: Session = Depends(get_db)):
     code = "".join(secrets.choice("0123456789") for _ in range(settings.otp_length))
     db.add(OtpChallenge(phone=phone, code_hash=_hash(phone, code) if has_account else "-", expires_at=now + timedelta(seconds=settings.otp_ttl_seconds)))
     db.commit()
+    if not has_account:  # the app gets the same answer (no number probing), but whoever runs the server can see why
+        log.warning("No SMS sent to %s: no active user has this mobile number. Add it to a user (web app → Users).", phones.masked(phone))
     if has_account:
         try:
             sms.send_otp(phone, code)
         except sms.SmsError as e:
+            log.warning("SMS to %s failed: %s", phones.masked(phone), e)
             raise HTTPException(502, f"Couldn't send the SMS: {e}") from e
         if settings.sms_provider == "console" and settings.seed_demo:
             out["dev_code"] = code  # demo installs only (no SMS provider): lets testers sign in

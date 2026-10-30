@@ -32,7 +32,7 @@ def _verify(client, code, phone="9876543210"):
 
 def test_owner_with_two_businesses_signs_in_and_picks_one(client):
     out = _code(client, "98765 43210")
-    assert out["phone"] == OWNER and out["length"] == 4 and out["resend_in"] == 0 and out["masked"] == "+919876••••10"
+    assert out["phone"] == OWNER and out["length"] == 6 and out["resend_in"] == 0 and out["masked"] == "+919876••••10"
     code = out["dev_code"]  # demo install with SMS_PROVIDER=console
     with SessionLocal() as db:
         assert code not in db.query(OtpChallenge).order_by(OtpChallenge.id.desc()).first().code_hash  # only a hash is stored
@@ -143,7 +143,7 @@ def test_msg91(client, monkeypatch):
     assert "dev_code" not in out  # real SMS: the code is never in the response
     req = calls[0]
     assert req.url.host == "control.msg91.com" and req.headers["authkey"] == "mk"
-    assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 4
+    assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 6
 
 
 def test_provider_failure_is_reported(client, monkeypatch):
@@ -172,7 +172,7 @@ def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
     assert (q["usr"], q["user"], q["authkey"], q["sender"], q["mobile"], q["entityid"], q["templateid"], q["rpt"]) == \
         ("u1", "u1", "ak", "SNDRID", "9876543210", "ent1", "tpl1", "1")
     otp = q["text"].removeprefix("Your OTP is ").split(".")[0]
-    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 4 and otp.isdigit()
+    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 6 and otp.isdigit()
     # the code in the SMS signs in
     assert _verify(client, otp).status_code == 200
 
@@ -224,3 +224,43 @@ def test_nimbusit_plain_text_answers_and_http_fallback(client, monkeypatch):
     monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="Wrong Username or Password"))))
     r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
     assert r.status_code == 502 and "Wrong Username or Password" in r.json()["detail"]
+
+
+def _nimbus(monkeypatch, handler, **over):
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
+    cfg = {"sms_provider": "nimbusit", "sms_host": "nimbusit.net", "sms_user": "u1", "sms_authkey": "ak", "sms_sender": "SNDRID",
+           "sms_entityid": "ent1", "sms_templateid": "tpl1", "sms_rpt": "1",
+           "sms_text": "Dear customer, your OTP is {#var#}. Valid for 3 mins. - Team"}
+    for k, v in (cfg | over).items():
+        monkeypatch.setattr(settings, k, v)
+
+
+def test_dlt_template_with_var_placeholder(client, monkeypatch):
+    calls = []
+    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="OK msgid 1"))
+    _code(client)
+    text = calls[0].url.params["text"]
+    code = text.removeprefix("Dear customer, your OTP is ").split(".")[0]
+    assert text == f"Dear customer, your OTP is {code}. Valid for 3 mins. - Team" and code.isdigit() and len(code) == settings.otp_length
+    assert _verify(client, code).status_code == 200
+
+
+def test_unknown_number_is_explained_in_the_server_log(client, monkeypatch, caplog):
+    calls = []
+    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="OK"))
+    with caplog.at_level("WARNING", logger="greenmedia.auth"):
+        assert _code(client, "9123456789")["sent"] is True  # same answer for the app
+    assert not calls and "No SMS sent to +919123••••89: no active user has this mobile number" in caplog.text
+
+
+def test_send_test_sms_command_shows_the_gateway_reply(monkeypatch):
+    from app.manage import send_test_sms
+    calls = []
+    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="Message Submitted id-77"))
+    out = send_test_sms("98330 12303")  # no account needed
+    assert "SMS: NimbusIT via nimbusit.net as SNDRID" in out and "To +919833012303" in out and "Gateway replied: Message Submitted id-77" in out
+    assert calls[0].url.params["mobile"] == "9833012303"
+    _nimbus(monkeypatch, lambda r: httpx.Response(200, text="Invalid Template"))
+    assert "FAILED: NimbusIT: Invalid Template" in send_test_sms("9833012303")
+    _nimbus(monkeypatch, lambda r: httpx.Response(200, text="x"), sms_text="no placeholder here")
+    assert "missing SMS_TEXT" in send_test_sms("9833012303")

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .ai import ai_enabled
+from . import plans, sms
 from .config import settings
 from .routers import ai as ai_router
 from .routers import meta as meta_router
@@ -35,8 +36,22 @@ async def _scheduler(minutes: int) -> None:
         await asyncio.sleep(minutes * 60)
 
 
+def _show_app_logs() -> None:
+    """uvicorn only prints its own messages; also print ours (SMS sent or refused, scheduler runs, …)."""
+    log = logging.getLogger("greenmedia")
+    if not log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+        log.propagate = False
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    _show_app_logs()
+    logging.getLogger("greenmedia.sms").info(sms.describe())
+    logging.getLogger("greenmedia.plans").info(plans.describe())
     init_db(seed_if_empty=settings.seed_demo)
     # With Redis, Celery beat owns scheduling; the in-process loop is only the no-Redis fallback.
     run_loop = settings.scheduler_minutes > 0 and not settings.celery_enabled

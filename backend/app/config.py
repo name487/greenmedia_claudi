@@ -20,6 +20,11 @@ def _url(value: str) -> str:
 
 
 
+def first_set(env, *names: str) -> str:
+    """The first of these settings that has a value (several names are accepted for the same thing)."""
+    return next((v.strip() for v in (env.get(n) for n in names) if v and v.strip()), "")
+
+
 def sms_provider_from(env) -> str:
     """SMS_PROVIDER, or nimbusit when only SMS_AUTHKEY is filled. An empty `SMS_PROVIDER=` line counts as not set."""
     chosen = (env.get("SMS_PROVIDER") or "").strip().lower()
@@ -73,7 +78,7 @@ class Settings:
     sms_text: str = os.getenv("SMS_TEXT", "")  # NimbusIT: the DLT-approved template, word for word, with {otp}
     msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
     msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
-    otp_length: int = int(os.getenv("OTP_LENGTH", "4"))
+    otp_length: int = int(os.getenv("OTP_LENGTH", "6"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))
     otp_max_per_hour: int = int(os.getenv("OTP_MAX_PER_HOUR", "5"))
@@ -94,8 +99,10 @@ class Settings:
 
     # My Plan (app): payments through Razorpay Payment Links (a hosted Razorpay page; the app needs no payment SDK).
     # Without keys, PAYMENTS_DEMO=1 (default when SEED_DEMO=1) offers a clearly marked practice checkout instead.
-    razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
-    razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    # RAZORPAY_KEY / RAZORPAY_SECRET are accepted too. A test key (rzp_test_…) runs Razorpay's test mode: real
+    # checkout pages, test cards/UPI, no money moves.
+    razorpay_key_id: str = first_set(os.environ, "RAZORPAY_KEY_ID", "RAZORPAY_KEY")
+    razorpay_key_secret: str = first_set(os.environ, "RAZORPAY_KEY_SECRET", "RAZORPAY_SECRET")
     razorpay_webhook_secret: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
     payments_demo: bool = os.getenv("PAYMENTS_DEMO", os.getenv("SEED_DEMO", "1")) == "1"
     # COUPONS="WELCOME10:10%,FESTIVE500:500" — a percentage, or rupees off

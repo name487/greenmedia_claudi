@@ -38,7 +38,7 @@ def my_plan(client_id: int, user: User = Depends(require_section("dashboard")), 
     pays = db.scalars(select(PlanPayment).where(PlanPayment.client_id == c.id, PlanPayment.status != "created").order_by(PlanPayment.id.desc()))
     return {"status": plans.status(c), "offer": plans.OFFER, "plans": plans.PLANS, "default_plan": plans.DEFAULT_PLAN, "compare": plans.COMPARE,
             "billing": {"gstin": "", "billing_address": "", "shipping_same": True, "shipping_address": "", **(c.billing or {})},
-            "payments": [plans.payment_out(p) for p in pays], "mandates": [], "payments_mode": plans.mode(),
+            "payments": [plans.payment_out(p) for p in pays], "mandates": [], "payments_mode": plans.mode(), "payments_test": plans.test_mode(),
             "can_buy": user.client_id == c.id or can(user, "client.edit")}
 
 

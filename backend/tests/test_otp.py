@@ -1,6 +1,7 @@
 """Phone OTP sign-in for the mobile app: request → verify → choose profile."""
 
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -137,13 +138,17 @@ def _provider(monkeypatch, name, **cfg):
     return calls
 
 
-def test_msg91(client, monkeypatch):
+def test_msg91_and_twilio(client, monkeypatch):
     calls = _provider(monkeypatch, "msg91", msg91_auth_key="mk", msg91_template_id="tpl")
     out = _code(client)
     assert "dev_code" not in out  # real SMS: the code is never in the response
     req = calls[0]
     assert req.url.host == "control.msg91.com" and req.headers["authkey"] == "mk"
     assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 6
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
+    _code(client)
+    form = parse_qs(calls[0].content.decode())
+    assert calls[0].url.path == "/2010-04-01/Accounts/AC1/Messages.json" and form["To"] == [OWNER] and "sign-in code" in form["Body"][0]
 
 
 def test_provider_failure_is_reported(client, monkeypatch):
@@ -153,114 +158,25 @@ def test_provider_failure_is_reported(client, monkeypatch):
     assert r.status_code == 502 and "Invalid authkey" in r.json()["detail"]
 
 
-def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
-    calls = []
-
-    def handler(req):
-        calls.append(req)
-        return httpx.Response(200, json={"STATUS": "OK", "RESPONSE": {"CODE": "100", "INFO": "msg-1"}})
-
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
-    for k, v in {"sms_provider": "nimbusit", "sms_host": "nimbusit.net", "sms_user": "u1", "sms_authkey": "ak", "sms_sender": "SNDRID",
-                 "sms_entityid": "ent1", "sms_templateid": "tpl1", "sms_rpt": "1",
-                 "sms_text": "Your OTP is {otp}. Valid for {minutes} minutes."}.items():
-        monkeypatch.setattr(settings, k, v)
-    out = _code(client)
-    assert "dev_code" not in out
-    q = calls[0].url.params
-    assert calls[0].url.scheme == "https" and calls[0].url.host == "nimbusit.net" and calls[0].url.path == "/api/pushsms"
-    assert (q["usr"], q["user"], q["authkey"], q["sender"], q["mobile"], q["entityid"], q["templateid"], q["rpt"]) == \
-        ("u1", "u1", "ak", "SNDRID", "9876543210", "ent1", "tpl1", "1")
-    otp = q["text"].removeprefix("Your OTP is ").split(".")[0]
-    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 6 and otp.isdigit()
-    # the code in the SMS signs in
-    assert _verify(client, otp).status_code == 200
-
-    # the gateway's refusal reaches the app
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(
-        lambda r: httpx.Response(200, json={"STATUS": "ERROR", "RESPONSE": {"CODE": "105", "INFO": "Invalid Template"}}))))
-    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
-    assert r.status_code == 502 and "Invalid Template" in r.json()["detail"]
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="ERROR: Invalid authkey"))))
-    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
-    assert r.status_code == 502 and "Invalid authkey" in r.json()["detail"]
-
-    # without the template text nothing is sent, and the app is told what's missing
-    calls.clear()
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
-    monkeypatch.setattr(settings, "sms_text", "")
-    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
-    assert r.status_code == 502 and "missing SMS_TEXT" in r.json()["detail"] and not calls
-
-
 def test_sms_provider_choice():
     from app.config import sms_provider_from
     assert sms_provider_from({}) == "console"
-    assert sms_provider_from({"SMS_PROVIDER": "", "SMS_AUTHKEY": "ak"}) == "nimbusit"  # the .env.example line left empty
-    assert sms_provider_from({"SMS_PROVIDER": " ", "SMS_AUTHKEY": ""}) == "console"
-    assert sms_provider_from({"SMS_PROVIDER": "MSG91", "SMS_AUTHKEY": "ak"}) == "msg91"
-
-
-def test_nimbusit_plain_text_answers_and_http_fallback(client, monkeypatch):
-    calls = []
-
-    def handler(req):
-        calls.append(req)
-        if req.url.scheme == "https":
-            raise httpx.ConnectError("no https here", request=req)
-        return httpx.Response(200, text="SMS-SHOOT-ID/demo1234ab")  # NimbusIT answers in plain text
-
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
-    for k, v in {"sms_provider": "nimbusit", "sms_host": "nimbusit.net", "sms_user": "u1", "sms_authkey": "ak", "sms_sender": "SNDRID",
-                 "sms_entityid": "", "sms_templateid": "", "sms_rpt": "1", "sms_text": "OTP {otp}"}.items():
-        monkeypatch.setattr(settings, k, v)
-    assert "dev_code" not in _code(client)
-    assert [c.url.scheme for c in calls] == ["https", "http"]  # like NimbusIT's sample when the gateway has no https
-    assert "entityid" not in calls[1].url.params  # the DLT ids are optional
-    monkeypatch.setattr(settings, "sms_host", "http://nimbusit.net")  # a scheme in SMS_HOST is used as is
-    calls.clear()
-    _code(client)
-    assert [c.url.scheme for c in calls] == ["http"]
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="Wrong Username or Password"))))
-    r = client.post("/api/auth/otp/request", json={"phone": "9876543210"})
-    assert r.status_code == 502 and "Wrong Username or Password" in r.json()["detail"]
-
-
-def _nimbus(monkeypatch, handler, **over):
-    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(handler)))
-    cfg = {"sms_provider": "nimbusit", "sms_host": "nimbusit.net", "sms_user": "u1", "sms_authkey": "ak", "sms_sender": "SNDRID",
-           "sms_entityid": "ent1", "sms_templateid": "tpl1", "sms_rpt": "1",
-           "sms_text": "Dear customer, your OTP is {#var#}. Valid for 3 mins. - Team"}
-    for k, v in (cfg | over).items():
-        monkeypatch.setattr(settings, k, v)
-
-
-def test_dlt_template_with_var_placeholder(client, monkeypatch):
-    calls = []
-    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="OK msgid 1"))
-    _code(client)
-    text = calls[0].url.params["text"]
-    code = text.removeprefix("Dear customer, your OTP is ").split(".")[0]
-    assert text == f"Dear customer, your OTP is {code}. Valid for 3 mins. - Team" and code.isdigit() and len(code) == settings.otp_length
-    assert _verify(client, code).status_code == 200
+    assert sms_provider_from({"SMS_PROVIDER": ""}) == "console"  # the .env.example line left empty
+    assert sms_provider_from({"SMS_PROVIDER": " Twilio "}) == "twilio"
 
 
 def test_unknown_number_is_explained_in_the_server_log(client, monkeypatch, caplog):
-    calls = []
-    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="OK"))
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
     with caplog.at_level("WARNING", logger="greenmedia.auth"):
         assert _code(client, "9123456789")["sent"] is True  # same answer for the app
     assert not calls and "No SMS sent to +919123••••89: no active user has this mobile number" in caplog.text
 
 
-def test_send_test_sms_command_shows_the_gateway_reply(monkeypatch):
+def test_send_test_sms_command_shows_the_provider_reply(monkeypatch):
     from app.manage import send_test_sms
-    calls = []
-    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="Message Submitted id-77"))
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
     out = send_test_sms("98330 12303")  # no account needed
-    assert "SMS: NimbusIT via nimbusit.net as SNDRID" in out and "To +919833012303" in out and "Gateway replied: Message Submitted id-77" in out
-    assert calls[0].url.params["mobile"] == "9833012303"
-    _nimbus(monkeypatch, lambda r: httpx.Response(200, text="Invalid Template"))
-    assert "FAILED: NimbusIT: Invalid Template" in send_test_sms("9833012303")
-    _nimbus(monkeypatch, lambda r: httpx.Response(200, text="x"), sms_text="no placeholder here")
-    assert "missing SMS_TEXT" in send_test_sms("9833012303")
+    assert "SMS: Twilio from +15550001111" in out and "To +919833012303" in out and "Provider replied:" in out
+    assert parse_qs(calls[0].content.decode())["To"] == ["+919833012303"]
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "Authenticate"}))))
+    assert "FAILED: Twilio: Authenticate" in send_test_sms("9833012303")

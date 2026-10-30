@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .ai import ai_enabled
-from . import sms
+from . import plans, sms
 from .config import settings
 from .routers import ai as ai_router
 from .routers import meta as meta_router
@@ -51,6 +51,7 @@ def _show_app_logs() -> None:
 async def lifespan(_: FastAPI):
     _show_app_logs()
     logging.getLogger("greenmedia.sms").info(sms.describe())
+    logging.getLogger("greenmedia.plans").info(plans.describe())
     init_db(seed_if_empty=settings.seed_demo)
     # With Redis, Celery beat owns scheduling; the in-process loop is only the no-Redis fallback.
     run_loop = settings.scheduler_minutes > 0 and not settings.celery_enabled

@@ -70,6 +70,19 @@ def mode() -> str:
     return "demo" if settings.payments_demo else "off"
 
 
+def test_mode() -> bool:
+    """Razorpay test keys: real Razorpay pages, but only test cards / UPI and no money moves."""
+    return mode() == "live" and settings.razorpay_key_id.startswith("rzp_test_")
+
+
+def describe() -> str:
+    """One line for the startup log: how payments run."""
+    m = mode()
+    if m == "live":
+        return "Payments: Razorpay TEST mode (test key — no real money)" if test_mode() else "Payments: Razorpay LIVE (real money)"
+    return "Payments: practice checkout (no Razorpay keys)" if m == "demo" else "Payments: off (no Razorpay keys, PAYMENTS_DEMO=0)"
+
+
 def today() -> date:
     return datetime.now(TZ).date()
 

@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 194 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 195 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,7 +554,7 @@ cd backend && pytest -q          # 194 tests: Preference (fields, validation, ph
                                  #   phone OTP sign-in: codes, limits, profiles, NimbusIT/MSG91)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
-cd mobile  && flutter analyze && flutter test   # 49 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in (owners and staff; SMS refused, no demo chip with a real SMS), no email or server option on the sign-in screen, role-based navigation, escalation UI, API contract
+cd mobile  && flutter analyze && flutter test   # 50 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone OTP sign-in (owners and staff; SMS refused, no demo chip with a real SMS), no email or server option on the sign-in screen, role-based navigation, escalation UI, API contract
 ```
 
 The Flutter tests use JSON fixtures captured from the real API, so they catch contract drift.
@@ -764,6 +764,8 @@ API: `GET /api/clients/{id}/monthly-report?month=YYYY-MM`, `POST /api/clients/{i
 - **No Active Mandates**: nothing is debited automatically; every payment is one the owner makes. **Payments** lists
   each one with its date, period, coupon and status.
 
+**Test payments:** with Razorpay *test* keys (`rzp_test_…`) everything runs for real on Razorpay's pages, but no money moves: pay with UPI ID `success@razorpay` (or `failure@razorpay` to try a failed payment) or a test card from Razorpay's docs. The app's My Plan screen and the API's start-up log say "Razorpay TEST mode". On your own PC the webhook can't reach `localhost`; that's fine, because the app also asks Razorpay for the payment's status when you come back from the payment page. For a phone, `PUBLIC_BASE_URL` must be an address the phone can open (not `127.0.0.1`).
+
 **Payment** goes through **Razorpay Payment Links**: the app opens Razorpay's hosted page, so the app needs no payment
 SDK. A plan becomes active only when Razorpay confirms the payment, through any of these:
 - the signed redirect back (`/api/plan/razorpay/callback`)
@@ -772,7 +774,7 @@ SDK. A plan becomes active only when Razorpay confirms the payment, through any 
 
 The app's word alone never activates a plan. Paying again extends the plan from the end of the current one.
 
-Settings: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` (set the webhook in the Razorpay
+Settings: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (or `RAZORPAY_KEY` / `RAZORPAY_SECRET`), `RAZORPAY_WEBHOOK_SECRET` (set the webhook in the Razorpay
 dashboard to `{PUBLIC_BASE_URL}/api/plan/razorpay/webhook`). `COUPONS` takes the form `CODE:10%,CODE2:500` (a
 percentage, or rupees off). Without keys, `PAYMENTS_DEMO=1` (default when `SEED_DEMO=1`) uses a practice checkout page
 that is clearly marked and moves no money; with `PAYMENTS_DEMO=0` and no keys, the app says online payment isn't set up.

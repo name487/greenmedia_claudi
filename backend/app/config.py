@@ -19,8 +19,7 @@ def _url(value: str) -> str:
     return value if "://" in value else f"https://{value}"
 
 
-<<<<<<< HEAD
-=======
+
 
 def first_set(env, *names: str) -> str:
     """The first of these settings that has a value (several names are accepted for the same thing)."""
@@ -32,7 +31,7 @@ def sms_provider_from(env) -> str:
     chosen = (env.get("SMS_PROVIDER") or "").strip().lower()
     return chosen or ("nimbusit" if (env.get("SMS_AUTHKEY") or "").strip() else "console")
 
->>>>>>> 33702dcaf42d5acefcfe73774bc4f12512da1f4c
+
 class Settings:
     database_url: str = _db_url(os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}"))
     jwt_secret: str = os.getenv("JWT_SECRET", "dev-only-change-me")

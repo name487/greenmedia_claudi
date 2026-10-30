@@ -122,6 +122,7 @@ def test_razorpay_link_callback_and_forgery(client, portal, razorpay):
     assert "Payment successful" in client.get("/api/plan/razorpay/callback", params=signed).text
     p = client.get("/api/clients/1/plan", headers=portal).json()
     assert p["status"]["state"] == "active" and p["payments"][0]["status"] == "paid" and p["payments_mode"] == "live"
+    assert p["payments_test"] is True  # rzp_test_ key: the app says no real money moves
 
 
 def test_razorpay_webhook_and_status_refresh(client, portal, razorpay):
@@ -137,3 +138,16 @@ def test_razorpay_webhook_and_status_refresh(client, portal, razorpay):
     razorpay.links["plink_2"].update(status="paid", payments=[{"payment_id": "pay_Z", "status": "captured"}])
     st = client.get(f"/api/clients/1/plan/payments/{b['id']}", headers=portal).json()
     assert st["status"] == "paid" and st["plan_status"]["plan"]["name"] == "Pro"
+
+
+def test_razorpay_key_names_and_test_or_live(monkeypatch):
+    from app.config import first_set
+    # RAZORPAY_KEY / RAZORPAY_SECRET work as well as RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET
+    assert first_set({"RAZORPAY_KEY": " rzp_test_abc "}, "RAZORPAY_KEY_ID", "RAZORPAY_KEY") == "rzp_test_abc"
+    assert first_set({"RAZORPAY_KEY_ID": "", "RAZORPAY_KEY": "k2"}, "RAZORPAY_KEY_ID", "RAZORPAY_KEY") == "k2"
+    assert first_set({}, "RAZORPAY_KEY_ID", "RAZORPAY_KEY") == ""
+    monkeypatch.setattr(settings, "razorpay_key_secret", "s")
+    monkeypatch.setattr(settings, "razorpay_key_id", "rzp_test_abc")
+    assert plans.test_mode() and plans.describe() == "Payments: Razorpay TEST mode (test key — no real money)"
+    monkeypatch.setattr(settings, "razorpay_key_id", "rzp_live_abc")
+    assert not plans.test_mode() and plans.describe() == "Payments: Razorpay LIVE (real money)"

@@ -472,6 +472,7 @@ class _ChoosePlanScreenState extends State<ChoosePlanScreen> with WidgetsBinding
   @override
   Widget build(BuildContext context) {
     final demo = widget.data['payments_mode'] == 'demo';
+    final test = widget.data['payments_test'] == true;
     return Scaffold(
       appBar: navyBar('My Plan', subtitle: context.read<Session>().me!.clientName),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 16, 14, 16), children: [
@@ -523,7 +524,12 @@ class _ChoosePlanScreenState extends State<ChoosePlanScreen> with WidgetsBinding
             const Icon(Icons.lock_outline, color: Colors.black45),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(demo ? 'Practice mode: a test checkout page, no money moves.' : 'Secure payments by Razorpay. One-time charge. Nothing is debited automatically later.',
+              child: Text(
+                  demo
+                      ? 'Practice mode: a test checkout page, no money moves.'
+                      : test
+                          ? 'Razorpay test mode: no real money moves. On Razorpay\'s page pay with UPI ID success@razorpay or a Razorpay test card.'
+                          : 'Secure payments by Razorpay. One-time charge. Nothing is debited automatically later.',
                   key: const Key('payments-note'), style: const TextStyle(fontSize: 12, color: Colors.black54)),
             ),
           ]),

@@ -19,6 +19,20 @@ def _url(value: str) -> str:
     return value if "://" in value else f"https://{value}"
 
 
+<<<<<<< HEAD
+=======
+
+def first_set(env, *names: str) -> str:
+    """The first of these settings that has a value (several names are accepted for the same thing)."""
+    return next((v.strip() for v in (env.get(n) for n in names) if v and v.strip()), "")
+
+
+def sms_provider_from(env) -> str:
+    """SMS_PROVIDER, or nimbusit when only SMS_AUTHKEY is filled. An empty `SMS_PROVIDER=` line counts as not set."""
+    chosen = (env.get("SMS_PROVIDER") or "").strip().lower()
+    return chosen or ("nimbusit" if (env.get("SMS_AUTHKEY") or "").strip() else "console")
+
+>>>>>>> 33702dcaf42d5acefcfe73774bc4f12512da1f4c
 class Settings:
     database_url: str = _db_url(os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}"))
     jwt_secret: str = os.getenv("JWT_SECRET", "dev-only-change-me")
@@ -88,8 +102,10 @@ class Settings:
 
     # My Plan (app): payments through Razorpay Payment Links (a hosted Razorpay page; the app needs no payment SDK).
     # Without keys, PAYMENTS_DEMO=1 (default when SEED_DEMO=1) offers a clearly marked practice checkout instead.
-    razorpay_key_id: str = os.getenv("RAZORPAY_KEY_ID", "")
-    razorpay_key_secret: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    # RAZORPAY_KEY / RAZORPAY_SECRET are accepted too. A test key (rzp_test_…) runs Razorpay's test mode: real
+    # checkout pages, test cards/UPI, no money moves.
+    razorpay_key_id: str = first_set(os.environ, "RAZORPAY_KEY_ID", "RAZORPAY_KEY")
+    razorpay_key_secret: str = first_set(os.environ, "RAZORPAY_KEY_SECRET", "RAZORPAY_SECRET")
     razorpay_webhook_secret: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
     payments_demo: bool = os.getenv("PAYMENTS_DEMO", os.getenv("SEED_DEMO", "1")) == "1"
     # COUPONS="WELCOME10:10%,FESTIVE500:500" — a percentage, or rupees off

@@ -54,6 +54,9 @@ var reportNoScore = false;
 /// The fake plan has been paid for.
 var planPaid = false;
 
+/// The fake backend uses Razorpay test keys (rzp_test_…).
+var planRazorpayTest = false;
+
 /// The person's Analytics & Personalisation choice on the fake backend.
 var analyticsOn = false;
 
@@ -187,7 +190,8 @@ MockClient fakeApi(List<String> calls) {
     // My Plan (fixtures captured from the real API)
     switch ((req.method, req.url.path)) {
       case ('GET', '/api/clients/1/plan'):
-        return json(fixture(planPaid ? 'plan_client_active' : 'plan_client'));
+        final plan = fixture(planPaid ? 'plan_client_active' : 'plan_client') as Map<String, dynamic>;
+        return json(planRazorpayTest ? {...plan, 'payments_mode': 'live', 'payments_test': true} : plan);
       case ('PUT', '/api/clients/1/plan/billing'):
         sentBodies['plan-billing'] = jsonDecode(req.body);
         return json(fixture('plan_billing'));
@@ -1135,6 +1139,17 @@ void main() {
       await tester.tap(find.byKey(Key(key)));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('Razorpay test keys: the app says no real money moves', (tester) async {
+      planRazorpayTest = true;
+      addTearDown(() => planRazorpayTest = false);
+      await openPlan(tester, []);
+      await tapKey(tester, 'plan-start');
+      await tapKey(tester, 'go-premium');
+      expect(find.textContaining('Razorpay test mode: no real money moves'), findsOneWidget);
+      expect(find.textContaining('success@razorpay'), findsOneWidget);
+      expect(find.textContaining('Practice mode'), findsNothing);
+    });
 
     testWidgets('not activated, no mandates, no payments; billing details', (tester) async {
       final calls = <String>[];

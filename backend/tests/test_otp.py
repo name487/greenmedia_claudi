@@ -1,6 +1,7 @@
 """Phone OTP sign-in for the mobile app: request → verify → choose profile."""
 
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -137,13 +138,17 @@ def _provider(monkeypatch, name, **cfg):
     return calls
 
 
-def test_msg91(client, monkeypatch):
+def test_msg91_and_twilio(client, monkeypatch):
     calls = _provider(monkeypatch, "msg91", msg91_auth_key="mk", msg91_template_id="tpl")
     out = _code(client)
     assert "dev_code" not in out  # real SMS: the code is never in the response
     req = calls[0]
     assert req.url.host == "control.msg91.com" and req.headers["authkey"] == "mk"
     assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 6
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
+    _code(client)
+    form = parse_qs(calls[0].content.decode())
+    assert calls[0].url.path == "/2010-04-01/Accounts/AC1/Messages.json" and form["To"] == [OWNER] and "sign-in code" in form["Body"][0]
 
 
 def test_provider_failure_is_reported(client, monkeypatch):
@@ -153,6 +158,7 @@ def test_provider_failure_is_reported(client, monkeypatch):
     assert r.status_code == 502 and "Invalid authkey" in r.json()["detail"]
 
 
+<<<<<<< HEAD
 def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
     calls = []
 
@@ -248,21 +254,27 @@ def test_dlt_template_with_var_placeholder(client, monkeypatch):
     code = text.removeprefix("Dear customer, your OTP is ").split(".")[0]
     assert text == f"Dear customer, your OTP is {code}. Valid for 3 mins. - Team" and code.isdigit() and len(code) == settings.otp_length
     assert _verify(client, code).status_code == 200
+=======
+def test_sms_provider_choice():
+    from app.config import sms_provider_from
+    assert sms_provider_from({}) == "console"
+    assert sms_provider_from({"SMS_PROVIDER": ""}) == "console"  # the .env.example line left empty
+    assert sms_provider_from({"SMS_PROVIDER": " Twilio "}) == "twilio"
+>>>>>>> aeb64512cfea35c1dfda847a91b3ed1e1018ff98
 
 
 def test_unknown_number_is_explained_in_the_server_log(client, monkeypatch, caplog):
-    calls = []
-    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="OK"))
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
     with caplog.at_level("WARNING", logger="greenmedia.auth"):
         assert _code(client, "9123456789")["sent"] is True  # same answer for the app
     assert not calls and "No SMS sent to +919123••••89: no active user has this mobile number" in caplog.text
 
 
-def test_send_test_sms_command_shows_the_gateway_reply(monkeypatch):
+def test_send_test_sms_command_shows_the_provider_reply(monkeypatch):
     from app.manage import send_test_sms
-    calls = []
-    _nimbus(monkeypatch, lambda r: calls.append(r) or httpx.Response(200, text="Message Submitted id-77"))
+    calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
     out = send_test_sms("98330 12303")  # no account needed
+<<<<<<< HEAD
     assert "SMS: NimbusIT via nimbusit.net as SNDRID" in out and "To +919833012303" in out and "Gateway replied: Message Submitted id-77" in out
     assert calls[0].url.params["mobile"] == "9833012303"
     _nimbus(monkeypatch, lambda r: httpx.Response(200, text="Invalid Template"))
@@ -270,3 +282,9 @@ def test_send_test_sms_command_shows_the_gateway_reply(monkeypatch):
     _nimbus(monkeypatch, lambda r: httpx.Response(200, text="x"), sms_text="no placeholder here")
     assert "missing SMS_TEXT" in send_test_sms("9833012303")
 >>>>>>> 33702dcaf42d5acefcfe73774bc4f12512da1f4c
+=======
+    assert "SMS: Twilio from +15550001111" in out and "To +919833012303" in out and "Provider replied:" in out
+    assert parse_qs(calls[0].content.decode())["To"] == ["+919833012303"]
+    monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "Authenticate"}))))
+    assert "FAILED: Twilio: Authenticate" in send_test_sms("9833012303")
+>>>>>>> aeb64512cfea35c1dfda847a91b3ed1e1018ff98

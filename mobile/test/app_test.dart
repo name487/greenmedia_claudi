@@ -75,7 +75,7 @@ MockClient fakeApi(List<String> calls) {
         final digits = ((jsonDecode(req.body) as Map)['phone'] as String).replaceAll(RegExp(r'\D'), '');
         final phone = '+91$digits';
         // 9111111111: the SMS gateway refuses; 9222222222: a real SMS went out (no demo code in the answer)
-        if (digits == '9111111111') return json({'detail': "Couldn't send the SMS: NimbusIT: Invalid Template"}, 502);
+        if (digits == '9111111111') return json({'detail': "Couldn't send the SMS: MSG91: Invalid template"}, 502);
         if (digits == '9222222222') {
           return json({...(fixture('otp_request') as Map)..remove('dev_code'), 'phone': phone, 'masked': '+919222••••22'});
         }
@@ -391,7 +391,7 @@ void main() {
     testWidgets('code sent by SMS: no demo chip; a refused SMS shows why', (tester) async {
       await pumpApp(tester, []);
       await requestCode(tester, '9111111111');
-      expect(find.text("Couldn't send the SMS: NimbusIT: Invalid Template"), findsOneWidget);
+      expect(find.text("Couldn't send the SMS: MSG91: Invalid template"), findsOneWidget);
       expect(find.text('Enter your\nphone number'), findsOneWidget);
       await requestCode(tester, '9222222222');
       expect(find.text('Code sent to +919222••••22'), findsOneWidget);

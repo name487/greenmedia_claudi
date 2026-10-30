@@ -3,6 +3,7 @@
     python -m app.manage create-admin --email you@agency.com --name "Your Name" [--agency "Green Media Technology"]
     python -m app.manage import-clients clients.csv [--agency "Green Media Technology"]
     python -m app.manage clients-template > clients.csv
+    python -m app.manage send-test-sms 98XXXXXXXX      # send one sign-in SMS through NimbusIT and print its reply
 
 Creates the database tables if needed, the agency (tenant) with its built-in roles if it doesn't exist,
 and an Admin user. The password is prompted for (never pass it on the command line)."""
@@ -13,7 +14,9 @@ import sys
 
 from sqlalchemy import func, select
 
-from . import importer
+from . import importer, sms
+from . import phone as phones
+from .config import settings
 from .db import SessionLocal
 from .models import Tenant, User
 from .security import ensure_default_roles, hash_password
@@ -37,6 +40,18 @@ def create_admin(email: str, name: str, agency: str, password: str) -> User:
         return user
 
 
+def send_test_sms(mobile: str, code: str = "") -> str:
+    """Skips the account check, so it shows exactly what NimbusIT says about this number and SMS_TEXT."""
+    phone = phones.normalize(mobile)
+    code = code or "123456"[: settings.otp_length].ljust(settings.otp_length, "0")
+    lines = [sms.describe(), f"To {phone}, code {code}"]
+    try:
+        lines.append("Gateway replied: " + sms.send_otp(phone, code))
+    except sms.SmsError as e:
+        lines.append(f"FAILED: {e}")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="python -m app.manage")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -48,8 +63,14 @@ def main(argv: list[str] | None = None) -> None:
     imp.add_argument("csv_file")
     imp.add_argument("--agency", default="Green Media Technology")
     sub.add_parser("clients-template", help="print an example clients CSV")
+    t = sub.add_parser("send-test-sms", help="send one sign-in SMS (code 123456) and print the gateway's reply")
+    t.add_argument("mobile")
+    t.add_argument("--code", default="")
     args = p.parse_args(argv)
 
+    if args.cmd == "send-test-sms":
+        print(send_test_sms(args.mobile, args.code))
+        return
     if args.cmd == "clients-template":
         print(importer.TEMPLATE, end="")
         return

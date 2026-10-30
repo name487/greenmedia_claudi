@@ -15,6 +15,7 @@ import 'package:greenmedia/screens/my_plan_screen.dart';
 import 'package:greenmedia/screens/owner_settings_screen.dart';
 import 'package:greenmedia/screens/owner_report_screen.dart';
 import 'package:greenmedia/screens/owner_reviews_screen.dart';
+import 'package:greenmedia/screens/phone_login_screen.dart' show OtpBoxes;
 import 'package:greenmedia/screens/reviews_screen.dart';
 import 'package:greenmedia/state/session.dart';
 import 'package:greenmedia/widgets/common.dart';
@@ -78,7 +79,7 @@ MockClient fakeApi(List<String> calls) {
         return json({...fixture('otp_request') as Map, 'phone': phone, 'masked': '${phone.substring(0, phone.length - 6)}••••${phone.substring(phone.length - 2)}'});
       case '/api/auth/otp/verify':
         final b = jsonDecode(req.body) as Map;
-        if (b['code'] != '1234') return json({'detail': 'Incorrect code — 4 attempts left'}, 400);
+        if (b['code'] != '123456') return json({'detail': 'Incorrect code — 4 attempts left'}, 400);
         return json(fixture(b['phone'] == '+919000000001' ? 'otp_verify_admin' : 'otp_verify_owner'));
       case '/api/auth/otp/select':
         final b = jsonDecode(req.body) as Map;
@@ -318,7 +319,7 @@ Future<void> requestCode(WidgetTester tester, String phone) async {
 Future<void> signIn(WidgetTester tester, String who) async {
   final owner = who.startsWith('anjali');
   await requestCode(tester, owner ? '9876543210' : '9000000001');
-  await tester.enterText(find.byKey(const Key('otp')), '1234');
+  await tester.enterText(find.byKey(const Key('otp')), '123456');
   await tester.pumpAndSettle();
   if (owner) {
     await tester.tap(find.text('Smile Dental Studio'));
@@ -350,11 +351,11 @@ void main() {
       expect(find.text('Code sent to +919876••••10'), findsOneWidget);
       expect(find.text('00:30'), findsOneWidget);
 
-      await tester.enterText(find.byKey(const Key('otp')), '9999');
+      await tester.enterText(find.byKey(const Key('otp')), '999999');
       await tester.pumpAndSettle();
       expect(find.textContaining('Incorrect code'), findsOneWidget);
 
-      await tester.enterText(find.byKey(const Key('otp')), '1234'); // verifies automatically when complete
+      await tester.enterText(find.byKey(const Key('otp')), '123456'); // verifies automatically when complete
       await tester.pumpAndSettle();
       expect(find.text('Select profile'), findsOneWidget);
       expect(find.text('Smile Dental Studio'), findsOneWidget);
@@ -377,7 +378,7 @@ void main() {
     testWidgets('a single profile opens straight away; demo code chip fills the code', (tester) async {
       final session = await pumpApp(tester, []);
       await requestCode(tester, '9000000001');
-      await tester.tap(find.text('Demo server — code 1234'));
+      await tester.tap(find.text('Demo server — code 123456'));
       await tester.pumpAndSettle();
       expect(session.signedIn, isTrue);
       expect(session.me!.role, 'admin');
@@ -392,6 +393,18 @@ void main() {
       expect(find.text('Code sent to +919222••••22'), findsOneWidget);
       expect(find.textContaining('Demo server'), findsNothing);
       expect(tester.widget<TextField>(find.byKey(const Key('otp'))).autofillHints, contains(AutofillHints.oneTimeCode));
+    });
+
+    testWidgets('six code boxes fit a small phone', (tester) async {
+      await pumpApp(tester, []);
+      await tester.binding.setSurfaceSize(const Size(320, 640));
+      await tester.pumpAndSettle();
+      await requestCode(tester, '9876543210');
+      expect(tester.takeException(), isNull); // no overflow
+      final boxes = find.descendant(of: find.byType(OtpBoxes), matching: find.byType(Container));
+      expect(boxes, findsNWidgets(6));
+      expect(tester.getTopRight(boxes.last).dx, lessThanOrEqualTo(320));
+      await tester.binding.setSurfaceSize(const Size(420, 900));
     });
 
     testWidgets('back from the code step returns to the number', (tester) async {

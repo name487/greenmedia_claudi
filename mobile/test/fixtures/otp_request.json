@@ -2,8 +2,8 @@
  "sent": true,
  "phone": "+919876543210",
  "masked": "+919876••••10",
- "length": 4,
+ "length": 6,
  "expires_in": 300,
  "resend_in": 30,
- "dev_code": "1234"
+ "dev_code": "123456"
 }

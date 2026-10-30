@@ -32,7 +32,7 @@ def _verify(client, code, phone="9876543210"):
 
 def test_owner_with_two_businesses_signs_in_and_picks_one(client):
     out = _code(client, "98765 43210")
-    assert out["phone"] == OWNER and out["length"] == 4 and out["resend_in"] == 0 and out["masked"] == "+919876••••10"
+    assert out["phone"] == OWNER and out["length"] == 6 and out["resend_in"] == 0 and out["masked"] == "+919876••••10"
     code = out["dev_code"]  # demo install with SMS_PROVIDER=console
     with SessionLocal() as db:
         assert code not in db.query(OtpChallenge).order_by(OtpChallenge.id.desc()).first().code_hash  # only a hash is stored
@@ -143,7 +143,7 @@ def test_msg91(client, monkeypatch):
     assert "dev_code" not in out  # real SMS: the code is never in the response
     req = calls[0]
     assert req.url.host == "control.msg91.com" and req.headers["authkey"] == "mk"
-    assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 4
+    assert req.url.params["mobile"] == "919876543210" and req.url.params["template_id"] == "tpl" and len(req.url.params["otp"]) == 6
 
 
 def test_provider_failure_is_reported(client, monkeypatch):
@@ -172,7 +172,7 @@ def test_nimbusit_sends_the_dlt_template(client, monkeypatch):
     assert (q["usr"], q["user"], q["authkey"], q["sender"], q["mobile"], q["entityid"], q["templateid"], q["rpt"]) == \
         ("u1", "u1", "ak", "SNDRID", "9876543210", "ent1", "tpl1", "1")
     otp = q["text"].removeprefix("Your OTP is ").split(".")[0]
-    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 4 and otp.isdigit()
+    assert q["text"] == f"Your OTP is {otp}. Valid for 5 minutes." and len(otp) == 6 and otp.isdigit()
     # the code in the SMS signs in
     assert _verify(client, otp).status_code == 200
 

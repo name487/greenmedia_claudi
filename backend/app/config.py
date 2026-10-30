@@ -73,7 +73,7 @@ class Settings:
     sms_text: str = os.getenv("SMS_TEXT", "")  # NimbusIT: the DLT-approved template, word for word, with {otp}
     msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
     msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
-    otp_length: int = int(os.getenv("OTP_LENGTH", "4"))
+    otp_length: int = int(os.getenv("OTP_LENGTH", "6"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))
     otp_max_per_hour: int = int(os.getenv("OTP_MAX_PER_HOUR", "5"))

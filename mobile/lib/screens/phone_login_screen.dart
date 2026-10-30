@@ -420,14 +420,17 @@ class OtpBoxes extends StatelessWidget {
         ),
         ListenableBuilder(
           listenable: Listenable.merge([controller, focusNode]),
-          builder: (context, _) {
+          builder: (context, _) => LayoutBuilder(builder: (context, box) {
             final text = controller.text;
+            // 54-wide boxes when there's room; narrower so a 6-digit code still fits a small phone
+            final gap = length > 4 ? 4.0 : 6.0;
+            final width = ((box.maxWidth / length) - 2 * gap).clamp(30.0, 54.0);
             return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               for (var i = 0; i < length; i++)
                 Container(
-                  width: 54,
+                  width: width,
                   height: 56,
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                  margin: EdgeInsets.symmetric(horizontal: gap),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: i < text.length || i == text.length ? Colors.white : const Color(0xFFEFF3F1),
@@ -440,7 +443,7 @@ class OtpBoxes extends StatelessWidget {
                   child: Text(i < text.length ? text[i] : '', style: Theme.of(context).textTheme.headlineSmall),
                 ),
             ]);
-          },
+          }),
         ),
       ]),
     );
@@ -454,7 +457,10 @@ class _SafeNote extends StatelessWidget {
   Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.lock_outline, size: 14, color: Colors.blueGrey),
         const SizedBox(width: 4),
-        Text('Your number is safe with us', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey)),
+        Flexible(
+          child: Text('Your number is safe with us', textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey)),
+        ),
       ]);
 }
 

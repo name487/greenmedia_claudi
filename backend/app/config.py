@@ -59,8 +59,8 @@ class Settings:
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     # Phone OTP sign-in (mobile app). SMS_PROVIDER: console (code only in the server log — development/demo),
     # nimbusit (India: SMS_HOST, SMS_USER, SMS_AUTHKEY, SMS_SENDER and the DLT SMS_ENTITYID + SMS_TEMPLATEID, with
-    # SMS_TEXT exactly as the approved template and {otp} where the code goes), msg91 (MSG91_AUTH_KEY +
-    # MSG91_TEMPLATE_ID with an ##OTP## variable) or twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM).
+    # SMS_TEXT exactly as the approved template and {otp} where the code goes) or msg91 (MSG91_AUTH_KEY +
+    # MSG91_TEMPLATE_ID with an ##OTP## variable).
     # Without SMS_PROVIDER, setting SMS_AUTHKEY picks nimbusit.
     sms_provider: str = sms_provider_from(os.environ)
     sms_host: str = os.getenv("SMS_HOST", "nimbusit.net")
@@ -73,9 +73,6 @@ class Settings:
     sms_text: str = os.getenv("SMS_TEXT", "")  # NimbusIT: the DLT-approved template, word for word, with {otp}
     msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
     msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
-    twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
-    twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
-    twilio_from: str = os.getenv("TWILIO_FROM", "")
     otp_length: int = int(os.getenv("OTP_LENGTH", "4"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))

@@ -64,7 +64,7 @@ class Settings:
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     # Phone OTP sign-in (mobile app). SMS_PROVIDER: console (code only in the server log — development/demo),
-<<<<<<< HEAD
+
     # nimbusit (India: SMS_HOST, SMS_USER, SMS_AUTHKEY, SMS_SENDER and the DLT SMS_ENTITYID + SMS_TEMPLATEID, with
     # SMS_TEXT exactly as the approved template and {otp} where the code goes) or msg91 (MSG91_AUTH_KEY +
     # MSG91_TEMPLATE_ID with an ##OTP## variable).
@@ -78,11 +78,11 @@ class Settings:
     sms_templateid: str = os.getenv("SMS_TEMPLATEID", "")
     sms_rpt: str = os.getenv("SMS_RPT", "1")
     sms_text: str = os.getenv("SMS_TEXT", "")  # NimbusIT: the DLT-approved template, word for word, with {otp}
-=======
+
     # msg91 (India: MSG91_AUTH_KEY + MSG91_TEMPLATE_ID with an ##OTP## variable) or twilio (TWILIO_ACCOUNT_SID,
     # TWILIO_AUTH_TOKEN, TWILIO_FROM).
     sms_provider: str = sms_provider_from(os.environ)
->>>>>>> aeb64512cfea35c1dfda847a91b3ed1e1018ff98
+
     msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
     msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
     twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")

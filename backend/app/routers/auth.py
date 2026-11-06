@@ -145,6 +145,8 @@ def otp_request(body: OtpRequestIn, db: Session = Depends(get_db)):
         log.warning("%s to %s failed: %s", "Email" if channel == "email" else "SMS", _masked(channel, to), e)
         raise HTTPException(502, f"Couldn't send the {'email' if channel == 'email' else 'SMS'}: {e}") from e
     console = not mailer.enabled() if channel == "email" else settings.sms_provider == "console"
+    if not console:
+        log.info("Sign-in code sent by %s to %s", "email" if channel == "email" else "SMS", _masked(channel, to))
     if console and settings.seed_demo:
         out["dev_code"] = code  # demo installs only (nothing really sent): lets testers sign in
     return out

@@ -277,3 +277,22 @@ def test_contact_email_is_explained_and_zeptomail_style_settings(client, monkeyp
     monkeypatch.setattr(settings, "smtp_encryption", "")
     monkeypatch.setattr(settings, "smtp_port", 587)
     assert mailer.encryption() == "starttls"
+
+
+def test_admin_puts_a_real_email_on_a_user_and_it_receives_the_code(client, monkeypatch, caplog):
+    from app import mailer
+    admin = login(client, "admin@greenmedia.in")
+    anjali = next(u for u in client.get("/api/users", headers=admin).json() if u["email"] == OWNER_EMAIL)
+    assert client.patch(f"/api/users/{anjali['id']}", headers=admin, json={"email": "admin@greenmedia.in"}).status_code == 409
+    assert client.patch(f"/api/users/{anjali['id']}", headers=admin, json={"email": "nope"}).status_code == 422
+    r = client.patch(f"/api/users/{anjali['id']}", headers=admin, json={"email": " Dr.Anjali.Rao@Gmail.com "})
+    assert r.status_code == 200 and r.json()["email"] == "dr.anjali.rao@gmail.com"
+    fake = FakeSmtp()
+    monkeypatch.setattr(mailer, "smtp_factory", fake)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.zeptomail.in")
+    monkeypatch.setattr(settings, "smtp_from", "Green Media GMB <noreply@greenmedia.example>")
+    with caplog.at_level("INFO", logger="greenmedia.auth"):
+        assert client.post("/api/auth/otp/request", json={"email": "dr.anjali.rao@gmail.com"}).status_code == 200
+    assert fake.sent[0]["To"] == "dr.anjali.rao@gmail.com" and "Sign-in code sent by email to dr••••@gmail.com" in caplog.text
+    # the old demo address is no longer a login
+    assert client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL}).status_code == 200 and len(fake.sent) == 1

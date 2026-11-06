@@ -800,6 +800,8 @@ def settings_view(request):
             messages.success(request, f"Created {u['email']} as {u['role_label']}. Share the password with them securely.")
         elif action == "update_user":
             patch = {"role": request.POST["role"], "status": request.POST["status"], "phone": request.POST.get("phone", "").strip()}
+            if request.POST.get("email", "").strip():
+                patch["email"] = request.POST["email"].strip()
             if request.POST["role"] == "client":
                 patch["client_id"] = _int(request.POST.get("client_id"))
             if request.POST.get("password"):

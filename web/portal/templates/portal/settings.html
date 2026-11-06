@@ -40,6 +40,7 @@
             <select class="input" name="role" aria-label="Role">{% for r in roles.roles %}<option value="{{ r.name }}"{% if r.name == u.role %} selected{% endif %}>{{ r.label }}</option>{% endfor %}</select>
             <select class="input" name="client_id" aria-label="Client (client-portal role only)"><option value="">— client —</option>{% for c in clients %}<option value="{{ c.id }}"{% if c.id == u.client_id %} selected{% endif %}>{{ c.company_name }}</option>{% endfor %}</select>
             <select class="input" name="status" aria-label="Status"><option value="active"{% if u.status == 'active' %} selected{% endif %}>Active</option><option value="disabled"{% if u.status != 'active' %} selected{% endif %}>Disabled</option></select>
+            <input class="input" type="email" name="email" value="{{ u.email }}" placeholder="Email (sign-in)" aria-label="Email for sign-in (web and app)" style="max-width:220px">
             <input class="input" type="tel" name="phone" value="{{ u.phone }}" placeholder="Mobile (app sign-in)" aria-label="Mobile number for app sign-in" style="max-width:170px">
             <input class="input" type="password" name="password" placeholder="New password (optional)" minlength="8" autocomplete="new-password" style="max-width:200px">
             <button class="btn sm">Save</button>

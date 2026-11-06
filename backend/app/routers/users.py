@@ -1,7 +1,7 @@
 """User and role administration (Admins: settings.edit). Roles live in the `roles` table per tenant."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -84,6 +84,12 @@ class UserPatch(BaseModel):
     status: str | None = Field(default=None, pattern="^(active|disabled)$")
     password: str | None = Field(default=None, min_length=MIN_PASSWORD, max_length=128)
     phone: str | None = None  # "" removes it
+    email: str | None = Field(default=None, min_length=5, max_length=200, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")  # also the app's email sign-in
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _trim_email(cls, v):
+        return v.strip() if isinstance(v, str) else v
 
 
 @router.patch("/users/{user_id}")
@@ -96,6 +102,12 @@ def update_user(user_id: int, body: UserPatch, user: User = Depends(require("set
         raise HTTPException(409, "You can't disable yourself or change your own role — ask another admin")
     if "role" in changes or "client_id" in changes:
         _check_role_and_client(db, user, changes.get("role", u.role), changes.get("client_id", u.client_id if "role" not in changes or changes["role"] == "client" else None))
+    if "email" in changes:
+        changes["email"] = changes["email"].strip().lower()
+        if changes["email"] == (u.email or "").lower():
+            del changes["email"]
+        elif db.scalar(select(User).where(func.lower(User.email) == changes["email"], User.id != u.id)):
+            raise HTTPException(409, "A user with that email already exists")
     for k, v in changes.items():
         if k == "password":
             u.password_hash = hash_password(v)

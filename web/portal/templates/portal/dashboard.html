@@ -1,5 +1,6 @@
 {% extends "portal/base.html" %}{% load gm %}
 {% block content %}
+{% if popup %}{% include "portal/_plan_popup.html" %}{% endif %}
 <div class="page-header">
   <div><h1>Good {{ greeting }}, {{ me.name }}</h1><p class="muted">{% if me.client_id %}{{ me.client_name }}{% else %}{{ d.client_performance|length }} clients{% endif %} · last 30 days</p></div>
   {% if not me.client_id and 'content.create' in perms %}<div class="page-actions"><a class="btn" href="{% url 'content' %}">+ New campaign</a></div>{% endif %}

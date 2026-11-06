@@ -205,6 +205,18 @@ def by_link(db: Session, link_id: str) -> PlanPayment | None:
     return db.scalar(select(PlanPayment).where(PlanPayment.link_id == link_id, PlanPayment.provider == "razorpay"))
 
 
+EXPIRING_DAYS = 7  # a plan ending within this many days is shown in red, like an expired one
+
+
+def alert(st: dict) -> str:
+    """'expired' / 'expiring' (red), 'active' (green) or 'none' (no plan yet) for a plan status()."""
+    if st["state"] == "expired":
+        return "expired"
+    if st["state"] == "active":
+        return "expiring" if st["days_left"] <= EXPIRING_DAYS else "active"
+    return "none"
+
+
 def payment_out(p: PlanPayment) -> dict:
     return {"id": p.id, "plan": p.plan_key, "plan_name": PLAN.get(p.plan_key, {}).get("name", p.plan_key), "amount": p.amount,
             "list_amount": p.list_amount, "coupon": p.coupon, "status": p.status, "demo": p.provider == "demo",

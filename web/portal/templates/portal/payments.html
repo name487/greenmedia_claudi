@@ -1,0 +1,65 @@
+{% extends "portal/base.html" %}{% load gm %}
+{% block title %}Payments · Green Media{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Payments</h1><p class="muted">My Plan purchases from the app, and every client's plan</p></div>
+</div>
+
+<div class="grid stats">
+  <div class="stat"><span class="stat-label">Collected</span><strong class="stat-value">{{ s.collected|inr }}</strong>
+    <span class="stat-hint">{{ s.payments_paid }} paid payment{{ s.payments_paid|pluralize }}</span></div>
+  <div class="stat"><span class="stat-label">This month</span><strong class="stat-value">{{ s.this_month|inr }}</strong></div>
+  <a class="stat link" href="?tab=plans"><span class="stat-label">Active plans</span><strong class="stat-value txt-green">{{ s.plans_active }}</strong>
+    <span class="stat-hint">running more than {{ s.expiring_days }} days</span></a>
+  <a class="stat link" href="?tab=plans"><span class="stat-label">Expired or ending soon</span>
+    <strong class="stat-value{% if s.plans_expired or s.plans_expiring %} txt-red{% endif %}">{{ s.plans_expired|add:s.plans_expiring }}</strong>
+    <span class="stat-hint">{{ s.plans_expired }} expired · {{ s.plans_expiring }} within {{ s.expiring_days }} days</span></a>
+</div>
+
+<nav class="pill-tabs" aria-label="Payments views">
+  <a href="?tab=history" class="{% if tab == 'history' %}on{% endif %}" id="tab-history">Payment history</a>
+  <a href="?tab=plans" class="{% if tab == 'plans' %}on{% endif %}" id="tab-plans">Client plans</a>
+</nav>
+
+{% if tab == "history" %}
+<section class="card">
+  <header class="card-head"><h3>Payment history</h3>
+    <div class="chips">{% for k, label in statuses %}<a class="chip{% if k == status %} on{% endif %}" href="?tab=history{% if k %}&status={{ k }}{% endif %}">{{ label }}</a>{% endfor %}</div>
+  </header>
+  <div class="table-wrap"><table class="table responsive" id="payments-table">
+    <thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Amount</th><th>Status</th><th>Plan period</th><th>Reference</th></tr></thead>
+    <tbody>
+    {% for p in d.payments %}
+      <tr>
+        <td data-label="Date">{{ p.paid_at|default:p.created_at|when:"long" }}</td>
+        <td data-label="Client" class="primary"><a href="{% url 'client_detail' p.client_id %}">{{ p.company_name }}</a></td>
+        <td data-label="Plan">{{ p.plan_name }}</td>
+        <td data-label="Amount">{{ p.amount|inr }}{% if p.coupon %}<div class="muted small">{{ p.coupon }} · was {{ p.list_amount|inr }}</div>{% endif %}</td>
+        <td data-label="Status">{% if p.status == "paid" %}<span class="badge badge-green">Paid</span>{% elif p.status == "failed" %}<span class="badge badge-red">Failed</span>{% else %}<span class="badge badge-gray">{{ p.status|capfirst }}</span>{% endif %}
+          {% if p.demo %}<span class="badge badge-gray">practice</span>{% elif p.test %}<span class="badge badge-gray">test</span>{% endif %}</td>
+        <td data-label="Plan period">{% if p.period_start %}{{ p.period_start|when:"long" }} – {{ p.period_end|when:"long" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td data-label="Reference" class="muted small">{{ p.payment_ref|default:"—" }}</td>
+      </tr>
+    {% empty %}<tr><td colspan="7" class="muted">No payments{% if status %} with this status{% endif %} yet. They appear here when a business buys a plan in the app (My Plan).</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% else %}
+<section class="card">
+  <header class="card-head"><h3>Client plans</h3><span class="muted small"><span class="txt-red">Red</span>: expired or ending within {{ s.expiring_days }} days · <span class="txt-green">green</span>: active</span></header>
+  <div class="table-wrap"><table class="table responsive" id="plans-table">
+    <thead><tr><th>Client</th><th>Plan</th><th>Status</th><th>Valid until</th></tr></thead>
+    <tbody>
+    {% for p in d.plans %}
+      <tr class="plan-{% if p.alert == 'expired' or p.alert == 'expiring' %}red{% elif p.alert == 'active' %}green{% else %}none{% endif %}">
+        <td data-label="Client" class="primary"><a href="{% url 'client_detail' p.client_id %}">{{ p.company_name }}</a></td>
+        <td data-label="Plan">{{ p.plan_name|default:"—" }}</td>
+        <td data-label="Status">{% include "portal/_plan_state.html" %}</td>
+        <td data-label="Valid until">{% if p.valid_until %}{{ p.valid_until|when:"long" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="4" class="muted">No clients.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

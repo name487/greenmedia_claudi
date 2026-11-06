@@ -1,10 +1,30 @@
+import os
+
+import pytest
 from sqlalchemy import create_engine, inspect, text
 
 from app.upgrade import add_missing_columns
 
+# UPGRADE_TEST_DATABASE_URL=mysql+pymysql://…/scratch also runs these on MySQL/MariaDB. Use an empty scratch database:
+# every table in it is dropped first.
+BACKENDS = ["sqlite"] + (["other"] if os.environ.get("UPGRADE_TEST_DATABASE_URL") else [])
 
-def test_old_database_gets_new_columns_and_demo_prefix(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+
+@pytest.fixture(params=BACKENDS)
+def old_engine(request, tmp_path):
+    if request.param == "sqlite":
+        engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    else:
+        engine = create_engine(os.environ["UPGRADE_TEST_DATABASE_URL"])
+        with engine.begin() as c:
+            for t in inspect(engine).get_table_names():
+                c.execute(text(f"DROP TABLE {t}"))
+    yield engine
+    engine.dispose()
+
+
+def test_old_database_gets_new_columns_and_demo_prefix(old_engine):
+    engine = old_engine
     with engine.begin() as c:  # gmb_accounts / gmb_reviews as created before the Google integration
         c.execute(text("CREATE TABLE gmb_accounts (id INTEGER PRIMARY KEY, tenant_id INTEGER, client_id INTEGER, location_id VARCHAR(100), "
                        "oauth_ref VARCHAR(200), status VARCHAR(20), last_sync DATETIME, rating FLOAT, review_count INTEGER)"))
@@ -19,11 +39,15 @@ def test_old_database_gets_new_columns_and_demo_prefix(tmp_path):
     with engine.connect() as c:
         assert c.execute(text("SELECT google_account, title, last_error, connection_id FROM gmb_accounts")).one() == ("", "", "", None)
         assert [r[0] for r in c.execute(text("SELECT external_review_id FROM gmb_reviews ORDER BY id"))] == ["demo_1_0", "demo_ab12cd34ef"]
+    if engine.dialect.name in ("mysql", "mariadb"):  # old whole-second DATETIME columns keep microseconds now
+        assert "gmb_accounts.last_sync (microseconds)" in added
+        cols = {c["name"]: c for c in inspect(engine).get_columns("gmb_accounts")}
+        assert cols["last_sync"]["type"].fsp == 6
     assert add_missing_columns(engine) == []  # idempotent
 
 
-def test_previous_release_gets_token_columns_and_stays_live(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'prev.db'}")
+def test_previous_release_gets_token_columns_and_stays_live(old_engine):
+    engine = old_engine
     with engine.begin() as c:  # as created by the release with agency-only Google connections
         c.execute(text("CREATE TABLE google_connections (id INTEGER PRIMARY KEY, tenant_id INTEGER, email VARCHAR(200), refresh_token_enc TEXT, "
                        "scopes TEXT, status VARCHAR(20), last_error TEXT, connected_by INTEGER, created_at DATETIME)"))
@@ -43,8 +67,8 @@ def test_previous_release_gets_token_columns_and_stays_live(tmp_path):
         assert g.refresh_token_enc == "" and g.token_expires_at is None and g.is_live  # agency link keeps working
 
 
-def test_previous_release_content_gets_status_columns(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path / 'content.db'}")
+def test_previous_release_content_gets_status_columns(old_engine):
+    engine = old_engine
     with engine.begin() as c:
         c.execute(text("CREATE TABLE content_variants (id INTEGER PRIMARY KEY, content_id INTEGER, platform VARCHAR(20), copy TEXT, format VARCHAR(10), external_post_id VARCHAR(100))"))
         c.execute(text("INSERT INTO content_variants VALUES (1, 1, 'gmb', 'a', '4:3', 'gmb_123'), (2, 1, 'facebook', 'b', '1:1', NULL)"))

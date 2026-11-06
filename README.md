@@ -18,7 +18,7 @@ Manage 100+ local-business clients from one place: Google Business Profile, AI r
                  │ tenancy · AI ·   │
                  │ workflows · audit│
                  └────────┬─────────┘
-          SQLite (dev) / PostgreSQL (prod) · Anthropic or OpenAI · Google / Meta / LinkedIn APIs
+          SQLite (dev) / PostgreSQL or MySQL (prod) · Anthropic or OpenAI · Google / Meta / LinkedIn APIs
 ```
 
 | Part | Stack | What it does |
@@ -72,7 +72,7 @@ Sign in with any demo account; the password is `demo1234`. The login screens hav
 
 ### PostgreSQL
 
-The API runs on PostgreSQL (recommended) or SQLite (a zero-setup file for quick demos). To use PostgreSQL:
+The API runs on PostgreSQL (recommended), MySQL/MariaDB (see below) or SQLite (a zero-setup file for quick demos). To use PostgreSQL:
 
 ```bash
 docker compose up -d db          # PostgreSQL 16 on 127.0.0.1:5432 (or use any existing server)
@@ -81,6 +81,21 @@ DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedi
 ```
 
 Tables are created on first start. Upgrading to a newer version adds any new tables and columns automatically, and your data is kept.
+
+### MySQL / MariaDB (phpMyAdmin)
+
+The API also runs on MySQL 8 or MariaDB 10.4+ through PyMySQL, for example with XAMPP, where phpMyAdmin manages the database.
+
+1. Start **MySQL** in the XAMPP Control Panel and open http://localhost/phpmyadmin.
+2. **Databases** → name `greenmedia`, collation **utf8mb4_unicode_ci** (so emoji and Hindi/Marathi text in reviews are kept) → **Create**. Leave it empty; the app creates the tables.
+3. In `backend/.env` (XAMPP's default user is `root` with no password):
+   ```
+   DATABASE_URL=mysql+pymysql://root:@127.0.0.1:3306/greenmedia?charset=utf8mb4
+   ```
+   With a password: `mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/greenmedia?charset=utf8mb4`. Special characters in the password must be URL-encoded (`@` → `%40`, `#` → `%23`).
+4. `pip install -r requirements.txt` (installs `pymysql`), then start the API as usual. The tables appear in phpMyAdmin, and with `SEED_DEMO=1` the demo data too.
+
+Moving from SQLite starts with a fresh database: the existing `greenmedia.db` is not copied over.
 
 **For a real installation (no demo data)**, set `SEED_DEMO=0` and create your first admin. The password is prompted for, never typed on the command line:
 
@@ -546,7 +561,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 194 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 197 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -554,6 +569,7 @@ cd backend && pytest -q          # 194 tests: Preference (fields, validation, ph
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
+TEST_DATABASE_URL='mysql+pymysql://USER:PASS@127.0.0.1:3306/greenmedia_test?charset=utf8mb4' UPGRADE_TEST_DATABASE_URL='mysql+pymysql://USER:PASS@127.0.0.1:3306/gm_upgrade?charset=utf8mb4' pytest -q   # on MySQL/MariaDB (both databases empty)
 cd mobile  && flutter analyze && flutter test   # 51 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone or email OTP sign-in (owners and staff; SMS refused, no demo chip with a real SMS), no email or server option on the sign-in screen, role-based navigation, escalation UI, API contract
 ```
 
@@ -578,7 +594,7 @@ Agency staff sign in the same way, with their mobile number. The sign-in screen 
 - Choosing a profile requires the short-lived token from verification, and the chosen account must use that number.
 - Sign-ins are audited as `signed in (phone OTP)`.
 
-**SMS or email:** the sign-in screen has an **SMS | Email** switch. With **Email**, the person types their email address and the code arrives by email; it must be the email of an active user. Everything else is the same: code length, expiry, attempts, the "no probing" answer and choosing a profile. Codes are emailed over SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`; see `.env.example` for Gmail). Without `SMTP_HOST` the code is only written to the API log, and demo installs show it in the app.
+**SMS or email:** the sign-in screen has an **SMS | Email** switch. With **Email**, the person types their email address and the code arrives by email; it must be the email of an active user. Everything else is the same: code length, expiry, attempts, the "no probing" answer and choosing a profile. Codes are emailed over SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `MAIL_ENCRYPTION`; see `.env.example` for Gmail and ZeptoMail). `SMTP_FROM` must contain an address on your sending domain, e.g. `Green Media <noreply@yourdomain.com>`. The sign-in email has to be a **user's** email (change it in the web app under Settings → Users; this also changes their web login). The demo users have made-up addresses such as `anjali@smiledental.in` that no one receives mail at, so to test real email put your own address on a user first. And: a client's contact email (Clients → contacts) is not a login, and the API log says so when someone tries one. Without `SMTP_HOST` the code is only written to the API log, and demo installs show it in the app.
 
 **Sending the SMS** (`backend/.env`)
 - `SMS_PROVIDER=console` (default): the code only appears in the API log. On demo installs (`SEED_DEMO=1`) the app also shows a "Demo server — code 123456" chip.
@@ -768,6 +784,12 @@ API: `GET /api/clients/{id}/monthly-report?month=YYYY-MM`, `POST /api/clients/{i
   each one with its date, period, coupon and status.
 
 **Test payments:** with Razorpay *test* keys (`rzp_test_…`) everything runs for real on Razorpay's pages, but no money moves: pay with UPI ID `success@razorpay` (or `failure@razorpay` to try a failed payment) or a test card from Razorpay's docs. The app's My Plan screen and the API's start-up log say "Razorpay TEST mode". On your own PC the webhook can't reach `localhost`; that's fine, because the app also asks Razorpay for the payment's status when you come back from the payment page. For a phone, `PUBLIC_BASE_URL` must be an address the phone can open (not `127.0.0.1`).
+
+**In the web app**, the **Payments** page (sidebar) has two tabs:
+- **Payment history:** every My Plan payment, with date, client, plan, amount (and coupon), status, plan period and Razorpay reference, filterable by status. Above it: total collected, this month, active plans, and plans expired or ending soon.
+- **Client plans:** every client's plan. Expired plans and plans ending within 7 days are highlighted in **red**, active plans in **green**, and clients without a plan are grey.
+
+Right after signing in, the dashboard shows a **Plans at a glance** pop-up: what needs attention (red) and what's active (green), with a link to Payments. A client-portal user sees only their own business. API: `GET /api/plan-payments[?status=paid|failed|expired]`. The demo data includes sample plans (active, ending in a few days, expired) and payments.
 
 **Payment** goes through **Razorpay Payment Links**: the app opens Razorpay's hosted page, so the app needs no payment
 SDK. A plan becomes active only when Razorpay confirms the payment, through any of these:

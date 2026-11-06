@@ -11,6 +11,7 @@ NAV = [
     ("seo", "seo", "SEO Center", "search"),
     ("analytics", "analytics", "Analytics", "chart"),
     ("reports", "reports", "Reports", "file"),
+    ("dashboard", "payments", "Payments", "card"),
     ("tasks", "tasks", "Team & Tasks", "check"),
     ("settings", "settings", "Settings", "gear"),
 ]

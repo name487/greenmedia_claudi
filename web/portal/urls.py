@@ -18,6 +18,7 @@ urlpatterns = [
     path("seo/", views.seo, name="seo"),
     path("analytics/", views.analytics, name="analytics"),
     path("reports/", views.reports, name="reports"),
+    path("payments/", views.payments, name="payments"),
     path("tasks/", views.tasks, name="tasks"),
     path("settings/", views.settings_view, name="settings"),
 ]

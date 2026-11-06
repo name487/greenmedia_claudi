@@ -15,7 +15,7 @@ from .. import phone as phones
 from .. import mailer, review_queue, sms
 from ..config import settings
 from ..db import get_db
-from ..models import Client, OtpChallenge, Tenant, User
+from ..models import Client, ClientContact, OtpChallenge, Tenant, User
 from ..security import ROLE_LABELS, audit, create_token, current_user, load_role, verify_password
 from ..serializers import me_out, user_out
 
@@ -133,8 +133,8 @@ def otp_request(body: OtpRequestIn, db: Session = Depends(get_db)):
                         code_hash=_hash(_key(channel, to), code) if has_account else "-", expires_at=now + timedelta(seconds=settings.otp_ttl_seconds)))
     db.commit()
     if not has_account:  # the app gets the same answer (no probing), but whoever runs the server can see why
-        log.warning("No code sent to %s: no active user has this %s. Add it to a user (web app → Users).", _masked(channel, to),
-                    "email" if channel == "email" else "mobile number")
+        log.warning("No code sent to %s: no active user has this %s. Add it to a user (web app → Users).%s", _masked(channel, to),
+                    "email" if channel == "email" else "mobile number", _contact_hint(db, channel, to))
         return out
     try:
         if channel == "email":
@@ -145,9 +145,22 @@ def otp_request(body: OtpRequestIn, db: Session = Depends(get_db)):
         log.warning("%s to %s failed: %s", "Email" if channel == "email" else "SMS", _masked(channel, to), e)
         raise HTTPException(502, f"Couldn't send the {'email' if channel == 'email' else 'SMS'}: {e}") from e
     console = not mailer.enabled() if channel == "email" else settings.sms_provider == "console"
+    if not console:
+        log.info("Sign-in code sent by %s to %s", "email" if channel == "email" else "SMS", _masked(channel, to))
     if console and settings.seed_demo:
         out["dev_code"] = code  # demo installs only (nothing really sent): lets testers sign in
     return out
+
+
+def _contact_hint(db: Session, channel: str, to: str) -> str:
+    """When the address or number is a business's contact (not a login), say whose — the usual mix-up."""
+    col = func.lower(ClientContact.email) if channel == "email" else ClientContact.phone
+    contact = db.scalar(select(ClientContact).where(col == to).limit(1))
+    if contact is None:
+        return ""
+    client = db.get(Client, contact.client_id)
+    return (f" It is the contact {'email' if channel == 'email' else 'number'} of {contact.name} at "
+            f"{client.company_name if client else 'a client'}, not a login: sign in with the business user's email, or give that user this one.")
 
 
 def _key(channel: str, to: str) -> str:

@@ -69,6 +69,7 @@ def login_view(request):
         request.session.cycle_key()
         request.session[SESSION_TOKEN] = out["access_token"]
         request.session[SESSION_ME] = out["user"]
+        request.session["plan_popup"] = True  # the dashboard shows the plans pop-up once after signing in
         nxt = request.GET.get("next", "/")
         return redirect(nxt if url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}) else "/")
     return render(request, "portal/login.html", ctx)
@@ -88,10 +89,31 @@ def dashboard(request):
     hour = timezone.localtime().hour
     greeting = "morning" if hour < 12 else "afternoon" if hour < 17 else "evening"
     src = d["lead_sources"]
+    popup = None
+    if request.session.pop("plan_popup", False):
+        try:
+            popup = request.api.get("/api/plan-payments")
+        except ApiError:
+            popup = None  # never block the dashboard on the pop-up
     return render(request, "portal/dashboard.html", {
-        "d": d, "k": d["kpis"], "greeting": greeting,
+        "d": d, "k": d["kpis"], "greeting": greeting, "popup": popup,
         "lead_sources": [("Calls from Google", src["calls"]), ("Direction requests", src["directions"]), ("Website clicks", src["website_clicks"]), ("Social engagement", src["social_engagement"])],
     })
+
+
+# ---------- payments ----------
+
+PAYMENT_STATUSES = [("", "All"), ("paid", "Paid"), ("failed", "Failed"), ("expired", "Link expired")]
+
+
+@login_required("dashboard")
+def payments(request):
+    tab = "plans" if request.GET.get("tab") == "plans" else "history"
+    status = request.GET.get("status", "")
+    if status not in dict(PAYMENT_STATUSES):
+        status = ""
+    d = request.api.get("/api/plan-payments", status=status)
+    return render(request, "portal/payments.html", {"d": d, "s": d["summary"], "tab": tab, "status": status, "statuses": PAYMENT_STATUSES})
 
 
 # ---------- clients ----------
@@ -800,6 +822,8 @@ def settings_view(request):
             messages.success(request, f"Created {u['email']} as {u['role_label']}. Share the password with them securely.")
         elif action == "update_user":
             patch = {"role": request.POST["role"], "status": request.POST["status"], "phone": request.POST.get("phone", "").strip()}
+            if request.POST.get("email", "").strip():
+                patch["email"] = request.POST["email"].strip()
             if request.POST["role"] == "client":
                 patch["client_id"] = _int(request.POST.get("client_id"))
             if request.POST.get("password"):

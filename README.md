@@ -18,7 +18,7 @@ Manage 100+ local-business clients from one place: Google Business Profile, AI r
                  │ tenancy · AI ·   │
                  │ workflows · audit│
                  └────────┬─────────┘
-          SQLite (dev) / PostgreSQL (prod) · Anthropic or OpenAI · Google / Meta / LinkedIn APIs
+          SQLite (dev) / PostgreSQL or MySQL (prod) · Anthropic or OpenAI · Google / Meta / LinkedIn APIs
 ```
 
 | Part | Stack | What it does |
@@ -72,7 +72,7 @@ Sign in with any demo account; the password is `demo1234`. The login screens hav
 
 ### PostgreSQL
 
-The API runs on PostgreSQL (recommended) or SQLite (a zero-setup file for quick demos). To use PostgreSQL:
+The API runs on PostgreSQL (recommended), MySQL/MariaDB (see below) or SQLite (a zero-setup file for quick demos). To use PostgreSQL:
 
 ```bash
 docker compose up -d db          # PostgreSQL 16 on 127.0.0.1:5432 (or use any existing server)
@@ -81,6 +81,21 @@ DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedi
 ```
 
 Tables are created on first start. Upgrading to a newer version adds any new tables and columns automatically, and your data is kept.
+
+### MySQL / MariaDB (phpMyAdmin)
+
+The API also runs on MySQL 8 or MariaDB 10.4+ through PyMySQL, for example with XAMPP, where phpMyAdmin manages the database.
+
+1. Start **MySQL** in the XAMPP Control Panel and open http://localhost/phpmyadmin.
+2. **Databases** → name `greenmedia`, collation **utf8mb4_unicode_ci** (so emoji and Hindi/Marathi text in reviews are kept) → **Create**. Leave it empty; the app creates the tables.
+3. In `backend/.env` (XAMPP's default user is `root` with no password):
+   ```
+   DATABASE_URL=mysql+pymysql://root:@127.0.0.1:3306/greenmedia?charset=utf8mb4
+   ```
+   With a password: `mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/greenmedia?charset=utf8mb4`. Special characters in the password must be URL-encoded (`@` → `%40`, `#` → `%23`).
+4. `pip install -r requirements.txt` (installs `pymysql`), then start the API as usual. The tables appear in phpMyAdmin, and with `SEED_DEMO=1` the demo data too.
+
+Moving from SQLite starts with a fresh database: the existing `greenmedia.db` is not copied over.
 
 **For a real installation (no demo data)**, set `SEED_DEMO=0` and create your first admin. The password is prompted for, never typed on the command line:
 
@@ -554,6 +569,7 @@ cd backend && pytest -q          # 197 tests: Preference (fields, validation, ph
                                  #   phone OTP sign-in: codes, limits, profiles, MSG91/Twilio)
 REDIS_TEST_URL=redis://127.0.0.1:6379/0 pytest -q tests/test_content_scheduling.py   # + a real Redis broker and Celery worker
 TEST_DATABASE_URL=postgresql+psycopg://greenmedia:greenmedia@127.0.0.1:5432/greenmedia_test pytest -q   # same suite on PostgreSQL
+TEST_DATABASE_URL='mysql+pymysql://USER:PASS@127.0.0.1:3306/greenmedia_test?charset=utf8mb4' UPGRADE_TEST_DATABASE_URL='mysql+pymysql://USER:PASS@127.0.0.1:3306/gm_upgrade?charset=utf8mb4' pytest -q   # on MySQL/MariaDB (both databases empty)
 cd mobile  && flutter analyze && flutter test   # 51 tests: Preference (progress, socials, tabs, poster fields, logo upload, hashtags, colour, choices, publish and religious switches, AI terms), Settings (privacy choice, legal, QRs, standee scan, change profile, refund, delete account), My Plan (billing details, compare, choose plan, coupon, pay, back active), Report (summary, filters, trends, download, month), Google Media (tabs, where/what to upload, gallery + camera upload, approve, retry), Google Post (approve, edit, reject, post automatically, write now), AI Post (tabs, viral video flow, items + poster), owner review replies + reply settings, owner home (help, Facebook/Instagram connect, carousel, performance, calendar, keyword planner), phone or email OTP sign-in (owners and staff; SMS refused, no demo chip with a real SMS), no email or server option on the sign-in screen, role-based navigation, escalation UI, API contract
 ```
 

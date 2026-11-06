@@ -3,10 +3,10 @@ can become a multi-tenant SaaS without a rebuild; every query in the routers fil
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, Float, ForeignKey, ForeignKeyConstraint, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .db import Base
+from .db import Base, TZDateTime
 
 
 def now() -> datetime:
@@ -50,7 +50,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(30))  # roles.name within the same tenant
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)  # client-portal users
     status: Mapped[str] = mapped_column(String(20), default="active")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
     # Mobile number in E.164 (+919876543210) for OTP sign-in. Several accounts may share one number — e.g. an owner of
     # two businesses — and the app then asks which profile to open.
     phone: Mapped[str] = mapped_column(String(20), default="", index=True)
@@ -67,10 +67,10 @@ class OtpChallenge(Base):
     phone: Mapped[str] = mapped_column(String(20), index=True)  # "" for an email code
     email: Mapped[str] = mapped_column(String(200), default="", index=True)  # "" for an SMS code
     code_hash: Mapped[str] = mapped_column(String(64))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(TZDateTime)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
+    verified_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now, index=True)
 
 
 class Client(Base):
@@ -124,7 +124,7 @@ class GmbAccount(Base):
     location_id: Mapped[str] = mapped_column(String(100))
     oauth_ref: Mapped[str] = mapped_column(String(200), default="")  # pointer to encrypted token in a secrets store
     status: Mapped[str] = mapped_column(String(20), default="connected")  # connected | disconnected | expired
-    last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sync: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     rating: Mapped[float] = mapped_column(Float, default=0)
     review_count: Mapped[int] = mapped_column(Integer, default=0)
     # Agency-level Google account this location is reached through (NULL when using the client's own sign-in).
@@ -141,7 +141,7 @@ class GmbAccount(Base):
     scopes: Mapped[str] = mapped_column(Text, default="")
     refresh_token_enc: Mapped[str] = mapped_column(Text, default="")
     access_token_enc: Mapped[str] = mapped_column(Text, default="")
-    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     token_status: Mapped[str] = mapped_column(String(20), default="")  # "" (none) | active | revoked
 
     connection: Mapped["GoogleConnection | None"] = relationship()
@@ -170,9 +170,9 @@ class GoogleConnection(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")  # active | revoked
     last_error: Mapped[str] = mapped_column(Text, default="")
     access_token_enc: Mapped[str] = mapped_column(Text, default="")
-    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     connected_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class SocialAccount(Base):
@@ -191,7 +191,7 @@ class SocialAccount(Base):
     access_token_enc: Mapped[str] = mapped_column(Text, default="")
     meta_connection_id: Mapped[int | None] = mapped_column(ForeignKey("meta_connections.id"), nullable=True)
     last_error: Mapped[str] = mapped_column(Text, default="")
-    connected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
 
     @property
     def is_live(self) -> bool:
@@ -209,12 +209,12 @@ class MetaConnection(Base):
     fb_user_id: Mapped[str] = mapped_column(String(64))
     name: Mapped[str] = mapped_column(String(200), default="")
     user_token_enc: Mapped[str] = mapped_column(Text)
-    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    token_expires_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     scopes: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="active")  # active | expired
     last_error: Mapped[str] = mapped_column(Text, default="")
     connected_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class MetaConnectAttempt(Base):
@@ -234,8 +234,8 @@ class MetaConnectAttempt(Base):
     message: Mapped[str] = mapped_column(Text, default="")
     candidates: Mapped[list] = mapped_column(JSON, default=list)  # Pages to choose from (no tokens)
     connection_id: Mapped[int | None] = mapped_column(ForeignKey("meta_connections.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
 
 
 class Review(Base):
@@ -251,19 +251,19 @@ class Review(Base):
     sentiment: Mapped[str] = mapped_column(String(10))  # positive | neutral | negative
     reply: Mapped[str | None] = mapped_column(Text, nullable=True)
     reply_status: Mapped[str] = mapped_column(String(20), default="new")  # new | drafted | approved | published | rejected | failed
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # Google's updateTime (edits)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
+    published_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)  # Google's updateTime (edits)
     reviewer_photo: Mapped[str] = mapped_column(String(500), default="")
     # Who wrote the current reply text: ai | template | human (edited) | google (replied on Google directly)
     reply_source: Mapped[str] = mapped_column(String(20), default="")
     reply_model: Mapped[str] = mapped_column(String(80), default="")  # e.g. "openai/gpt-4.1-mini"
     reply_error: Mapped[str] = mapped_column(Text, default="")  # why the AI wasn't used for the last draft
-    drafted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    drafted_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     # Approval of the current reply text. Nothing is published without it: set by Approve (approved_by = the user) or by
     # the client's opt-in auto-publish rule (approval_rule = "auto_publish"); cleared whenever the text changes.
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     approval_rule: Mapped[str] = mapped_column(String(40), default="")
 
     @property
@@ -287,13 +287,13 @@ class ContentItem(Base):
     creative_brief: Mapped[str] = mapped_column(Text, default="")
     # draft → (in_review →) scheduled → publishing → published | failed. "publishing" is held only while a worker posts.
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)  # UTC
+    scheduled_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True, index=True)  # UTC
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
+    updated_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)  # publish attempts for the current schedule
-    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # retry after a temporary error
+    next_attempt_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)  # retry after a temporary error
     last_error: Mapped[str] = mapped_column(Text, default="")
     ai_source: Mapped[str] = mapped_column(String(20), default="")  # ai | template | "" (written by hand)
     ai_model: Mapped[str] = mapped_column(String(80), default="")
@@ -310,7 +310,7 @@ class ContentItem(Base):
     # Approval of the current copy (Approve & schedule, or created/scheduled by someone allowed to approve). Cleared when
     # the copy changes; the publisher refuses anything without it.
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     approval_rule: Mapped[str] = mapped_column(String(40), default="")  # "" = a person approved; "auto_google_post" = standing approval
 
     variants: Mapped[list["ContentVariant"]] = relationship(cascade="all, delete-orphan", order_by="ContentVariant.id")
@@ -325,7 +325,7 @@ class ContentVariant(Base):
     format: Mapped[str] = mapped_column(String(10))
     external_post_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending | published | failed (per platform)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     error: Mapped[str] = mapped_column(Text, default="")
 
 
@@ -369,7 +369,7 @@ class ProductItem(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     price: Mapped[str] = mapped_column(String(40), default="")
     image_path: Mapped[str] = mapped_column(String(300), default="")  # relative to MEDIA_DIR
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class GoogleMedia(Base):
@@ -386,15 +386,15 @@ class GoogleMedia(Base):
     thumb_path: Mapped[str] = mapped_column(String(300), default="")
     # pending (needs approval) | scheduled | publishing | uploaded | failed
     status: Mapped[str] = mapped_column(String(20), default="scheduled", index=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
-    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True, index=True)
+    uploaded_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     external_name: Mapped[str] = mapped_column(String(300), default="")
     error: Mapped[str] = mapped_column(String(500), default="")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    approved_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class PlanPayment(Base):
@@ -416,8 +416,8 @@ class PlanPayment(Base):
     period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
+    paid_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
 
 
 class ReviewQr(Base):
@@ -433,9 +433,9 @@ class ReviewQr(Base):
     kind: Mapped[str] = mapped_column(String(10), default="app")  # app | standee
     label: Mapped[str] = mapped_column(String(80), default="")
     scans: Mapped[int] = mapped_column(Integer, default=0)
-    last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_scan_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class RefundRequest(Base):
@@ -449,7 +449,7 @@ class RefundRequest(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="open")  # open | approved | rejected
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class Competitor(Base):
@@ -466,7 +466,7 @@ class Competitor(Base):
     address: Mapped[str] = mapped_column(String(300), default="")
     distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # from the client; ≤5 km counts as local
     is_sample: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
 
 
 class ScoreSnapshot(Base):
@@ -491,7 +491,7 @@ class KeywordSearchLog(Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     keyword: Mapped[str] = mapped_column(String(200))
     city: Mapped[str] = mapped_column(String(100), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now, index=True)
 
 
 class MetricDaily(Base):
@@ -537,8 +537,8 @@ class Report(Base):
     period_end: Mapped[date] = mapped_column(Date)
     summary: Mapped[str] = mapped_column(Text)
     source: Mapped[str] = mapped_column(String(10), default="template")  # ai | template
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now)
+    delivered_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     delivered_via: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
@@ -553,4 +553,4 @@ class AuditLog(Base):
     entity_id: Mapped[str] = mapped_column(String(50), default="")
     # Structured context, e.g. for review replies: before/after text, AI provider/model/tokens, Google response, errors
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, index=True)
+    created_at: Mapped[datetime] = mapped_column(TZDateTime, default=now, index=True)

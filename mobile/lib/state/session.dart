@@ -79,9 +79,13 @@ class Session extends ChangeNotifier {
   Future<OtpSent> requestOtp(String phone, {String countryCode = '+91'}) async =>
       OtpSent.fromJson(await api.post('/api/auth/otp/request', {'phone': phone, 'country_code': countryCode}) as Map<String, dynamic>);
 
+  /// Step 1, by email instead of SMS.
+  Future<OtpSent> requestEmailOtp(String email) async =>
+      OtpSent.fromJson(await api.post('/api/auth/otp/request', {'email': email.trim()}) as Map<String, dynamic>);
+
   /// Step 2: check the code; returns every profile (account) linked to the number.
-  Future<OtpVerified> verifyOtp(String phone, String code) async =>
-      OtpVerified.fromJson(await api.post('/api/auth/otp/verify', {'phone': phone, 'code': code}) as Map<String, dynamic>);
+  Future<OtpVerified> verifyOtp(OtpSent sent, String code) async => OtpVerified.fromJson(await api.post(
+      '/api/auth/otp/verify', {if (sent.byEmail) 'email': sent.email else 'phone': sent.phone, 'code': code}) as Map<String, dynamic>);
 
   /// Step 3: open one profile.
   Future<void> selectProfile(String otpToken, int userId) async {

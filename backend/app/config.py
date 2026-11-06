@@ -20,7 +20,6 @@ def _url(value: str) -> str:
 
 
 
-
 def first_set(env, *names: str) -> str:
     """The first of these settings that has a value (several names are accepted for the same thing)."""
     return next((v.strip() for v in (env.get(n) for n in names) if v and v.strip()), "")
@@ -29,7 +28,6 @@ def first_set(env, *names: str) -> str:
 def sms_provider_from(env) -> str:
     """SMS_PROVIDER (console, msg91 or twilio). An empty `SMS_PROVIDER=` line counts as not set (console)."""
     return (env.get("SMS_PROVIDER") or "").strip().lower() or "console"
-
 
 class Settings:
     database_url: str = _db_url(os.getenv("DATABASE_URL", f"sqlite:///{Path(__file__).resolve().parents[1] / 'greenmedia.db'}"))
@@ -64,30 +62,21 @@ class Settings:
     # Fernet key for OAuth tokens at rest: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str = os.getenv("TOKEN_ENCRYPTION_KEY", "")
     # Phone OTP sign-in (mobile app). SMS_PROVIDER: console (code only in the server log — development/demo),
-
-    # nimbusit (India: SMS_HOST, SMS_USER, SMS_AUTHKEY, SMS_SENDER and the DLT SMS_ENTITYID + SMS_TEMPLATEID, with
-    # SMS_TEXT exactly as the approved template and {otp} where the code goes) or msg91 (MSG91_AUTH_KEY +
-    # MSG91_TEMPLATE_ID with an ##OTP## variable).
-    # Without SMS_PROVIDER, setting SMS_AUTHKEY picks nimbusit.
-    sms_provider: str = os.getenv("SMS_PROVIDER", "nimbusit" if os.getenv("SMS_AUTHKEY") else "console").lower()
-    sms_host: str = os.getenv("SMS_HOST", "nimbusit.net")
-    sms_user: str = os.getenv("SMS_USER", "")
-    sms_authkey: str = os.getenv("SMS_AUTHKEY", "")
-    sms_sender: str = os.getenv("SMS_SENDER", "")
-    sms_entityid: str = os.getenv("SMS_ENTITYID", "")
-    sms_templateid: str = os.getenv("SMS_TEMPLATEID", "")
-    sms_rpt: str = os.getenv("SMS_RPT", "1")
-    sms_text: str = os.getenv("SMS_TEXT", "")  # NimbusIT: the DLT-approved template, word for word, with {otp}
-
     # msg91 (India: MSG91_AUTH_KEY + MSG91_TEMPLATE_ID with an ##OTP## variable) or twilio (TWILIO_ACCOUNT_SID,
     # TWILIO_AUTH_TOKEN, TWILIO_FROM).
     sms_provider: str = sms_provider_from(os.environ)
-
     msg91_auth_key: str = os.getenv("MSG91_AUTH_KEY", "")
     msg91_template_id: str = os.getenv("MSG91_TEMPLATE_ID", "")
     twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     twilio_from: str = os.getenv("TWILIO_FROM", "")
+    # Sign-in codes by email (the app's "Email" option). Without SMTP_HOST the code is only written to the server log
+    # (demo installs also show it in the app). Gmail: smtp.gmail.com, port 587, an App Password, SMTP_FROM = that address.
+    smtp_host: str = os.getenv("SMTP_HOST", "").strip()
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587") or "587")
+    smtp_user: str = os.getenv("SMTP_USER", "").strip()
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "").strip()
     otp_length: int = int(os.getenv("OTP_LENGTH", "6"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))

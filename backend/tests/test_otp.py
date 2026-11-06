@@ -247,5 +247,33 @@ def test_email_unknown_failure_and_validation(client, monkeypatch, caplog):
     assert client.post("/api/auth/otp/request", json={}).status_code == 422
     monkeypatch.setattr(mailer, "smtp_factory", FakeSmtp(fail=smtplib.SMTPAuthenticationError(535, b"Bad credentials")))
     monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "smtp_from", "noreply@example.com")
     r = client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL})
     assert r.status_code == 502 and r.json()["detail"].startswith("Couldn't send the email: SMTPAuthenticationError")
+
+
+def test_contact_email_is_explained_and_zeptomail_style_settings(client, monkeypatch, caplog):
+    from app import mailer
+    # a business contact's email isn't a login: the log says whose it is
+    with caplog.at_level("WARNING", logger="greenmedia.auth"):
+        assert client.post("/api/auth/otp/request", json={"email": "owner@smiledentalstudio.in"}).json()["sent"]
+    assert "It is the contact email of Dev Gupta at Smile Dental Studio, not a login" in caplog.text
+
+    # ZeptoMail-style: SMTP user "emailapikey", MAIL_ENCRYPTION=ssl, and a From that must carry an address
+    fake = FakeSmtp()
+    monkeypatch.setattr(mailer, "smtp_factory", fake)
+    for k, v in {"smtp_host": "smtp.zeptomail.in", "smtp_port": 465, "smtp_user": "emailapikey", "smtp_encryption": "ssl",
+                 "smtp_from": "Green Media GMB"}.items():
+        monkeypatch.setattr(settings, k, v)
+    assert mailer.encryption() == "ssl" and "no sender address" in mailer.describe()
+    r = client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL})
+    assert r.status_code == 502 and "SMTP_FROM needs an email address on your sending domain" in r.json()["detail"] and not fake.sent
+    monkeypatch.setattr(settings, "smtp_from", "Green Media GMB <noreply@greenmedia.example>")
+    assert client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL}).status_code == 200
+    assert fake.sent[0]["From"] == "Green Media GMB <noreply@greenmedia.example>" and fake.logins == ["emailapikey"]
+    assert "smtp.zeptomail.in:465 (ssl) from Green Media GMB <noreply@greenmedia.example>" in mailer.describe()
+    monkeypatch.setattr(settings, "smtp_encryption", "tls")
+    assert mailer.encryption() == "starttls"
+    monkeypatch.setattr(settings, "smtp_encryption", "")
+    monkeypatch.setattr(settings, "smtp_port", 587)
+    assert mailer.encryption() == "starttls"

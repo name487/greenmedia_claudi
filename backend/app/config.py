@@ -76,7 +76,9 @@ class Settings:
     smtp_port: int = int(os.getenv("SMTP_PORT", "587") or "587")
     smtp_user: str = os.getenv("SMTP_USER", "").strip()
     smtp_password: str = os.getenv("SMTP_PASSWORD", "")
-    smtp_from: str = os.getenv("SMTP_FROM", "").strip()
+    smtp_from: str = os.getenv("SMTP_FROM", "").strip()  # an address on your sending domain: "Green Media <noreply@yourdomain.com>"
+    # ssl (implicit TLS, usually port 465), tls/starttls (usually 587) or none. Empty: ssl on port 465, starttls otherwise.
+    smtp_encryption: str = first_set(os.environ, "SMTP_ENCRYPTION", "MAIL_ENCRYPTION").lower()
     otp_length: int = int(os.getenv("OTP_LENGTH", "6"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))

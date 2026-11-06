@@ -70,6 +70,13 @@ class Settings:
     twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     twilio_from: str = os.getenv("TWILIO_FROM", "")
+    # Sign-in codes by email (the app's "Email" option). Without SMTP_HOST the code is only written to the server log
+    # (demo installs also show it in the app). Gmail: smtp.gmail.com, port 587, an App Password, SMTP_FROM = that address.
+    smtp_host: str = os.getenv("SMTP_HOST", "").strip()
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587") or "587")
+    smtp_user: str = os.getenv("SMTP_USER", "").strip()
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_from: str = os.getenv("SMTP_FROM", "").strip()
     otp_length: int = int(os.getenv("OTP_LENGTH", "6"))
     otp_ttl_seconds: int = int(os.getenv("OTP_TTL_SECONDS", "300"))
     otp_resend_seconds: int = int(os.getenv("OTP_RESEND_SECONDS", "30"))

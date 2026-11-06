@@ -145,16 +145,21 @@ const platformLabels = {
 /// Answer to POST /api/auth/otp/request.
 class OtpSent {
   OtpSent.fromJson(Map<String, dynamic> j)
-      : phone = j['phone'] as String,
+      : channel = j['channel'] as String? ?? 'sms',
+        phone = j['phone'] as String? ?? '',
+        email = j['email'] as String? ?? '',
         masked = j['masked'] as String,
         length = j['length'] as int,
         resendIn = j['resend_in'] as int,
         devCode = j['dev_code'] as String?;
 
-  final String phone, masked;
+  /// 'sms' (code sent to [phone]) or 'email' (sent to [email]).
+  final String channel, phone, email, masked;
   final int length, resendIn;
 
-  /// Only on demo servers without an SMS provider.
+  bool get byEmail => channel == 'email';
+
+  /// Only on demo servers that don't really send the code.
   final String? devCode;
 }
 
@@ -181,7 +186,7 @@ class LoginProfile {
 class OtpVerified {
   OtpVerified.fromJson(Map<String, dynamic> j)
       : otpToken = j['otp_token'] as String,
-        phone = j['phone'] as String,
+        phone = j['phone'] as String? ?? '',
         profiles = [for (final p in j['profiles'] as List) LoginProfile.fromJson(p as Map<String, dynamic>)];
 
   final String otpToken, phone;

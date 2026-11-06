@@ -59,11 +59,13 @@ class User(Base):
 
 
 class OtpChallenge(Base):
-    """A one-time sign-in code sent by SMS. Only a hash is stored; it expires, allows a few attempts, and is used once."""
+    """A one-time sign-in code sent by SMS (phone) or email. Only a hash is stored; it expires, allows a few attempts,
+    and is used once."""
 
     __tablename__ = "otp_challenges"
     id: Mapped[int] = mapped_column(primary_key=True)
-    phone: Mapped[str] = mapped_column(String(20), index=True)
+    phone: Mapped[str] = mapped_column(String(20), index=True)  # "" for an email code
+    email: Mapped[str] = mapped_column(String(200), default="", index=True)  # "" for an SMS code
     code_hash: Mapped[str] = mapped_column(String(64))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     attempts: Mapped[int] = mapped_column(Integer, default=0)

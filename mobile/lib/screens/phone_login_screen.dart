@@ -27,6 +27,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   _Step _step = _Step.phone;
   String _countryCode = '+91';
   final _phone = TextEditingController();
+  final _email = TextEditingController();
+  bool _byEmail = false; // the "Email" option: the code comes by email instead of SMS
   final _code = TextEditingController();
   final _codeFocus = FocusNode();
   OtpSent? _sent;
@@ -45,10 +47,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     return _countryCode != '+91' || RegExp(r'^[6-9]').hasMatch(digits);
   }
 
+  bool get _emailValid => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email.text.trim());
+
   @override
   void dispose() {
     _timer?.cancel();
     _phone.dispose();
+    _email.dispose();
     _code.dispose();
     _codeFocus.dispose();
     super.dispose();
@@ -79,7 +84,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   }
 
   Future<void> _requestCode() => _run((s) async {
-        final sent = await s.requestOtp(_phone.text, countryCode: _countryCode);
+        final sent = _byEmail ? await s.requestEmailOtp(_email.text) : await s.requestOtp(_phone.text, countryCode: _countryCode);
         _code.clear();
         setState(() {
           _sent = sent;
@@ -90,7 +95,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       });
 
   Future<void> _verify() => _run((s) async {
-        final v = await s.verifyOtp(_sent!.phone, _code.text);
+        final v = await s.verifyOtp(_sent!, _code.text);
         setState(() {
           _verified = v;
           _step = _Step.profiles;
@@ -128,7 +133,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     final code = _step == _Step.code;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _Header(
-        title: code ? 'Verify your\nmobile number' : 'Enter your\nphone number',
+        title: code
+            ? (_sent!.byEmail ? 'Verify your\nemail' : 'Verify your\nmobile number')
+            : (_byEmail ? 'Enter your\nemail address' : 'Enter your\nphone number'),
         subtitle: code ? 'Code sent to ${_sent!.masked}' : "We'll send a one-time verification code",
         onBack: code ? _back : null,
       ),
@@ -148,7 +155,74 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
   List<Widget> _phoneStep(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    final valid = _phoneValid;
+    final valid = _byEmail ? _emailValid : _phoneValid;
+    return [
+      Center(
+        child: SegmentedButton<bool>(
+          key: const Key('otp-channel'),
+          segments: const [
+            ButtonSegment(value: false, icon: Icon(Icons.sms_outlined), label: Text('SMS', key: Key('otp-via-sms'))),
+            ButtonSegment(value: true, icon: Icon(Icons.alternate_email), label: Text('Email', key: Key('otp-via-email'))),
+          ],
+          selected: {_byEmail},
+          onSelectionChanged: _busy
+              ? null
+              : (v) => setState(() {
+                    _byEmail = v.first;
+                    _error = null;
+                  }),
+        ),
+      ),
+      const SizedBox(height: 18),
+      if (_byEmail) ..._emailInput(t, valid) else ..._phoneInput(t, valid),
+      if (_error != null) _ErrorText(_error!),
+      const SizedBox(height: 20),
+      GradientButton(label: _busy ? 'Sending…' : 'Get OTP', onPressed: valid && !_busy ? _requestCode : null),
+      const SizedBox(height: 10),
+      _SafeNote(email: _byEmail),
+    ];
+  }
+
+  List<Widget> _emailInput(TextTheme t, bool valid) => [
+        Row(children: [
+          const Icon(Icons.alternate_email, size: 18),
+          const SizedBox(width: 6),
+          Text('Email address', style: t.labelLarge),
+        ]),
+        const SizedBox(height: 10),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: valid ? const Color(0xFF1FAE6B) : Colors.blueGrey.shade200, width: valid ? 1.6 : 1.2),
+          ),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                key: const Key('email'),
+                controller: _email,
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                autocorrect: false,
+                style: t.titleMedium,
+                decoration: const InputDecoration(
+                  hintText: 'you@example.com',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                ),
+                onChanged: (_) => setState(() => _error = null),
+                onSubmitted: (_) => valid && !_busy ? _requestCode() : null,
+              ),
+            ),
+            if (valid) const Padding(padding: EdgeInsets.only(right: 12), child: Icon(Icons.check_circle, color: Color(0xFF1FAE6B))),
+          ]),
+        ),
+      ];
+
+  List<Widget> _phoneInput(TextTheme t, bool valid) {
     return [
       Row(children: [
         const Icon(Icons.smartphone, size: 18),
@@ -206,11 +280,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
           if (valid) const Padding(padding: EdgeInsets.only(right: 12), child: Icon(Icons.check_circle, color: Color(0xFF1FAE6B))),
         ]),
       ),
-      if (_error != null) _ErrorText(_error!),
-      const SizedBox(height: 20),
-      GradientButton(label: _busy ? 'Sending…' : 'Get OTP', onPressed: valid && !_busy ? _requestCode : null),
-      const SizedBox(height: 10),
-      const _SafeNote(),
     ];
   }
 
@@ -255,9 +324,12 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       const SizedBox(height: 20),
       GradientButton(label: _busy ? 'Verifying…' : 'Verify OTP', onPressed: ready && !_busy ? _verify : null),
       const SizedBox(height: 10),
-      const _SafeNote(),
+      _SafeNote(email: _sent!.byEmail),
       const SizedBox(height: 16),
-      Text("Didn't get a code? Check the number, or ask your agency to add it to your account.",
+      Text(
+          _sent!.byEmail
+              ? "Didn't get a code? Check the address and your spam folder, or ask your agency to add this email to your account."
+              : "Didn't get a code? Check the number, or ask your agency to add it to your account.",
           textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: Colors.blueGrey)),
     ];
   }
@@ -298,9 +370,10 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       const Icon(Icons.person_search_outlined, size: 48, color: Colors.blueGrey),
                       const SizedBox(height: 12),
-                      Text('No account uses this number yet', style: t.titleMedium, textAlign: TextAlign.center),
+                      Text(_sent?.byEmail == true ? 'No account uses this email yet' : 'No account uses this number yet',
+                          style: t.titleMedium, textAlign: TextAlign.center),
                       const SizedBox(height: 6),
-                      Text('Ask your Green Media account manager to add ${v.phone} to your profile.',
+                      Text('Ask your Green Media account manager to add ${_sent?.byEmail == true ? _sent!.email : v.phone} to your profile.',
                           style: t.bodyMedium, textAlign: TextAlign.center),
                     ]),
                   )
@@ -451,14 +524,15 @@ class OtpBoxes extends StatelessWidget {
 }
 
 class _SafeNote extends StatelessWidget {
-  const _SafeNote();
+  const _SafeNote({this.email = false});
+  final bool email;
 
   @override
   Widget build(BuildContext context) => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.lock_outline, size: 14, color: Colors.blueGrey),
         const SizedBox(width: 4),
         Flexible(
-          child: Text('Your number is safe with us', textAlign: TextAlign.center,
+          child: Text(email ? 'Your email is safe with us' : 'Your number is safe with us', textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey)),
         ),
       ]);

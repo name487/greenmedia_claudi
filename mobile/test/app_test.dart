@@ -72,6 +72,11 @@ MockClient fakeApi(List<String> calls) {
         http.Response.bytes(utf8.encode(jsonEncode(body)), status, headers: {'content-type': 'application/json'});
     switch (req.url.path) {
       case '/api/auth/otp/request':
+        final email = (jsonDecode(req.body) as Map)['email'] as String?;
+        if (email != null) {
+          sentBodies['otp-email'] = email;
+          return json({...fixture('otp_request') as Map, 'channel': 'email', 'phone': '', 'email': email, 'masked': 'an••••@smiledental.in'});
+        }
         final digits = ((jsonDecode(req.body) as Map)['phone'] as String).replaceAll(RegExp(r'\D'), '');
         final phone = '+91$digits';
         // 9111111111: the SMS gateway refuses; 9222222222: a real SMS went out (no demo code in the answer)
@@ -82,6 +87,7 @@ MockClient fakeApi(List<String> calls) {
         return json({...fixture('otp_request') as Map, 'phone': phone, 'masked': '${phone.substring(0, phone.length - 6)}••••${phone.substring(phone.length - 2)}'});
       case '/api/auth/otp/verify':
         final b = jsonDecode(req.body) as Map;
+        if (b.containsKey('email')) sentBodies['otp-verify-email'] = b['email'];
         if (b['code'] != '123456') return json({'detail': 'Incorrect code — 4 attempts left'}, 400);
         return json(fixture(b['phone'] == '+919000000001' ? 'otp_verify_admin' : 'otp_verify_owner'));
       case '/api/auth/otp/select':
@@ -409,6 +415,36 @@ void main() {
       expect(boxes, findsNWidgets(6));
       expect(tester.getTopRight(boxes.last).dx, lessThanOrEqualTo(320));
       await tester.binding.setSurfaceSize(const Size(420, 900));
+    });
+
+    testWidgets('the code can come by email instead of SMS', (tester) async {
+      final calls = <String>[];
+      final session = await pumpApp(tester, calls);
+      await tester.tap(find.byKey(const Key('otp-via-email')));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter your\nemail address'), findsOneWidget);
+      expect(find.byKey(const Key('phone')), findsNothing);
+      Opacity button() => tester.widget<Opacity>(find.ancestor(of: find.text('Get OTP'), matching: find.byType(Opacity)).first);
+      await tester.enterText(find.byKey(const Key('email')), 'anjali@smiledental');
+      await tester.pump();
+      expect(button().opacity, lessThan(1)); // not an address yet
+      await tester.enterText(find.byKey(const Key('email')), ' anjali@smiledental.in ');
+      await tester.pump();
+      expect(button().opacity, 1);
+      await tester.tap(find.text('Get OTP'));
+      await tester.pumpAndSettle();
+      expect(sentBodies['otp-email'], 'anjali@smiledental.in');
+      expect(find.text('Verify your\nemail'), findsOneWidget);
+      expect(find.text('Code sent to an••••@smiledental.in'), findsOneWidget);
+      expect(find.textContaining('spam folder'), findsOneWidget);
+      expect(find.text('Your email is safe with us'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('otp')), '123456');
+      await tester.pumpAndSettle();
+      expect(sentBodies['otp-verify-email'], 'anjali@smiledental.in');
+      await tester.tap(find.text('Smile Dental Studio'));
+      await tester.pumpAndSettle();
+      expect(session.signedIn, isTrue);
+      expect(calls, containsAllInOrder(['POST /api/auth/otp/request', 'POST /api/auth/otp/verify', 'POST /api/auth/otp/select']));
     });
 
     testWidgets('back from the code step returns to the number', (tester) async {

@@ -169,7 +169,7 @@ def test_unknown_number_is_explained_in_the_server_log(client, monkeypatch, capl
     calls = _provider(monkeypatch, "twilio", twilio_account_sid="AC1", twilio_auth_token="tok", twilio_from="+15550001111")
     with caplog.at_level("WARNING", logger="greenmedia.auth"):
         assert _code(client, "9123456789")["sent"] is True  # same answer for the app
-    assert not calls and "No SMS sent to +919123••••89: no active user has this mobile number" in caplog.text
+    assert not calls and "No code sent to +919123••••89: no active user has this mobile number" in caplog.text
 
 
 def test_send_test_sms_command_shows_the_provider_reply(monkeypatch):
@@ -180,3 +180,72 @@ def test_send_test_sms_command_shows_the_provider_reply(monkeypatch):
     assert parse_qs(calls[0].content.decode())["To"] == ["+919833012303"]
     monkeypatch.setattr(sms, "http", httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, json={"message": "Authenticate"}))))
     assert "FAILED: Twilio: Authenticate" in send_test_sms("9833012303")
+
+
+OWNER_EMAIL = "anjali@smiledental.in"  # demo: Dr. Anjali Rao (Smile Dental Studio)
+
+
+class FakeSmtp:
+    def __init__(self, fail=None):
+        self.sent, self.logins, self.fail = [], [], fail
+
+    def __call__(self):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def login(self, user, password):
+        self.logins.append(user)
+
+    def send_message(self, msg):
+        if self.fail:
+            raise self.fail
+        self.sent.append(msg)
+
+
+def test_email_code_signs_in(client, monkeypatch):
+    from app import mailer
+    out = client.post("/api/auth/otp/request", json={"email": " Anjali@SmileDental.in "}).json()
+    assert out["channel"] == "email" and out["email"] == OWNER_EMAIL and out["masked"] == "an••••@smiledental.in" and out["phone"] == ""
+    code = out["dev_code"]  # demo install without SMTP_HOST
+    assert client.post("/api/auth/otp/verify", json={"email": OWNER_EMAIL, "code": "000000" if code != "000000" else "111111"}).status_code == 400
+    v = client.post("/api/auth/otp/verify", json={"email": OWNER_EMAIL, "code": code}).json()
+    assert v["channel"] == "email" and [p["title"] for p in v["profiles"]] == ["Smile Dental Studio"]
+    signed = client.post("/api/auth/otp/select", json={"otp_token": v["otp_token"], "user_id": v["profiles"][0]["user_id"]}).json()
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {signed['access_token']}"}).json()
+    assert me["email"] == OWNER_EMAIL and me["client_name"] == "Smile Dental Studio"
+    # an email token can't open someone else's profile, and a phone code can't be verified as an email
+    other = client.post("/api/auth/otp/select", json={"otp_token": v["otp_token"], "user_id": 1})
+    assert other.status_code == 403 and "email" in other.json()["detail"]
+    # through a real mail server (faked): the code is in the subject and body, never in the API answer
+    fake = FakeSmtp()
+    monkeypatch.setattr(mailer, "smtp_factory", fake)
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "smtp_user", "noreply@example.com")
+    monkeypatch.setattr(settings, "smtp_from", "Green Media <noreply@example.com>")
+    out = client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL}).json()
+    assert "dev_code" not in out and fake.logins == ["noreply@example.com"]
+    msg = fake.sent[0]
+    code = msg["Subject"].split()[0]
+    assert msg["To"] == OWNER_EMAIL and len(code) == settings.otp_length and code in msg.get_content()
+    assert client.post("/api/auth/otp/verify", json={"email": OWNER_EMAIL, "code": code}).status_code == 200
+
+
+def test_email_unknown_failure_and_validation(client, monkeypatch, caplog):
+    import smtplib
+
+    from app import mailer
+    with caplog.at_level("WARNING", logger="greenmedia.auth"):
+        out = client.post("/api/auth/otp/request", json={"email": "nobody@example.com"}).json()
+    assert out["sent"] and "dev_code" not in out  # same answer, nothing sent
+    assert "No code sent to no••••@example.com: no active user has this email" in caplog.text
+    assert client.post("/api/auth/otp/request", json={"email": "not-an-email"}).status_code == 422
+    assert client.post("/api/auth/otp/request", json={}).status_code == 422
+    monkeypatch.setattr(mailer, "smtp_factory", FakeSmtp(fail=smtplib.SMTPAuthenticationError(535, b"Bad credentials")))
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+    r = client.post("/api/auth/otp/request", json={"email": OWNER_EMAIL})
+    assert r.status_code == 502 and r.json()["detail"].startswith("Couldn't send the email: SMTPAuthenticationError")

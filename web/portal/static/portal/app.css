@@ -335,3 +335,19 @@ a.stat.link:hover { outline: 1px solid var(--border); }
 .integrations-strip strong { font-size: 16px; }
 .list.attention li a { display: block; }
 .delta.flat { color: var(--muted); }
+
+/* Payments: plans expired or ending soon in red, active in green; the plans pop-up after signing in */
+.txt-green { color: var(--green); }
+.table tr.plan-red td { background: var(--red-bg); }
+.table tr.plan-red td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+.table tr.plan-green td:first-child { box-shadow: inset 3px 0 0 var(--green); }
+.plan-alerts li.plan-red { background: var(--red-bg); border-radius: 8px; padding: 8px 10px; }
+.plan-alerts li.plan-green { background: var(--green-bg); border-radius: 8px; padding: 8px 10px; }
+.plan-alerts { display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
+dialog.modal { border: 0; border-radius: var(--radius); padding: 20px; width: min(520px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  background: var(--surface); color: var(--text); }
+dialog.modal::backdrop { background: rgba(10, 20, 15, .45); }
+dialog.modal h2 { margin: 0 0 6px; font-size: 20px; }
+dialog.modal h3 { margin: 14px 0 6px; font-size: 14px; }
+.modal-close { position: absolute; top: 10px; right: 10px; }
+dialog.modal { position: fixed; }

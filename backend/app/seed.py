@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine
 from .models import (
-    Client, ClientContact, Competitor, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, Review, ScoreSnapshot, SearchKeyword, SocialAccount, Task, Tenant, User,
+    Client, ClientContact, Competitor, ContentItem, ContentVariant, GmbAccount, Keyword, MetricDaily, PlanPayment, Review, ScoreSnapshot, SearchKeyword, SocialAccount, Task, Tenant, User,
 )
 from .ai import PLATFORM_FORMAT
 from .config import settings
@@ -98,6 +98,27 @@ def seed_insights(db: Session, c: Client) -> None:
         db.add(ScoreSnapshot(tenant_id=c.tenant_id, client_id=c.id, date=today - timedelta(days=d), value=value))
     if c.gmb and not c.gmb.review_uri:
         c.gmb.review_uri = f"https://search.google.com/local/writereview?placeid=demo-{c.id}"
+
+
+def seed_plans(db: Session, clients: list[Client], when: date) -> None:
+    """Sample My Plan purchases so the web Payments page and log-in pop-up show every case: plans running (green),
+    one ending within days and one that has expired (red), and a failed attempt. Smile Dental and GlowUp keep no
+    plan: the app's My Plan screens start from "not activated"."""
+    from .plans import PLAN, add_months
+    cases = [  # (plan, days since it started, payment status)
+        ("pro_12", 200, "paid"), ("pro_24", 40, "paid"), ("social_monthly", 27, "paid"), ("pro_12", 377, "paid"),
+        ("social_monthly", 3, "paid"), ("pro_36", 2, "failed"),
+    ]
+    for c, (key, ago, status) in zip(clients, cases):
+        start = when - timedelta(days=ago)
+        end = add_months(start, PLAN[key]["months"]) - timedelta(days=1)
+        paid_at = datetime.combine(start, datetime.min.time(), tzinfo=timezone.utc) + timedelta(hours=11)
+        db.add(PlanPayment(tenant_id=c.tenant_id, client_id=c.id, plan_key=key, amount=PLAN[key]["amount"], list_amount=PLAN[key]["amount"],
+                           status=status, provider="demo", payment_ref=f"demo_pay_{c.id}" if status == "paid" else "",
+                           period_start=start if status == "paid" else None, period_end=end if status == "paid" else None,
+                           created_at=paid_at, paid_at=paid_at if status == "paid" else None))
+        if status == "paid":
+            c.plan_key, c.plan_until = key, end
 
 
 def seed(db: Session) -> None:
@@ -224,6 +245,7 @@ def seed(db: Session) -> None:
     glowup = db.scalar(select(Client).where(Client.company_name == "GlowUp Salon & Spa"))
     db.add(User(tenant_id=tenant.id, name="Dr. Anjali Rao", email="anjali@glowupsalon.in", password_hash=pw, role="client",
                 client_id=glowup.id, phone=DEMO_PHONES["client"]))
+    seed_plans(db, [c for c in db.scalars(select(Client).order_by(Client.id)) if c.id not in (smile.id, glowup.id)], date.today())
     db.commit()
 
 

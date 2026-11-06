@@ -17,10 +17,41 @@ from .. import plans
 from ..config import settings
 from ..db import get_db
 from ..models import Client, PlanPayment, User
-from ..security import audit, can, get_client, require_section
+from ..security import audit, can, get_client, require_section, visible_client_ids
 
 router = APIRouter(prefix="/api/clients", tags=["my plan"])
 public = APIRouter(prefix="/api/plan", tags=["my plan"])
+overview = APIRouter(prefix="/api/plan-payments", tags=["my plan"])
+
+
+@overview.get("")
+def plan_payments(status: str = "", user: User = Depends(require_section("dashboard")), db: Session = Depends(get_db)):
+    """The web dashboard's Payments page and log-in pop-up: every client's plan (expired or ending within
+    plans.EXPIRING_DAYS days flagged red, active green) and the payment history, for the clients this person may see."""
+    ids = visible_client_ids(db, user)
+    clients = {c.id: c for c in db.scalars(select(Client).where(Client.id.in_(ids)))} if ids else {}
+    order = {"expired": 0, "expiring": 1, "active": 2, "none": 3}
+    rows = []
+    for c in clients.values():
+        st = plans.status(c)
+        rows.append({"client_id": c.id, "company_name": c.company_name, "state": st["state"], "alert": plans.alert(st),
+                     "plan_name": st["plan"]["name"] if st["plan"] else "", "valid_until": st["valid_until"], "days_left": st["days_left"]})
+    rows.sort(key=lambda r: (order[r["alert"]], r["valid_until"] or "9999", r["company_name"].lower()))
+    q = select(PlanPayment).where(PlanPayment.client_id.in_(ids), PlanPayment.status != "created") if ids else None
+    if q is not None and status:
+        q = q.where(PlanPayment.status == status)
+    pays = list(db.scalars(q.order_by(PlanPayment.id.desc()).limit(500))) if q is not None else []
+    paid = [p for p in pays if p.status == "paid"]
+    month = plans.today().replace(day=1)
+    counts = {k: sum(1 for r in rows if r["alert"] == k) for k in order}
+    return {
+        "plans": rows,
+        "payments": [{**plans.payment_out(p), "client_id": p.client_id, "company_name": clients[p.client_id].company_name,
+                      "payment_ref": p.payment_ref, "test": p.provider == "razorpay" and plans.test_mode()} for p in pays],
+        "summary": {"collected": sum(p.amount for p in paid), "payments_paid": len(paid),
+                    "this_month": sum(p.amount for p in paid if p.paid_at and p.paid_at.date() >= month),
+                    **{f"plans_{k}": v for k, v in counts.items()}, "expiring_days": plans.EXPIRING_DAYS},
+    }
 GSTIN = re.compile(r"^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
 
 

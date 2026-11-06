@@ -151,3 +151,23 @@ def test_razorpay_key_names_and_test_or_live(monkeypatch):
     assert plans.test_mode() and plans.describe() == "Payments: Razorpay TEST mode (test key — no real money)"
     monkeypatch.setattr(settings, "razorpay_key_id", "rzp_live_abc")
     assert not plans.test_mode() and plans.describe() == "Payments: Razorpay LIVE (real money)"
+
+
+def test_payments_overview_for_the_web_dashboard(client, admin, portal):
+    d = client.get("/api/plan-payments", headers=admin).json()
+    alerts = [p["alert"] for p in d["plans"]]
+    # red first (expired, then ending soon), then green, then clients with no plan yet
+    assert alerts[:2] == ["expired", "expiring"] and "active" in alerts and alerts[-1] == "none"
+    assert alerts == sorted(alerts, key=["expired", "expiring", "active", "none"].index)
+    expiring = next(p for p in d["plans"] if p["alert"] == "expiring")
+    assert 0 <= expiring["days_left"] <= d["summary"]["expiring_days"] and expiring["plan_name"] == "Social Media"
+    s = d["summary"]
+    assert (s["plans_expired"], s["plans_expiring"], s["plans_active"]) == (1, 1, 3)
+    paid = [p for p in d["payments"] if p["status"] == "paid"]
+    assert s["payments_paid"] == len(paid) == 5 and s["collected"] == sum(p["amount"] for p in paid)
+    assert {p["status"] for p in d["payments"]} == {"paid", "failed"} and all(p["company_name"] for p in d["payments"])
+    assert [p["status"] for p in client.get("/api/plan-payments?status=failed", headers=admin).json()["payments"]] == ["failed"]
+    # a client-portal user sees only their own business (Smile Dental has no plan yet)
+    mine = client.get("/api/plan-payments", headers=portal).json()
+    assert [p["company_name"] for p in mine["plans"]] == ["Smile Dental Studio"] and mine["plans"][0]["alert"] == "none"
+    assert mine["payments"] == []

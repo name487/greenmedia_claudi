@@ -1,0 +1,4 @@
+{% load gm %}{% if p.alert == "expired" %}<span class="badge badge-red">Expired{% if p.valid_until %} · {{ p.valid_until|when:"long" }}{% endif %}</span>
+{% elif p.alert == "expiring" %}<span class="badge badge-red">Expires {% if p.days_left == 0 %}today{% elif p.days_left == 1 %}tomorrow{% else %}in {{ p.days_left }} days{% endif %}</span>
+{% elif p.alert == "active" %}<span class="badge badge-green">Active · until {{ p.valid_until|when:"long" }}</span>
+{% else %}<span class="badge badge-gray">No plan</span>{% endif %}

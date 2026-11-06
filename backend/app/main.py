@@ -80,6 +80,7 @@ app.include_router(google_media_router.categories_router)
 app.include_router(monthly_report_router.router)
 app.include_router(plans_router.router)
 app.include_router(plans_router.public)
+app.include_router(plans_router.overview)
 for r in (owner_settings_router.router, owner_settings_router.public, owner_settings_router.staff, owner_settings_router.legal_router):
     app.include_router(r)
 # Product photos and generated posters/videos (AI Post). Public so the app and Facebook/Instagram can fetch them.

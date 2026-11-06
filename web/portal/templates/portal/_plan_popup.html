@@ -1,0 +1,28 @@
+{% load gm %}{% with s=popup.summary %}
+<dialog class="modal" id="plan-popup" aria-labelledby="plan-popup-title">
+  <form method="dialog" class="modal-close"><button class="btn ghost sm" aria-label="Close">✕</button></form>
+  <h2 id="plan-popup-title">Plans at a glance</h2>
+  {% if me.client_id %}
+    {% for p in popup.plans %}<p class="lead">{{ p.company_name }}: {% include "portal/_plan_state.html" %}</p>{% endfor %}
+  {% else %}
+    <p class="muted">{{ s.plans_active }} active · {{ s.plans_expired }} expired · {{ s.plans_expiring }} ending within {{ s.expiring_days }} days</p>
+  {% endif %}
+  {% if s.plans_expired or s.plans_expiring %}
+    {% if not me.client_id %}<h3 class="txt-red">Needs attention</h3>{% endif %}
+    <ul class="list plan-alerts">{% for p in popup.plans %}{% if p.alert == "expired" or p.alert == "expiring" %}
+      <li class="row between plan-red"><a href="{% url 'client_detail' p.client_id %}"><strong>{{ p.company_name }}</strong></a>{% include "portal/_plan_state.html" %}</li>
+    {% endif %}{% endfor %}</ul>
+  {% endif %}
+  {% if not me.client_id and s.plans_active %}
+    <h3 class="txt-green">Active</h3>
+    <ul class="list plan-alerts">{% for p in popup.plans %}{% if p.alert == "active" %}
+      <li class="row between plan-green"><span>{{ p.company_name }}</span>{% include "portal/_plan_state.html" %}</li>
+    {% endif %}{% endfor %}</ul>
+  {% endif %}
+  <div class="btn-row" style="margin-top:14px">
+    <a class="btn" href="{% url 'payments' %}?tab=plans">Open Payments</a>
+    <form method="dialog"><button class="btn ghost">Close</button></form>
+  </div>
+</dialog>
+<script>document.getElementById('plan-popup').showModal();</script>
+{% endwith %}

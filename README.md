@@ -546,7 +546,7 @@ Hosting notes:
 ## Tests
 
 ```bash
-cd backend && pytest -q          # 196 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
+cd backend && pytest -q          # 197 tests: Preference (fields, validation, photos, progress, AI facts, poster logo and colour, hashtag modes, publish switches), Settings (QR codes and standees, profiles, delete account, refunds, legal), My Plan (billing, coupons, practice checkout, Razorpay callback / webhook / forgery), monthly Report (summary, targets, trends, insights, PDF link), Google Media (validation, one a day, approval, live media API, retry), Google Post (daily keyword posts, auto-post as a standing approval), AI Post (items, posters, viral videos, approve/schedule, video publishing), owner review replies, owner home, Meta connect from the app, business score, clients/contacts CRUD, CSV import, users/roles/login, permissions, tenant isolation, escalation, state machines, publish failures,
                                  #   and the Google flow (agency + per-client OAuth, encrypted tokens, persisted refresh, locations, review import, reply, posts, insights, revoked access, diagnostics, review fetch/edits, sample-data fallback, queue filters and bulk actions, OpenAI requests/errors/retry, brand-voice prompt, audit details,
                                  #   content statuses, AI post drafts, single-winner publishing, retries/backoff, Celery dispatch,
                                  #   Meta connect/link/publish to Facebook & Instagram, per-platform adapt + checks, calendar,
@@ -768,6 +768,12 @@ API: `GET /api/clients/{id}/monthly-report?month=YYYY-MM`, `POST /api/clients/{i
   each one with its date, period, coupon and status.
 
 **Test payments:** with Razorpay *test* keys (`rzp_test_…`) everything runs for real on Razorpay's pages, but no money moves: pay with UPI ID `success@razorpay` (or `failure@razorpay` to try a failed payment) or a test card from Razorpay's docs. The app's My Plan screen and the API's start-up log say "Razorpay TEST mode". On your own PC the webhook can't reach `localhost`; that's fine, because the app also asks Razorpay for the payment's status when you come back from the payment page. For a phone, `PUBLIC_BASE_URL` must be an address the phone can open (not `127.0.0.1`).
+
+**In the web app**, the **Payments** page (sidebar) has two tabs:
+- **Payment history:** every My Plan payment, with date, client, plan, amount (and coupon), status, plan period and Razorpay reference, filterable by status. Above it: total collected, this month, active plans, and plans expired or ending soon.
+- **Client plans:** every client's plan. Expired plans and plans ending within 7 days are highlighted in **red**, active plans in **green**, and clients without a plan are grey.
+
+Right after signing in, the dashboard shows a **Plans at a glance** pop-up: what needs attention (red) and what's active (green), with a link to Payments. A client-portal user sees only their own business. API: `GET /api/plan-payments[?status=paid|failed|expired]`. The demo data includes sample plans (active, ending in a few days, expired) and payments.
 
 **Payment** goes through **Razorpay Payment Links**: the app opens Razorpay's hosted page, so the app needs no payment
 SDK. A plan becomes active only when Razorpay confirms the payment, through any of these:

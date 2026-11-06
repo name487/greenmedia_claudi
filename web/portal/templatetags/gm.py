@@ -33,6 +33,7 @@ ICONS = {
     "menu": "M4 7h16M4 12h16M4 17h16",
     "sparkle": "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z",
     "back": "M15 18l-6-6 6-6",
+    "card": "M3 6h18v12H3zM3 10h18M7 15h4",
 }
 
 PLATFORMS = {"gmb": "Google Business", "facebook": "Facebook", "instagram": "Instagram", "linkedin": "LinkedIn", "youtube": "YouTube", "x": "X"}
@@ -44,6 +45,20 @@ def icon(name, size=20):
         '<svg width="{}" height="{}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{}"/></svg>',
         size, size, ICONS.get(name, ""),
     )
+
+
+@register.filter
+def inr(paise):
+    """Paise → "₹16,000" (Indian digit grouping)."""
+    if paise in (None, ""):
+        return "—"
+    rupees = int(paise) // 100
+    s = str(rupees)
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        head = ",".join([head[max(i - 2, 0):i] for i in range(len(head), 0, -2)][::-1])
+        s = f"{head},{tail}"
+    return f"₹{s}"
 
 
 @register.filter
